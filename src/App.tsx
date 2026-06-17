@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import './App.css'
+import './proof.css'
 
 type Stage = {
   id: string
@@ -146,6 +147,42 @@ const stages: Stage[] = [
 
 const agentStates = ['PRIME', 'SCOUT', 'GROWTH', 'OPS', 'RAILS', 'LEDGER']
 
+const sponsorStack = [
+  {
+    sponsor: 'Nous Research',
+    lane: 'ORCHESTRATION',
+    primitive: 'Hermes Agent skills + tool calls',
+    proof: '6 agents delegated · 5 skills executed · replayable operator log',
+    value: 'Shows Hermes as the business-ops operating system, not a chatbot wrapper.',
+  },
+  {
+    sponsor: 'Stripe',
+    lane: 'COMMERCE RAIL',
+    primitive: 'Spend warrant + checkout session + attribution',
+    proof: '$250 cap · $117 staged spend · $49/mo test checkout · live locked',
+    value: 'Positions Stripe as the financial control plane for agentic companies.',
+  },
+  {
+    sponsor: 'NVIDIA',
+    lane: 'RUNTIME',
+    primitive: 'Accelerated inference + policy checks + workload trace',
+    proof: 'research scoring · asset generation · ROI policy · scale path to GPU runtime',
+    value: 'Frames NVIDIA as governed runtime infrastructure for real commercial agents.',
+  },
+]
+
+function downloadFile(filename: string, content: string, mimeType: string) {
+  const blob = new Blob([content], { type: mimeType })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
 function App() {
   const [objective, setObjective] = useState('Get 10 qualified paid-pilot conversations for a Hermes-powered agent ops product under a $250 cap. Require approval before spend.')
   const [stageIndex, setStageIndex] = useState(0)
@@ -160,6 +197,96 @@ function App() {
     if (railOpen) base.push('[01:18] RAIL RECEIPT opened — Stripe test mode verified')
     return base
   }, [stageIndex, approved, railOpen])
+
+  const proofPacket = useMemo(() => ({
+    packet_id: 'rf_demo_001',
+    standard: 'Commercial Autonomy Proof v0.1',
+    product: 'Agentic Revenue Operator / Revenue Forge',
+    thesis: 'Hermes orchestrates, NVIDIA accelerates, Stripe settles, and Revenue Forge proves every dollar and decision.',
+    mission: {
+      objective,
+      budget_cap_usd: 250,
+      staged_spend_usd: 117,
+      live_charges_enabled: false,
+      operator_approval_required: true,
+      current_stage: current.section,
+      verdict: stageIndex === stages.length - 1 ? 'HOLD_TO_SCALE' : 'FORGING',
+    },
+    sponsor_stack: sponsorStack.map((sponsor) => ({
+      sponsor: sponsor.sponsor,
+      lane: sponsor.lane,
+      primitive: sponsor.primitive,
+      proof: sponsor.proof,
+    })),
+    events: [
+      {
+        type: 'mission.created',
+        agent: 'PRIME',
+        framework: 'Hermes Agent',
+        runtime: 'NVIDIA-accelerated inference ready',
+        payment_rail: 'Stripe test mode',
+        result: 'Commercial objective converted into governed revenue mission',
+      },
+      {
+        type: 'market.scored',
+        agent: 'SCOUT',
+        framework: 'Hermes Agent skill execution',
+        runtime: 'Accelerated scoring workload',
+        result: '128 accounts scored, 31 qualified, fit score 82',
+      },
+      {
+        type: 'spend.warrant.requested',
+        agent: 'OPS',
+        policy: 'budget_cap_usd <= 250 && human_approval_required',
+        result: '$117 staged spend blocked until operator signature',
+      },
+      {
+        type: approved ? 'operator.approval.signed' : 'operator.approval.pending',
+        agent: 'OPERATOR',
+        result: approved ? 'Spend warrant signed; cap still enforced' : 'No chargeable action has authority',
+      },
+      {
+        type: 'stripe.checkout.created',
+        agent: 'RAILS',
+        payment_rail: 'Stripe',
+        mode: 'test',
+        checkout_session: 'cs_test_revops_72h',
+        product: 'Agent Ops Revenue Audit',
+        price: '$49/mo',
+        live_charges_enabled: false,
+      },
+      {
+        type: 'ledger.verdict.issued',
+        agent: 'LEDGER',
+        projected_cac_usd: 38,
+        break_even_sales: 1,
+        verdict: 'Hold paid spend until 3 qualified replies, then scale if CAC < $60',
+      },
+    ],
+    ledger: ledgerLines,
+  }), [approved, current.section, ledgerLines, objective, stageIndex])
+
+  const proofMarkdown = useMemo(() => [
+    '# Revenue Forge Proof Packet',
+    '',
+    `**Standard:** ${proofPacket.standard}`,
+    `**Mission:** ${proofPacket.mission.objective}`,
+    `**Budget cap:** $${proofPacket.mission.budget_cap_usd}`,
+    `**Live charges enabled:** ${proofPacket.mission.live_charges_enabled ? 'yes' : 'no'}`,
+    `**Verdict:** ${proofPacket.mission.verdict}`,
+    '',
+    '## Sponsor Stack',
+    ...proofPacket.sponsor_stack.map((item) => `- **${item.sponsor} / ${item.lane}:** ${item.primitive} — ${item.proof}`),
+    '',
+    '## Proof Events',
+    ...proofPacket.events.map((event) => `- \`${event.type}\` — ${event.agent}: ${'result' in event ? event.result : ''}`),
+    '',
+    '## Ledger',
+    ...proofPacket.ledger.map((line) => `- ${line}`),
+  ].join('\n'), [proofPacket])
+
+  const exportJson = () => downloadFile('RevenueForge_ProofPacket_demo.json', JSON.stringify(proofPacket, null, 2), 'application/json')
+  const exportMarkdown = () => downloadFile('RevenueForge_ProofPacket_demo.md', proofMarkdown, 'text/markdown')
 
   const nextStage = () => setStageIndex((index) => Math.min(stages.length - 1, index + 1))
   const reset = () => {
@@ -251,7 +378,7 @@ function App() {
 
         <aside className="controls-rail machine-panel">
           <div className="panel-kicker">Controls / consequences</div>
-          <div className="budget-gauge" style={{ '--progress': `${progress}%` } as React.CSSProperties}>
+          <div className="budget-gauge" style={{ '--progress': `${progress}%` } as CSSProperties}>
             <span>Budget authority</span>
             <strong>{approved ? '$117 armed' : '$0 armed'}</strong>
             <div className="gauge-track"><i /></div>
@@ -276,6 +403,40 @@ function App() {
         <button className="secondary" onClick={() => setApproved(true)}>Arm $117 spend</button>
         <button className="ghost" onClick={reset}>Reset machine</button>
         <div className="verdict-dial"><span>Verdict</span><strong>{stageIndex === stages.length - 1 ? 'HOLD → SCALE' : 'FORGING'}</strong></div>
+      </section>
+
+      <section className="proof-ledger machine-panel">
+        <div className="proof-header">
+          <div>
+            <span className="panel-kicker">Sponsor-native proof layer</span>
+            <h2>Commercial Autonomy Proof Ledger</h2>
+            <p>Hermes orchestrates, NVIDIA accelerates, Stripe settles, and Revenue Forge proves every dollar and decision.</p>
+          </div>
+          <div className="proof-actions">
+            <button onClick={exportJson}>Export JSON</button>
+            <button className="ghost" onClick={exportMarkdown}>Export MD</button>
+          </div>
+        </div>
+        <div className="sponsor-grid">
+          {sponsorStack.map((sponsor) => (
+            <article className="sponsor-card" key={sponsor.sponsor}>
+              <span>{sponsor.lane}</span>
+              <strong>{sponsor.sponsor}</strong>
+              <p>{sponsor.primitive}</p>
+              <em>{sponsor.proof}</em>
+              <small>{sponsor.value}</small>
+            </article>
+          ))}
+        </div>
+        <div className="proof-chain">
+          {proofPacket.events.map((event, index) => (
+            <div className="proof-event" key={event.type}>
+              <b>{String(index + 1).padStart(2, '0')}</b>
+              <span>{event.type}</span>
+              <strong>{event.agent}</strong>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="ledger-ticker">

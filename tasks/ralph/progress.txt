@@ -16,3 +16,9 @@
 - Added MOAT.md and UX_DIRECTION_REVENUE_FORGE.md.
 - Rebuilt UI around Revenue Forge: Agent Circuit, Revenue Packet, Spend Warrant, Rail Receipt, Living Ledger, Verdict Dial.
 - Verified build and browser interactions; rail receipt modal opens after signed warrant.
+
+## 2026-06-16 sponsor proof ledger
+- Added Commercial Autonomy Proof Ledger: Nous/Hermes orchestration, Stripe commerce rail, NVIDIA runtime lanes.
+- Added exportable proof packet buttons for JSON and Markdown.
+- Added COMMERCIAL_AUTONOMY_PROOF.md to define event schema and sponsor value.
+- Verified `npm run build`, browser rendering, export button click, and console with zero JS errors.
