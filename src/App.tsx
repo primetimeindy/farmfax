@@ -1,250 +1,307 @@
 import { useMemo, useState } from 'react'
 import './App.css'
-import './modal.css'
 
 type Stage = {
   id: string
   agent: string
+  agentRole: string
+  section: string
   title: string
   headline: string
   detail: string
-  metrics: { label: string; value: string; tone?: 'good' | 'warn' | 'hot' }[]
-  outputs: string[]
-  audit: string
+  kind: 'SIGNAL' | 'COPY PLATE' | 'WARRANT' | 'RAIL' | 'VERDICT' | 'BRIEF'
+  metrics: { label: string; value: string; tone?: 'good' | 'warn' | 'danger' | 'stripe' }[]
+  slips: { label: string; text: string }[]
+  ledger: string
 }
 
 const stages: Stage[] = [
   {
     id: 'brief',
     agent: 'PRIME',
-    title: 'Mission brief',
-    headline: 'Objective decomposed into a revenue workflow.',
-    detail: 'Turn one founder request into an executable GTM sprint: pick ICP, source prospects, generate assets, approve spend, publish a Stripe-backed offer, and report ROI.',
+    agentRole: 'decomposes objective',
+    section: '01 BRIEF',
+    kind: 'BRIEF',
+    title: 'Objective decomposition stamped',
+    headline: 'The founder goal becomes a governed revenue mission.',
+    detail: 'PRIME turns the raw commercial objective into constraints, approval rules, and measurable success criteria. This is not a chat session. It is an operating warrant.',
     metrics: [
-      { label: 'Budget cap', value: '$250', tone: 'warn' },
+      { label: 'Hard cap', value: '$250', tone: 'warn' },
       { label: 'Approval gates', value: '3', tone: 'good' },
       { label: 'Target window', value: '72h' },
     ],
-    outputs: ['ICP: AI/devtools founders with 5–50 employees', 'Offer: $49/mo agent ops audit', 'Primary channel: founder-led LinkedIn + niche communities'],
-    audit: 'Mission accepted. No spend authorized until operator approval.',
+    slips: [
+      { label: 'MISSION', text: 'Generate qualified leads for a Hermes-powered agent ops product.' },
+      { label: 'CONSTRAINT', text: 'No chargeable action may run without signed operator authority.' },
+      { label: 'SUCCESS', text: 'Prove a path to 1 paid audit before scaling spend.' },
+    ],
+    ledger: 'PRIME stamped mission constraints — zero spend authority granted',
   },
   {
-    id: 'research',
+    id: 'market',
     agent: 'SCOUT',
-    title: 'ICP + opportunity scan',
-    headline: 'Scout found high-intent segments with pain now.',
-    detail: 'The operator scores niches by urgency, ability to pay, reachable channels, and demo clarity. Generic lead lists are rejected.',
+    agentRole: 'scores reachable demand',
+    section: '02 MARKET',
+    kind: 'SIGNAL',
+    title: 'Market signal forged',
+    headline: 'SCOUT found a reachable wedge with pain now.',
+    detail: 'Instead of scraping a lead list, the agent scores demand by urgency, buying trigger, channel reachability, and ability to pay.',
     metrics: [
       { label: 'Accounts scored', value: '128' },
-      { label: 'Qualified leads', value: '31', tone: 'good' },
-      { label: 'Avg fit score', value: '82/100', tone: 'good' },
+      { label: 'Qualified', value: '31', tone: 'good' },
+      { label: 'Fit score', value: '82', tone: 'good' },
     ],
-    outputs: ['Top segment: seed-stage AI infra teams shipping agent products', 'Buying trigger: demos need payment/provisioning rails', 'Objection: security + runaway spend risk'],
-    audit: 'Read-only research completed. Source URLs and scoring weights logged.',
+    slips: [
+      { label: 'ICP', text: 'Seed-stage AI infra teams shipping agent products.' },
+      { label: 'TRIGGER', text: 'Their agents need spending/provisioning rails without runaway risk.' },
+      { label: 'OBJECTION', text: 'Security, auditability, and proving ROI before budget expansion.' },
+    ],
+    ledger: 'SCOUT retained sources and scoring weights — 31 accounts passed threshold',
   },
   {
     id: 'assets',
     agent: 'GROWTH',
-    title: 'Campaign asset generator',
-    headline: 'Growth produced a testable wedge and outreach package.',
-    detail: 'The copy is tied to the judge/customer pain: agents should operate under budget, payment, and audit controls.',
+    agentRole: 'forges offer assets',
+    section: '03 ASSETS',
+    kind: 'COPY PLATE',
+    title: 'Copy plate forged',
+    headline: 'The offer is built around controlled autonomy, not AI novelty.',
+    detail: 'GROWTH produces a wedge, CTA, and outreach packet designed to test willingness to pay quickly.',
     metrics: [
       { label: 'Landing variants', value: '3' },
       { label: 'Outbound snippets', value: '9' },
       { label: 'CTA clarity', value: 'A-', tone: 'good' },
     ],
-    outputs: ['CTA: “Get a 10-minute Agent Ops Revenue Audit”', 'Subject: Your agent can spend. Can it prove ROI?', 'Landing hero: Budgeted agents that turn workflows into revenue'],
-    audit: 'Creative generated. No messages sent before operator approval.',
+    slips: [
+      { label: 'CTA', text: 'Get a 10-minute Agent Ops Revenue Audit.' },
+      { label: 'SUBJECT', text: 'Your agent can spend. Can it prove ROI?' },
+      { label: 'HERO', text: 'Budgeted agents that turn workflows into revenue.' },
+    ],
+    ledger: 'GROWTH forged assets — no messages sent before approval',
   },
   {
     id: 'spend',
     agent: 'OPS',
-    title: 'Budgeted spend gate',
-    headline: 'Ops built the spend plan but held execution at the approval gate.',
-    detail: 'The agent can buy enrichment, provision SaaS, or boost a test — but every paid action is capped, justified, and reversible.',
+    agentRole: 'prices reversible actions',
+    section: '04 SPEND WARRANT',
+    kind: 'WARRANT',
+    title: 'Spend warrant blocked',
+    headline: 'The machine stops where money starts.',
+    detail: 'OPS stages chargeable actions behind a physical approval gate. The product moat is safe execution: budget cap, kill switch, and logged authority.',
     metrics: [
-      { label: 'Enrichment', value: '$42' },
-      { label: 'Micro-boost', value: '$75' },
-      { label: 'Remaining cap', value: '$133', tone: 'warn' },
+      { label: 'Lead enrichment', value: '$42', tone: 'warn' },
+      { label: 'Micro-boost', value: '$75', tone: 'warn' },
+      { label: 'Remaining cap', value: '$133', tone: 'good' },
     ],
-    outputs: ['Approve: enrich 31 leads @ <$1.50 each', 'Approve: reserve $75 for highest-performing asset', 'Reject: $500 cold ad test — exceeds sprint cap'],
-    audit: 'Spend plan staged. Requires FINAL APPROVE before chargeable actions.',
+    slips: [
+      { label: 'APPROVE', text: 'Enrich 31 leads only if cost remains under $1.50/account.' },
+      { label: 'HOLD', text: 'Reserve $75 boost until first 3 human replies arrive.' },
+      { label: 'REJECT', text: '$500 cold ad test exceeds sprint cap and is refused.' },
+    ],
+    ledger: 'OPS requested $117 warrant — chargeable actions physically blocked',
   },
   {
-    id: 'stripe',
+    id: 'rail',
     agent: 'RAILS',
-    title: 'Stripe monetization rail',
-    headline: 'Rails provisioned a test-mode offer and checkout path.',
-    detail: 'The demo shows the business loop: a generated offer can accept payment, route a customer to onboarding, and update the operator report.',
+    agentRole: 'opens test checkout',
+    section: '05 PAYMENT RAIL',
+    kind: 'RAIL',
+    title: 'Payment rail opened',
+    headline: 'The revenue path is provisioned before demand is scaled.',
+    detail: 'RAILS creates the monetization surface: a Stripe test product, recurring price, and checkout receipt that can attribute revenue back to the experiment.',
     metrics: [
-      { label: 'Price', value: '$49/mo', tone: 'hot' },
+      { label: 'Price', value: '$49/mo', tone: 'stripe' },
       { label: 'Mode', value: 'test' },
-      { label: 'Checkout', value: 'ready', tone: 'good' },
+      { label: 'Live charges', value: 'locked', tone: 'danger' },
     ],
-    outputs: ['Product: Agent Ops Revenue Audit', 'Price: monthly recurring $49', 'Checkout URL: stripe.test/agent-ops-audit'],
-    audit: 'Stripe test rail created. Live mode disabled until legal/billing checklist passes.',
+    slips: [
+      { label: 'PRODUCT', text: 'Agent Ops Revenue Audit.' },
+      { label: 'CHECKOUT', text: 'cs_test_revops_72h staged for demo attribution.' },
+      { label: 'SAFETY', text: 'Live mode disabled until legal, billing, and operator gates pass.' },
+    ],
+    ledger: 'RAILS opened Stripe test rail — live charging remains disabled',
   },
   {
     id: 'ledger',
     agent: 'LEDGER',
-    title: 'ROI + control report',
-    headline: 'Ledger converts activity into a decision, not a vibe.',
-    detail: 'The operator sees spend, expected pipeline, risks, next actions, and a complete audit trail for every autonomous step.',
+    agentRole: 'issues verdict',
+    section: '06 ROI LEDGER',
+    kind: 'VERDICT',
+    title: 'ROI verdict sealed',
+    headline: 'The agent recommends a commercial decision, not a vibe.',
+    detail: 'LEDGER compresses the experiment into a scale/hold/kill decision with expected CAC, break-even logic, and stop-loss thresholds.',
     metrics: [
       { label: 'Projected CAC', value: '$38', tone: 'good' },
       { label: 'Break-even', value: '1 sale' },
-      { label: 'Expected ROI', value: '2.7x', tone: 'hot' },
+      { label: 'Verdict', value: 'HOLD→SCALE', tone: 'good' },
     ],
-    outputs: ['Next action: approve enrichment only, hold ads until 3 replies', 'Risk: low sample size; cap follow-up to 48h', 'Kill switch: pause if reply rate <4% after 50 sends'],
-    audit: 'Sprint ready for operator decision. All spend remains inside cap.',
+    slips: [
+      { label: 'NEXT', text: 'Approve enrichment only. Hold ads until 3 qualified replies.' },
+      { label: 'STOP', text: 'Pause if reply rate is below 4% after 50 sends.' },
+      { label: 'SCALE', text: 'Expand to $750 only if CAC stays under $60.' },
+    ],
+    ledger: 'LEDGER issued HOLD→SCALE verdict — every action replayable',
   },
 ]
 
-const agents = [
-  { name: 'PRIME', role: 'strategy', status: 'orchestrating' },
-  { name: 'SCOUT', role: 'market intel', status: 'complete' },
-  { name: 'GROWTH', role: 'assets', status: 'armed' },
-  { name: 'OPS', role: 'spend guard', status: 'waiting approval' },
-  { name: 'RAILS', role: 'Stripe/x402', status: 'test-ready' },
-  { name: 'LEDGER', role: 'ROI audit', status: 'monitoring' },
-]
+const agentStates = ['PRIME', 'SCOUT', 'GROWTH', 'OPS', 'RAILS', 'LEDGER']
 
 function App() {
-  const [objective, setObjective] = useState('Generate qualified leads for a Hermes-powered agent ops product, spend under $250, and prove ROI before scaling.')
+  const [objective, setObjective] = useState('Get 10 qualified paid-pilot conversations for a Hermes-powered agent ops product under a $250 cap. Require approval before spend.')
   const [stageIndex, setStageIndex] = useState(0)
   const [approved, setApproved] = useState(false)
-  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [railOpen, setRailOpen] = useState(false)
   const current = stages[stageIndex]
-  const completed = useMemo(() => Math.round(((stageIndex + 1) / stages.length) * 100), [stageIndex])
-  const auditTrail = stages.slice(0, stageIndex + 1).map((stage) => `${stage.agent}: ${stage.audit}`)
 
-  const runNext = () => setStageIndex((idx) => Math.min(idx + 1, stages.length - 1))
+  const progress = Math.round(((stageIndex + 1) / stages.length) * 100)
+  const ledgerLines = useMemo(() => {
+    const base = stages.slice(0, stageIndex + 1).map((stage, index) => `[00:${String(12 + index * 11).padStart(2, '0')}] ${stage.ledger}`)
+    if (approved) base.push('[01:05] OPERATOR signed spend warrant — cap enforced at $250')
+    if (railOpen) base.push('[01:18] RAIL RECEIPT opened — Stripe test mode verified')
+    return base
+  }, [stageIndex, approved, railOpen])
+
+  const nextStage = () => setStageIndex((index) => Math.min(stages.length - 1, index + 1))
   const reset = () => {
     setStageIndex(0)
     setApproved(false)
-    setCheckoutOpen(false)
+    setRailOpen(false)
   }
 
   return (
-    <main className="shell">
-      <section className="hero-panel">
-        <div className="hero-copy">
-          <div className="eyebrow">Hermes Agent × NVIDIA × Stripe hackathon concept</div>
-          <h1>Agentic Revenue Operator</h1>
-          <p className="lede">A supervised business agent that researches a market, spends inside a hard budget, provisions monetization, and reports ROI — with approval gates instead of runaway autonomy.</p>
-          <div className="hero-actions">
-            <button onClick={runNext} disabled={stageIndex === stages.length - 1}>Run next agent</button>
-            <button className="secondary" onClick={() => setApproved(true)}>FINAL APPROVE staged spend</button>
-            <button className="ghost" onClick={reset}>Reset demo</button>
+    <main className="forge-shell">
+      <section className="forge-hero">
+        <div className="system-mark">
+          <span className="mark-dot" />
+          HERMES / NVIDIA / STRIPE HACKATHON BUILD
+        </div>
+        <div className="hero-grid">
+          <div>
+            <h1>Revenue Forge Online</h1>
+            <p className="hero-line">A supervised agentic machine that finds the market, forges the offer, requests spend authority, opens the payment rail, and stamps every move into an ROI ledger.</p>
           </div>
-        </div>
-        <div className="mission-card">
-          <span className="pulse" />
-          <label>Operator objective</label>
-          <textarea value={objective} onChange={(event) => setObjective(event.target.value)} />
-          <div className="guardrail-grid">
-            <div><strong>$250</strong><span>hard budget cap</span></div>
-            <div><strong>0</strong><span>live charges without approval</span></div>
-            <div><strong>100%</strong><span>audited actions</span></div>
-          </div>
-        </div>
-      </section>
-
-      <section className="status-strip">
-        <div>
-          <span className="muted">Workflow progress</span>
-          <strong>{completed}%</strong>
-        </div>
-        <div className="progress"><span style={{ width: `${completed}%` }} /></div>
-        <div className={approved ? 'approval approved' : 'approval'}>{approved ? 'Spend gate approved' : 'Spend gate locked'}</div>
-      </section>
-
-      <section className="grid">
-        <aside className="panel agents-panel">
-          <h2>Agent swarm</h2>
-          {agents.map((agent) => (
-            <div className="agent" key={agent.name}>
-              <div className="avatar">{agent.name.slice(0, 1)}</div>
-              <div>
-                <strong>{agent.name}</strong>
-                <span>{agent.role}</span>
-              </div>
-              <em>{agent.status}</em>
+          <div className="mission-block">
+            <label>Loaded objective</label>
+            <textarea value={objective} onChange={(event) => setObjective(event.target.value)} />
+            <div className="mission-metrics">
+              <span><b>$250</b> cap</span>
+              <span><b>0</b> live charges</span>
+              <span><b>100%</b> replayable</span>
             </div>
-          ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="machine-grid">
+        <aside className="agent-circuit machine-panel">
+          <div className="panel-kicker">Agent circuit</div>
+          {agentStates.map((agent, index) => {
+            const stage = stages[index]
+            const state = index < stageIndex ? 'stamped' : index === stageIndex ? (agent === 'OPS' && !approved ? 'approval' : 'working') : 'idle'
+            return (
+              <div className={`circuit-node ${state}`} key={agent}>
+                <div className="node-core">{agent.slice(0, 1)}</div>
+                <div className="node-copy">
+                  <strong>{agent}</strong>
+                  <span>{stage.agentRole}</span>
+                </div>
+                <em>{state}</em>
+              </div>
+            )
+          })}
         </aside>
 
-        <section className="panel main-stage">
-          <div className="stage-topline">
-            <span>{current.agent}</span>
-            <span>{stageIndex + 1}/{stages.length}</span>
+        <section className="forge-bay machine-panel">
+          <div className="packet-topbar">
+            <span>{current.section}</span>
+            <span>{progress}% forged</span>
           </div>
-          <h2>{current.title}</h2>
-          <h3>{current.headline}</h3>
-          <p>{current.detail}</p>
-
-          <div className="metrics">
-            {current.metrics.map((metric) => (
-              <div className={`metric ${metric.tone ?? ''}`} key={metric.label}>
-                <span>{metric.label}</span>
-                <strong>{metric.value}</strong>
+          <div className="packet-shell">
+            <div className="packet-spine">
+              {stages.map((stage, index) => (
+                <button key={stage.id} className={index === stageIndex ? 'active' : index < stageIndex ? 'done' : ''} onClick={() => setStageIndex(index)}>
+                  {stage.section.split(' ')[0]}
+                </button>
+              ))}
+            </div>
+            <article className={`artifact-plate ${current.kind.toLowerCase().replace(' ', '-')}`}>
+              <div className="artifact-kind">{current.kind}</div>
+              <h2>{current.title}</h2>
+              <h3>{current.headline}</h3>
+              <p>{current.detail}</p>
+              <div className="instrument-row">
+                {current.metrics.map((metric) => (
+                  <div className={`instrument ${metric.tone ?? ''}`} key={metric.label}>
+                    <span>{metric.label}</span>
+                    <strong>{metric.value}</strong>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-
-          <div className="outputs">
-            <h4>Generated outputs</h4>
-            {current.outputs.map((output) => <p key={output}>↳ {output}</p>)}
+              <div className="evidence-stack">
+                {current.slips.map((slip) => (
+                  <div className="evidence-slip" key={slip.label}>
+                    <span>{slip.label}</span>
+                    <p>{slip.text}</p>
+                  </div>
+                ))}
+              </div>
+            </article>
           </div>
         </section>
 
-        <aside className="panel rail-panel">
-          <h2>Revenue rail</h2>
-          <div className="checkout-card">
-            <span>Stripe test offer</span>
-            <strong>Agent Ops Revenue Audit</strong>
-            <p>$49 / month · recurring</p>
-            <button className="checkout" onClick={() => setCheckoutOpen(true)}>Open test checkout</button>
+        <aside className="controls-rail machine-panel">
+          <div className="panel-kicker">Controls / consequences</div>
+          <div className="budget-gauge" style={{ '--progress': `${progress}%` } as React.CSSProperties}>
+            <span>Budget authority</span>
+            <strong>{approved ? '$117 armed' : '$0 armed'}</strong>
+            <div className="gauge-track"><i /></div>
+            <p>Hard cap remains $250. Agent cannot exceed warrant.</p>
           </div>
-          <div className="risk-box">
-            <h4>Autonomy constraints</h4>
-            <p>Budget cap: $250</p>
-            <p>Paid action: approval required</p>
-            <p>Kill switch: reply rate &lt;4%</p>
-            <p>Live mode: disabled</p>
+          <div className={`warrant ${approved ? 'signed' : 'locked'}`}>
+            <span>{approved ? 'SIGNED WARRANT' : 'LOCKED WARRANT'}</span>
+            <strong>{approved ? 'Operator authority recorded' : 'Chargeable actions blocked'}</strong>
+            <button onClick={() => setApproved(true)}>{approved ? 'Warrant signed' : 'Sign spend warrant'}</button>
+          </div>
+          <div className="rail-receipt">
+            <span>PAYMENT RAIL / TEST MODE</span>
+            <strong>Agent Ops Revenue Audit</strong>
+            <p>$49/mo · cs_test_revops_72h</p>
+            <button onClick={() => setRailOpen(true)}>Raise rail receipt</button>
           </div>
         </aside>
       </section>
 
-      <section className="panel audit-panel">
-        <div>
-          <h2>Ledger audit trail</h2>
-          <p>Every agent action becomes operator-readable evidence.</p>
-        </div>
-        <ol>
-          {auditTrail.map((item) => <li key={item}>{item}</li>)}
-        </ol>
+      <section className="operator-bar machine-panel">
+        <button onClick={nextStage} disabled={stageIndex === stages.length - 1}>Forge next artifact</button>
+        <button className="secondary" onClick={() => setApproved(true)}>Arm $117 spend</button>
+        <button className="ghost" onClick={reset}>Reset machine</button>
+        <div className="verdict-dial"><span>Verdict</span><strong>{stageIndex === stages.length - 1 ? 'HOLD → SCALE' : 'FORGING'}</strong></div>
       </section>
 
-      {checkoutOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Stripe test checkout preview">
-          <div className="stripe-modal">
+      <section className="ledger-ticker">
+        <div className="ticker-label">Living Ledger</div>
+        <div className="ticker-lines">
+          {ledgerLines.map((line) => <span key={line}>{line}</span>)}
+        </div>
+      </section>
+
+      {railOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Stripe rail receipt">
+          <div className="rail-modal">
             <div className="modal-topline">
-              <span>Stripe test checkout</span>
-              <button className="ghost small" onClick={() => setCheckoutOpen(false)}>Close</button>
+              <span>PAYMENT RAIL / STRIPE TEST</span>
+              <button className="ghost mini" onClick={() => setRailOpen(false)}>Close</button>
             </div>
-            <div className="stripe-brand">stripe</div>
+            <div className="stripe-word">stripe</div>
             <h2>Agent Ops Revenue Audit</h2>
-            <p>Recurring offer generated by RAILS for the current GTM sprint.</p>
-            <div className="invoice-lines">
-              <div><span>Monthly subscription</span><strong>$49.00</strong></div>
+            <p>Recurring offer generated by RAILS and bound to the current revenue mission.</p>
+            <div className="receipt-lines">
+              <div><span>Product</span><strong>Agent Ops Revenue Audit</strong></div>
+              <div><span>Price</span><strong>$49.00 / month</strong></div>
               <div><span>Mode</span><strong>test</strong></div>
-              <div><span>Session</span><strong>cs_test_revops_72h</strong></div>
+              <div><span>Checkout</span><strong>cs_test_revops_72h</strong></div>
             </div>
-            <div className="modal-decision">
-              <strong>{approved ? 'Operator approval recorded' : 'Live charging locked'}</strong>
-              <span>{approved ? 'Safe to route demo customers through test checkout.' : 'Approve spend before any real provisioning or paid action.'}</span>
-            </div>
+            <div className="modal-lock">{approved ? 'Spend warrant signed. Live charging still disabled for demo safety.' : 'Live charging locked. Sign the spend warrant before provisioning paid actions.'}</div>
           </div>
         </div>
       )}

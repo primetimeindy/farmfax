@@ -10,3 +10,9 @@
 - Implemented six-stage GTM workflow: brief, research, assets, spend, Stripe rail, ledger.
 - Added budget guardrails, approval gate, Stripe-style test checkout modal, and expanding audit trail.
 - Verified with `npm run build` successfully.
+
+## 2026-06-16 moat + Revenue Forge design pass
+- Reframed moat as closed-loop revenue execution: Revenue Graph + Policy Engine + Audit Ledger.
+- Added MOAT.md and UX_DIRECTION_REVENUE_FORGE.md.
+- Rebuilt UI around Revenue Forge: Agent Circuit, Revenue Packet, Spend Warrant, Rail Receipt, Living Ledger, Verdict Dial.
+- Verified build and browser interactions; rail receipt modal opens after signed warrant.
