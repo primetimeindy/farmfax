@@ -1,26 +1,26 @@
 {
   "project": "Agentic Revenue Operator",
   "branchName": "hackathon/agentic-revenue-operator",
-  "description": "Hermes hackathon demo: supervised GTM agent that researches, spends, provisions monetization, and reports ROI.",
+  "description": "Hermes hackathon demo: Revenue Forge proves governed agentic commerce with sponsor-native proof packets.",
   "qualityChecks": ["npm run build"],
   "userStories": [
     {
       "id": "US-001",
-      "title": "Hackathon command center landing UI",
-      "description": "As a judge, I need to immediately understand that this is a serious operator-grade revenue agent, not a chatbot.",
-      "acceptanceCriteria": ["Hero clearly states earn/spend/run operations", "UI has mission control feel", "Agent roster and guardrails visible"],
+      "title": "Revenue Forge command center UI",
+      "description": "As a judge, I need to immediately understand that this is a governed revenue machine, not a chatbot.",
+      "acceptanceCriteria": ["Hero clearly states revenue forge concept", "Agent Circuit and Revenue Packet visible", "Spend Warrant and Rail Receipt visible"],
       "priority": 1,
       "passes": true,
-      "notes": "Hero, agent swarm, mission objective, guardrails, and revenue rail implemented."
+      "notes": "Revenue Forge UI implemented."
     },
     {
       "id": "US-002",
-      "title": "Interactive GTM workflow simulator",
+      "title": "Interactive forged revenue workflow",
       "description": "As an operator, I can step through the revenue workflow from objective to report.",
-      "acceptanceCriteria": ["At least 5 stages", "Each stage shows agent output", "Progress and audit log update"],
+      "acceptanceCriteria": ["At least 6 stages", "Each stage shows agent output", "Progress and living ledger update"],
       "priority": 2,
       "passes": true,
-      "notes": "Six stages implemented with progress bar and expanding audit trail."
+      "notes": "Six stages implemented with proof-like slips and ledger."
     },
     {
       "id": "US-003",
@@ -29,7 +29,25 @@
       "acceptanceCriteria": ["Budget cap visible", "Approval gate visible", "Stripe test checkout/offer visible", "Projected ROI visible"],
       "priority": 3,
       "passes": true,
-      "notes": "Spend gate, approval state, Stripe-style checkout modal, and ROI metrics implemented."
+      "notes": "Spend Warrant and Rail Receipt implemented."
+    },
+    {
+      "id": "US-004",
+      "title": "Typed proof packet module",
+      "description": "As a builder, I need the Commercial Autonomy Proof packet to be a reusable typed artifact rather than inline component data.",
+      "acceptanceCriteria": ["Proof packet builder lives outside App.tsx", "Export JSON and Markdown still work", "Proof events include sponsor stack and policy/rail fields"],
+      "priority": 4,
+      "passes": true,
+      "notes": "src/proofPacket.ts contains typed builder, sponsor stack, and Markdown serializer."
+    },
+    {
+      "id": "US-005",
+      "title": "Submission docs and demo script",
+      "description": "As a submitter, I need a demo script, README, and submission brief ready before video production.",
+      "acceptanceCriteria": ["DEMO_SCRIPT.md exists", "SUBMISSION.md exists", "README explains product, sponsor value, and run commands"],
+      "priority": 5,
+      "passes": true,
+      "notes": "DEMO_SCRIPT.md, SUBMISSION.md, and README.md are ready for submission asset production."
     }
   ]
 }

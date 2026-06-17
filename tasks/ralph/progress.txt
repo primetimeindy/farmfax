@@ -22,3 +22,9 @@
 - Added exportable proof packet buttons for JSON and Markdown.
 - Added COMMERCIAL_AUTONOMY_PROOF.md to define event schema and sponsor value.
 - Verified `npm run build`, browser rendering, export button click, and console with zero JS errors.
+
+## 2026-06-16 Ralph loop: submission readiness
+- Added US-004 and US-005 to Ralph PRD and marked complete after implementation.
+- Refactored proof packet into src/proofPacket.ts with typed schema, sponsor stack, event IDs, replay metadata, and Markdown serializer.
+- Added DEMO_SCRIPT.md, SUBMISSION.md, and upgraded README.md.
+- Next phase: produce submission video/assets and optionally wire real Stripe test API if credentials are provided through env.
