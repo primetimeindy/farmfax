@@ -1,0 +1,12 @@
+# Ralph Progress — Agentic Revenue Operator
+
+## 2026-06-16 kickoff
+- Chosen Option A: Founder GTM / Agentic Revenue Operator.
+- Prototype scope: one-page Vite React demo, no credentials required, polished enough for hackathon video.
+- Quality gate: `npm run build`.
+
+## 2026-06-16 prototype pass
+- Built polished Vite/React single-page demo with mission-control UI.
+- Implemented six-stage GTM workflow: brief, research, assets, spend, Stripe rail, ledger.
+- Added budget guardrails, approval gate, Stripe-style test checkout modal, and expanding audit trail.
+- Verified with `npm run build` successfully.

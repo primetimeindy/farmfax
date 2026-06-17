@@ -1,0 +1,95 @@
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.68);
+  backdrop-filter: blur(10px);
+  z-index: 20;
+}
+
+.stripe-modal {
+  width: min(520px, calc(100vw - 36px));
+  border-radius: 30px;
+  padding: 28px;
+  background: linear-gradient(150deg, #ffffff, #eef1ff 46%, #dbe3ff);
+  color: #101426;
+  box-shadow: 0 30px 120px rgba(0, 0, 0, 0.55);
+}
+
+.modal-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #635bff;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.76rem;
+  font-weight: 1000;
+}
+
+button.small {
+  padding: 8px 12px;
+  color: #101426;
+  border-color: rgba(16, 20, 38, 0.18);
+}
+
+.stripe-brand {
+  margin-top: 26px;
+  font-size: 2.2rem;
+  font-weight: 1000;
+  letter-spacing: -0.08em;
+  color: #635bff;
+}
+
+.stripe-modal h2 {
+  margin: 12px 0 6px;
+  font-size: 2rem;
+  letter-spacing: -0.05em;
+}
+
+.stripe-modal p {
+  color: #4c5572;
+  line-height: 1.6;
+}
+
+.invoice-lines {
+  margin: 22px 0;
+  border: 1px solid rgba(99, 91, 255, 0.16);
+  border-radius: 22px;
+  overflow: hidden;
+}
+
+.invoice-lines div {
+  display: flex;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgba(99, 91, 255, 0.12);
+}
+
+.invoice-lines div:last-child {
+  border-bottom: 0;
+}
+
+.invoice-lines span {
+  color: #5d6684;
+}
+
+.modal-decision {
+  display: grid;
+  gap: 6px;
+  border-radius: 20px;
+  padding: 16px;
+  background: #101426;
+  color: #fff;
+}
+
+.modal-decision strong {
+  color: #74ffb8;
+}
+
+.modal-decision span {
+  color: #c8d0ea;
+}

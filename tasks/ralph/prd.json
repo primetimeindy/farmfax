@@ -1,0 +1,35 @@
+{
+  "project": "Agentic Revenue Operator",
+  "branchName": "hackathon/agentic-revenue-operator",
+  "description": "Hermes hackathon demo: supervised GTM agent that researches, spends, provisions monetization, and reports ROI.",
+  "qualityChecks": ["npm run build"],
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Hackathon command center landing UI",
+      "description": "As a judge, I need to immediately understand that this is a serious operator-grade revenue agent, not a chatbot.",
+      "acceptanceCriteria": ["Hero clearly states earn/spend/run operations", "UI has mission control feel", "Agent roster and guardrails visible"],
+      "priority": 1,
+      "passes": true,
+      "notes": "Hero, agent swarm, mission objective, guardrails, and revenue rail implemented."
+    },
+    {
+      "id": "US-002",
+      "title": "Interactive GTM workflow simulator",
+      "description": "As an operator, I can step through the revenue workflow from objective to report.",
+      "acceptanceCriteria": ["At least 5 stages", "Each stage shows agent output", "Progress and audit log update"],
+      "priority": 2,
+      "passes": true,
+      "notes": "Six stages implemented with progress bar and expanding audit trail."
+    },
+    {
+      "id": "US-003",
+      "title": "Budget and Stripe rail visualization",
+      "description": "As a judge, I can see how the agent spends safely and creates monetization.",
+      "acceptanceCriteria": ["Budget cap visible", "Approval gate visible", "Stripe test checkout/offer visible", "Projected ROI visible"],
+      "priority": 3,
+      "passes": true,
+      "notes": "Spend gate, approval state, Stripe-style checkout modal, and ROI metrics implemented."
+    }
+  ]
+}
