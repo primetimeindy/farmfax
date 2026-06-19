@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type CSSProperties } from 'react'
 import { baseScores, buildProofPacket, proofPacketToMarkdown, sponsorStack } from './proofPacket'
 import './App.css'
 
@@ -18,6 +18,23 @@ type Layer = {
   status: 'green' | 'yellow' | 'red'
   summary: string
   proof: string
+}
+
+type Scenario = {
+  key: string
+  label: string
+  score: number
+  capex: string
+  upside: string
+  risk: string
+  verdict: string
+}
+
+type TimelineItem = {
+  day: string
+  title: string
+  detail: string
+  status: 'now' | 'verify' | 'paid' | 'decision'
 }
 
 const goals: Goal[] = [
@@ -98,6 +115,63 @@ const dueDiligence = [
   { label: 'Title/easement review', cost: '$300–$900', tone: 'red' },
 ]
 
+const scenarios: Scenario[] = [
+  {
+    key: 'homestead-plan',
+    label: 'Small home + goats',
+    score: 76,
+    capex: '$42k–$88k',
+    upside: 'Family use + ag valuation path + low flood risk.',
+    risk: 'Access/easement and septic carry the deal risk.',
+    verdict: 'Negotiate with contingencies',
+  },
+  {
+    key: 'pasture-lease',
+    label: 'Grazing lease',
+    score: 82,
+    capex: '$8k–$22k',
+    upside: 'Fence/water improvements can create modest recurring income.',
+    risk: 'Stocking rate and liability terms need local validation.',
+    verdict: 'Good low-capex path',
+  },
+  {
+    key: 'solar-conservation',
+    label: 'Solar / conservation',
+    score: 61,
+    capex: '$2k–$12k',
+    upside: 'Possible long-term lease or conservation support.',
+    risk: 'Parcel size/access may limit developer interest.',
+    verdict: 'Research more',
+  },
+]
+
+const timeline: TimelineItem[] = [
+  {
+    day: 'Now',
+    title: 'Screen before offer',
+    detail: 'Run ParcelProof, identify red flags, and decide whether the parcel deserves paid diligence.',
+    status: 'now',
+  },
+  {
+    day: 'Day 1',
+    title: 'Verify access + septic',
+    detail: 'Call county, seller, title company, and septic pro with the packet questions.',
+    status: 'verify',
+  },
+  {
+    day: 'Day 2',
+    title: 'Order paid checks',
+    detail: 'Use Stripe checkout for full due-diligence packet or expert review only if the free screen passes.',
+    status: 'paid',
+  },
+  {
+    day: 'Offer',
+    title: 'Buy / negotiate / walk',
+    detail: 'Attach contingencies and cost assumptions instead of making an emotional land offer.',
+    status: 'decision',
+  },
+]
+
 function downloadFile(filename: string, content: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
@@ -119,11 +193,13 @@ function statusLabel(status: 'green' | 'yellow' | 'red') {
 function App() {
   const [selectedGoal, setSelectedGoal] = useState<GoalKey>('homestead')
   const [activeLayer, setActiveLayer] = useState<LayerKey>('access')
+  const [activeScenario, setActiveScenario] = useState('homestead-plan')
   const [checkoutOpen, setCheckoutOpen] = useState(false)
   const [parcelInput, setParcelInput] = useState('12.4 acres near Lockhart, TX · APN R-18422-DEMO · $89,000')
 
   const goal = goals.find((item) => item.key === selectedGoal) ?? goals[0]
   const layer = layers.find((item) => item.key === activeLayer) ?? layers[0]
+  const scenario = scenarios.find((item) => item.key === activeScenario) ?? scenarios[0]
   const ledgerLines = useMemo(() => [
     '[00:04] PRIME translated buyer goal into land-use hypothesis',
     '[00:12] ATLAS mapped parcel fixture and county/APN identity',
@@ -172,6 +248,29 @@ function App() {
               <span><b>{packet.fit_score}</b> fit score</span>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section className="intel-ribbon">
+        <div className="intel-card hot">
+          <span>Deal-killer watch</span>
+          <strong>Access easement</strong>
+          <p>Highest-leverage verification before offer.</p>
+        </div>
+        <div className="intel-card">
+          <span>Best upside</span>
+          <strong>Ag valuation path</strong>
+          <p>Could change annual holding cost if county criteria are met.</p>
+        </div>
+        <div className="intel-card">
+          <span>Fastest monetization</span>
+          <strong>Pasture lease</strong>
+          <p>Lower capex than building; validates land utility early.</p>
+        </div>
+        <div className="intel-card stripe-mini">
+          <span>Paid rail</span>
+          <strong>$19 report</strong>
+          <p>Stripe test checkout + expert review upsell ready.</p>
         </div>
       </section>
 
@@ -241,6 +340,51 @@ function App() {
           <button onClick={exportJson}>Export JSON packet</button>
           <button className="secondary" onClick={exportMarkdown}>Export Markdown packet</button>
         </aside>
+      </section>
+
+      <section className="scenario-section panel">
+        <div className="scenario-copy">
+          <p className="eyebrow">Scenario simulator</p>
+          <h2>Compare what this parcel can become.</h2>
+          <p>Judges need to see this is not just another map. ParcelProof translates land into life paths, capex, upside, and deal risk.</p>
+        </div>
+        <div className="scenario-grid">
+          {scenarios.map((item) => (
+            <button key={item.key} className={item.key === activeScenario ? 'scenario-card active' : 'scenario-card'} onClick={() => setActiveScenario(item.key)}>
+              <span>{item.label}</span>
+              <strong>{item.score}</strong>
+              <small>{item.verdict}</small>
+            </button>
+          ))}
+        </div>
+        <div className="scenario-detail">
+          <div className="scenario-meter" style={{ '--meter': `${scenario.score}%` } as CSSProperties}>
+            <span>{scenario.score}</span>
+          </div>
+          <div>
+            <h3>{scenario.label}</h3>
+            <p><b>Likely capex:</b> {scenario.capex}</p>
+            <p><b>Upside:</b> {scenario.upside}</p>
+            <p><b>Risk:</b> {scenario.risk}</p>
+          </div>
+          <strong className="scenario-verdict">{scenario.verdict}</strong>
+        </div>
+      </section>
+
+      <section className="timeline-section panel">
+        <div>
+          <p className="eyebrow">Buyer action path</p>
+          <h2>From listing crush to safe offer.</h2>
+        </div>
+        <div className="timeline-track">
+          {timeline.map((item) => (
+            <article className={`timeline-item ${item.status}`} key={item.title}>
+              <span>{item.day}</span>
+              <h3>{item.title}</h3>
+              <p>{item.detail}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       <section className="score-section">
