@@ -22,6 +22,7 @@ type FeatureCount = { roads: number; waterways: number; buildings: number; ameni
 type FloodData = { source: 'live' | 'fallback'; zone: string; subtype: string; sfha: string; risk: 'low' | 'moderate' | 'high'; note: string }
 type SoilData = { source: 'live' | 'fallback'; mukey: string; mapunit: string; drainage: string; farmland: string; note: string }
 type ParcelProvider = { provider: string; status: 'configured' | 'missing-key' | 'fallback'; message: string; url: string }
+type ParcelBoundary = { source: 'live' | 'fallback'; propId: string; oldPropId: string; objectId: number | null; areaSqFt: number | null; perimeterFt: number | null; rings: number[][][]; note: string }
 type AnalysisStep = { agent: string; label: string; detail: string }
 
 const goals: Goal[] = [
@@ -63,6 +64,16 @@ const fixtureParcel: LiveParcel = {
 const initialFeatureCounts: FeatureCount = { roads: 3, waterways: 1, buildings: 2, amenities: 0 }
 const initialFlood: FloodData = { source: 'fallback', zone: 'X', subtype: 'Area of minimal flood hazard', sfha: 'OUT', risk: 'low', note: 'Fallback screen; live FEMA query runs after analysis.' }
 const initialSoil: SoilData = { source: 'fallback', mukey: 'demo', mapunit: 'Pasture-suitable loam fixture', drainage: 'Moderately well drained', farmland: 'Farmland of statewide importance', note: 'Fallback soil model; live USDA SDA query runs after analysis.' }
+const initialBoundary: ParcelBoundary = {
+  source: 'fallback',
+  propId: 'R-18422-DEMO',
+  oldPropId: 'fixture',
+  objectId: null,
+  areaSqFt: null,
+  perimeterFt: null,
+  rings: [[[-97.67358, 29.88314], [-97.67322, 29.88320], [-97.67316, 29.88290], [-97.67358, 29.88283], [-97.67367, 29.88326], [-97.67358, 29.88314]]],
+  note: 'Demo parcel polygon; live Caldwell CAD boundary query runs after analysis.',
+}
 
 function parcelProviderFor(parcel: LiveParcel): ParcelProvider {
   const apiKey = import.meta.env.VITE_REGRID_API_KEY as string | undefined
@@ -74,7 +85,7 @@ function parcelProviderFor(parcel: LiveParcel): ParcelProvider {
   if (apiKey) {
     return { provider: 'Regrid-compatible', status: 'configured', message: 'Regrid key detected. Wire backend proxy before exposing secret keys client-side.', url: `https://app.regrid.com/us#b=admin&q=${q}` }
   }
-  return { provider: 'County/Regrid/Acres handoff', status: 'missing-key', message: 'No parcel-provider key configured yet; using county + Regrid/Acres handoff links.', url: `https://app.regrid.com/us#b=admin&q=${q}` }
+  return { provider: 'Caldwell CAD public ArcGIS + Regrid handoff', status: 'configured', message: 'Live Caldwell CAD parcel boundary layer enabled; owner name not exposed by this public layer, so ownership links to CAD/Regrid handoff.', url: `https://app.regrid.com/us#b=admin&q=${q}` }
 }
 
 function statusLabel(status: 'green' | 'yellow' | 'red') {
@@ -226,6 +237,58 @@ async function fetchUsdaSoil(lat: number, lon: number): Promise<SoilData> {
   }
 }
 
+async function fetchCaldwellParcelBoundary(lat: number, lon: number): Promise<ParcelBoundary> {
+  const url = new URL('https://services.arcgis.com/rVxY74DxxIDrDbc0/arcgis/rest/services/Caldwell_CAD_Parcel_Map/FeatureServer/1/query')
+  url.searchParams.set('f', 'json')
+  url.searchParams.set('geometry', `${lon},${lat}`)
+  url.searchParams.set('geometryType', 'esriGeometryPoint')
+  url.searchParams.set('inSR', '4326')
+  url.searchParams.set('spatialRel', 'esriSpatialRelIntersects')
+  url.searchParams.set('outFields', 'OBJECTID,OLDPROPID,Prop_ID,Shape__Area,Shape__Length')
+  url.searchParams.set('returnGeometry', 'true')
+  url.searchParams.set('outSR', '4326')
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 7500)
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+    if (!response.ok) throw new Error(`Caldwell CAD returned ${response.status}`)
+    const data = await response.json() as { features?: Array<{ attributes?: Record<string, number | string>; geometry?: { rings?: number[][][] } }> }
+    const feature = data.features?.[0]
+    if (!feature?.geometry?.rings?.length) throw new Error('No parcel polygon at point')
+    const attrs = feature.attributes ?? {}
+    return {
+      source: 'live',
+      propId: String(attrs.Prop_ID ?? 'unknown'),
+      oldPropId: String(attrs.OLDPROPID ?? 'unknown'),
+      objectId: typeof attrs.OBJECTID === 'number' ? attrs.OBJECTID : null,
+      areaSqFt: typeof attrs.Shape__Area === 'number' ? attrs.Shape__Area : null,
+      perimeterFt: typeof attrs.Shape__Length === 'number' ? attrs.Shape__Length : null,
+      rings: feature.geometry.rings,
+      note: 'Live Caldwell CAD parcel polygon. Public layer exposes Prop_ID/OLDPROPID/boundary but not owner name; verify owner in CAD/property records.',
+    }
+  } catch (error) {
+    return { ...initialBoundary, note: `Caldwell CAD parcel boundary unavailable; fallback used. ${error instanceof Error ? error.message : ''}` }
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
+function boundaryToSvgPoints(boundary: ParcelBoundary) {
+  const ring = boundary.rings[0]
+  if (!ring?.length) return '210,110 470,70 595,205 510,348 260,372 145,235'
+  const xs = ring.map(([x]) => x)
+  const ys = ring.map(([, y]) => y)
+  const minX = Math.min(...xs); const maxX = Math.max(...xs)
+  const minY = Math.min(...ys); const maxY = Math.max(...ys)
+  const width = Math.max(maxX - minX, 0.000001)
+  const height = Math.max(maxY - minY, 0.000001)
+  return ring.map(([x, y]) => {
+    const sx = 150 + ((x - minX) / width) * 430
+    const sy = 78 + (1 - ((y - minY) / height)) * 285
+    return `${sx.toFixed(1)},${sy.toFixed(1)}`
+  }).join(' ')
+}
+
 function openStripeCheckout() {
   const checkoutUrl = import.meta.env.VITE_STRIPE_CHECKOUT_URL as string | undefined
   if (checkoutUrl) {
@@ -259,6 +322,7 @@ function App() {
   const [flood, setFlood] = useState<FloodData>(initialFlood)
   const [soil, setSoil] = useState<SoilData>(initialSoil)
   const [parcelProvider, setParcelProvider] = useState<ParcelProvider>(parcelProviderFor(fixtureParcel))
+  const [boundary, setBoundary] = useState<ParcelBoundary>(initialBoundary)
   const [liveNote, setLiveNote] = useState('Ready to geocode via OpenStreetMap/Nominatim. Falls back to the Lockhart demo fixture if a live service times out.')
 
   const goal = goals.find((item) => item.key === selectedGoal) ?? goals[0]
@@ -272,10 +336,11 @@ function App() {
     `[live] OSM context: ${features.roads} roads · ${features.waterways} waterways · ${features.buildings} buildings · ${features.amenities} amenities`,
     `[fema] ${flood.source} zone ${flood.zone} · SFHA ${flood.sfha} · risk ${flood.risk}`,
     `[usda] ${soil.source} mukey ${soil.mukey} · ${soil.mapunit}`,
-    `[parcel] ${parcelProvider.provider} · ${parcelProvider.status}`,
+    `[parcel] ${boundary.source} Prop_ID ${boundary.propId} · old ${boundary.oldPropId} · area ${boundary.areaSqFt ? Math.round(boundary.areaSqFt).toLocaleString() + ' sqft' : 'n/a'}`,
+    `[provider] ${parcelProvider.provider} · ${parcelProvider.status}`,
     `[screen] active layer: ${layer.label}`,
     checkoutOpen ? '[stripe] $19 test checkout staged' : '[stripe] paid report locked until user approval',
-  ], [checkoutOpen, features, flood, layer.label, liveParcel, parcelProvider, query, soil])
+  ], [boundary, checkoutOpen, features, flood, layer.label, liveParcel, parcelProvider, query, soil])
 
   const packet = useMemo(() => buildProofPacket({
     goal: goal.prompt,
@@ -302,14 +367,16 @@ function App() {
       const geocoded = await geocodePlace(place)
       setLiveParcel(geocoded)
       setParcelProvider(parcelProviderFor(geocoded))
-      const [counts, floodData, soilData] = await Promise.all([
+      const [counts, floodData, soilData, boundaryData] = await Promise.all([
         fetchFeatureCounts(geocoded.lat, geocoded.lon),
         fetchFemaFlood(geocoded.lat, geocoded.lon),
         fetchUsdaSoil(geocoded.lat, geocoded.lon),
+        fetchCaldwellParcelBoundary(geocoded.lat, geocoded.lon),
       ])
       setFeatures(counts)
       setFlood(floodData)
       setSoil(soilData)
+      setBoundary(boundaryData)
       setLiveNote(`Live geocode resolved: ${geocoded.displayName}`)
       setStage(analysisSteps.length)
       setStatus('ready')
@@ -319,6 +386,7 @@ function App() {
       setFeatures(initialFeatureCounts)
       setFlood(initialFlood)
       setSoil(initialSoil)
+      setBoundary(initialBoundary)
       setLiveNote(`Live service unavailable, using controlled demo fixture. ${error instanceof Error ? error.message : ''}`)
       setStage(analysisSteps.length)
       setStatus('ready')
@@ -328,9 +396,9 @@ function App() {
   }
 
   const fitScore = packet.fit_score
-  const liveReport = { ...packet, liveParcel, features, flood, soil, parcelProvider }
+  const liveReport = { ...packet, liveParcel, features, flood, soil, boundary, parcelProvider }
   const exportJson = () => downloadFile('ParcelProof_LiveDecisionPacket.json', JSON.stringify(liveReport, null, 2), 'application/json')
-  const exportMarkdown = () => downloadFile('ParcelProof_LiveDecisionPacket.md', `${markdown}\n\n## Live Data Layers\n- ${liveParcel.displayName}\n- Coordinates: ${liveParcel.lat}, ${liveParcel.lon}\n- OSM context: ${features.roads} roads, ${features.waterways} waterways, ${features.buildings} buildings, ${features.amenities} amenities\n- FEMA: zone ${flood.zone}, SFHA ${flood.sfha}, risk ${flood.risk}\n- USDA: ${soil.mapunit}, drainage ${soil.drainage}, farmland ${soil.farmland}\n- Parcel provider: ${parcelProvider.provider} (${parcelProvider.status})\n`, 'text/markdown')
+  const exportMarkdown = () => downloadFile('ParcelProof_LiveDecisionPacket.md', `${markdown}\n\n## Live Data Layers\n- ${liveParcel.displayName}\n- Coordinates: ${liveParcel.lat}, ${liveParcel.lon}\n- OSM context: ${features.roads} roads, ${features.waterways} waterways, ${features.buildings} buildings, ${features.amenities} amenities\n- FEMA: zone ${flood.zone}, SFHA ${flood.sfha}, risk ${flood.risk}\n- USDA: ${soil.mapunit}, drainage ${soil.drainage}, farmland ${soil.farmland}\n- Parcel boundary: Prop_ID ${boundary.propId}, OLDPROPID ${boundary.oldPropId}, area ${boundary.areaSqFt ? Math.round(boundary.areaSqFt).toLocaleString() + ' sqft' : 'n/a'}\n- Parcel provider: ${parcelProvider.provider} (${parcelProvider.status})\n`, 'text/markdown')
   const exportPdf = () => window.print()
   const startCheckout = () => {
     if (!openStripeCheckout()) setCheckoutOpen(true)
@@ -394,7 +462,7 @@ function App() {
               <path d="M0 330 C140 280 220 360 350 300 S560 190 700 240 L700 430 L0 430Z" fill="rgba(61,119,255,.18)" />
               <path d="M-20 330 L200 260 L520 220 L730 140" stroke="rgba(255,202,103,.72)" strokeWidth="18" />
               <path d="M-20 330 L200 260 L520 220 L730 140" stroke="rgba(20,16,11,.92)" strokeWidth="11" />
-              <polygon points="210,110 470,70 595,205 510,348 260,372 145,235" fill="url(#parcelGlow)" stroke="#9cff7d" strokeWidth="4" />
+              <polygon points={boundaryToSvgPoints(boundary)} fill="url(#parcelGlow)" stroke="#9cff7d" strokeWidth="4" />
               <circle cx="390" cy="188" r="10" fill="#9cff7d" /><text x="405" y="193">homesite</text>
               <circle cx="275" cy="292" r="10" fill="#7db8ff" /><text x="292" y="297">well?</text>
               <circle cx="190" cy="246" r="10" fill="#ffca67" /><text x="206" y="251">gate</text>
@@ -410,7 +478,7 @@ function App() {
           <div className="live-layer-grid">
             <article><span>FEMA NFHL</span><b>Zone {flood.zone}</b><small>{flood.risk} risk · SFHA {flood.sfha}</small></article>
             <article><span>USDA NRCS</span><b>{soil.mapunit}</b><small>{soil.drainage} · {soil.farmland}</small></article>
-            <article><span>Parcel API</span><b>{parcelProvider.status}</b><small>{parcelProvider.provider}</small></article>
+            <article><span>Parcel boundary</span><b>Prop {boundary.propId}</b><small>{boundary.source} · {boundary.areaSqFt ? Math.round(boundary.areaSqFt).toLocaleString() + ' sqft' : 'area pending'}</small></article>
           </div>
         </div>
 
@@ -461,7 +529,9 @@ function App() {
           <div className="data-disclosures">
             <p><b>FEMA:</b> {flood.note}</p>
             <p><b>USDA:</b> {soil.note}</p>
-            <p><b>County parcel:</b> {parcelProvider.message}</p>
+            <p><b>Parcel boundary:</b> {boundary.note}</p>
+            <p><b>Ownership:</b> Public Caldwell layer exposes parcel IDs/boundary, not owner name; use CAD/Regrid handoff for owner verification.</p>
+            <p><b>Provider:</b> {parcelProvider.message}</p>
           </div>
         </div>
         <div className="panel commerce-panel">

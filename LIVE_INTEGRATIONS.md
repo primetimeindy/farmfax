@@ -24,6 +24,12 @@
 - Returns mukey, map unit name, drainage, farmland class, and Web Soil Survey verification warning.
 - Falls back safely if SDA blocks/times out.
 
+### Caldwell CAD parcel boundary layer
+- Public ArcGIS FeatureServer: `Caldwell_CAD_Parcel_Map/FeatureServer/1`.
+- Point-intersects the resolved coordinate.
+- Returns live parcel polygon rings plus `Prop_ID`, `OLDPROPID`, area, perimeter, and OBJECTID.
+- The public layer does **not** expose owner names; ownership verification is handed off to CAD/Regrid/provider records.
+
 ### PDF report export
 - `Print / PDF` calls browser print with print-specific CSS.
 - This gives a no-dependency PDF export path for hackathon/demo.
@@ -54,6 +60,7 @@ If set, clicking **Unlock report** redirects to the real Stripe hosted Checkout/
 ## Current production-readiness status
 
 - Live public data: enabled.
-- Paid parcel-provider API: interface ready, provider key/backend proxy needed.
+- Live public parcel boundary: enabled for Caldwell CAD demo layer.
+- Paid owner/APN provider API: interface ready, provider key/backend proxy needed for owner names and broader counties.
 - Stripe: real hosted Checkout ready via env URL, account/payment link needed.
 - Legal/safety: still positioned as screening, not legal/survey/engineering/tax advice.
