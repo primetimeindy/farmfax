@@ -85,6 +85,11 @@ textarea { width:100%; min-height:94px; resize:vertical; border:1px solid rgba(2
 .layer-tabs button.active.green { background:var(--green); color:#06100c; }
 .layer-tabs button.active.yellow { background:var(--amber); color:#120a00; }
 .layer-tabs button.active.red { background:var(--red); color:#170000; }
+.live-layer-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:10px; }
+.live-layer-grid article { border:1px solid rgba(255,255,255,.10); border-radius:14px; padding:11px; background:rgba(0,0,0,.22); min-height:104px; }
+.live-layer-grid span { color:var(--mint); font:1000 .68rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:.11em; text-transform:uppercase; }
+.live-layer-grid b { display:block; margin:8px 0 5px; color:var(--green); line-height:1.1; }
+.live-layer-grid small { color:var(--muted); line-height:1.3; }
 .steps-list { display:grid; gap: 9px; margin-top: 12px; }
 .steps-list article { border:1px solid rgba(255,255,255,.1); border-radius: 15px; padding: 11px; background:rgba(0,0,0,.22); opacity:.6; }
 .steps-list article.done { opacity:1; border-color:rgba(156,255,125,.28); }
@@ -100,6 +105,7 @@ textarea { width:100%; min-height:94px; resize:vertical; border:1px solid rgba(2
 .status-pill.red { background:var(--red); }
 .muted { color:var(--muted) !important; }
 .verdict-panel button { width:100%; margin-top: 10px; }
+.provider-link { display:block; margin-top:10px; text-align:center; border:1px solid rgba(255,255,255,.15); border-radius:14px; padding:11px; color:var(--mint); font-weight:950; background:rgba(255,255,255,.045); }
 .score-strip { margin-top: 14px; display:grid; grid-template-columns: repeat(7,1fr); gap: 10px; }
 .score-strip article { border:1px solid rgba(255,255,255,.11); border-radius:18px; padding:14px; min-height:172px; background:linear-gradient(180deg, rgba(19,32,24,.92), rgba(6,12,8,.92)); }
 .score-strip article.green { border-color:rgba(156,255,125,.26); }
@@ -113,6 +119,8 @@ textarea { width:100%; min-height:94px; resize:vertical; border:1px solid rgba(2
 .question-grid div { border:1px solid rgba(255,255,255,.1); border-radius:16px; background:rgba(0,0,0,.22); padding: 14px; }
 .question-grid b { color:var(--mint); text-transform:uppercase; font:1000 .72rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:.12em; }
 .question-grid p { margin: 10px 0 0; }
+.data-disclosures { margin-top:12px; border:1px solid rgba(255,255,255,.10); border-radius:16px; padding:12px; background:rgba(0,0,0,.20); }
+.data-disclosures p { margin:7px 0; color:#b9c9bb; font-size:.92rem; }
 .commerce-panel { border-color:rgba(99,91,255,.36); }
 .commerce-panel h2 { color:#c9c5ff; font-size:5rem; }
 .commerce-panel button { width:100%; background:linear-gradient(180deg, #dcd9ff, #7d75ff); border-color:rgba(99,91,255,.52); }
@@ -130,5 +138,14 @@ textarea { width:100%; min-height:94px; resize:vertical; border:1px solid rgba(2
 .receipt span, .receipt b { padding:12px; border-bottom:1px solid rgba(99,91,255,.12); }
 .receipt span { color:#66708d; }
 @media (prefers-reduced-motion: reduce) { * { animation:none !important; transition:none !important; } }
-@media (max-width: 1180px) { .hero-card, .analysis-layout, .packet-layout { grid-template-columns:1fr; } .score-strip, .goal-bar { grid-template-columns: repeat(2,1fr); } .sponsor-row { grid-template-columns:1fr; } }
-@media (max-width: 720px) { .app-shell { width:calc(100vw - 18px); } .topbar { align-items:flex-start; flex-direction:column; gap:10px; } .topbar nav { flex-wrap:wrap; } h1 { font-size:3rem; } .search-row, .goal-bar, .score-strip, .question-grid, .layer-tabs { grid-template-columns:1fr; } .summary-card strong { font-size:4.5rem; } }
+@media print {
+  body { background:#fff; color:#111; }
+  .topbar, .goal-bar, .search-row, .layer-tabs, .commerce-panel, .sponsor-row, .modal-backdrop { display:none !important; }
+  .app-shell { width:100%; padding:0; }
+  .panel, .hero-card { box-shadow:none; border-color:#ddd; background:#fff; color:#111; break-inside:avoid; }
+  .analysis-layout, .packet-layout { grid-template-columns:1fr; }
+  .live-map { height:300px; filter:grayscale(.2); }
+  .source-trail { color:#111; background:#fff; font-size:10px; }
+}
+@media (max-width: 1180px) { .hero-card, .analysis-layout, .packet-layout { grid-template-columns:1fr; } .score-strip, .goal-bar, .live-layer-grid { grid-template-columns: repeat(2,1fr); } .sponsor-row { grid-template-columns:1fr; } }
+@media (max-width: 720px) { .app-shell { width:calc(100vw - 18px); } .topbar { align-items:flex-start; flex-direction:column; gap:10px; } .topbar nav { flex-wrap:wrap; } h1 { font-size:3rem; } .search-row, .goal-bar, .score-strip, .question-grid, .layer-tabs, .live-layer-grid { grid-template-columns:1fr; } .summary-card strong { font-size:4.5rem; } }

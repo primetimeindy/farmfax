@@ -19,6 +19,9 @@ type LiveParcel = {
   source: 'live' | 'fixture'
 }
 type FeatureCount = { roads: number; waterways: number; buildings: number; amenities: number }
+type FloodData = { source: 'live' | 'fallback'; zone: string; subtype: string; sfha: string; risk: 'low' | 'moderate' | 'high'; note: string }
+type SoilData = { source: 'live' | 'fallback'; mukey: string; mapunit: string; drainage: string; farmland: string; note: string }
+type ParcelProvider = { provider: string; status: 'configured' | 'missing-key' | 'fallback'; message: string; url: string }
 type AnalysisStep = { agent: string; label: string; detail: string }
 
 const goals: Goal[] = [
@@ -40,9 +43,10 @@ const layers: Layer[] = [
 const analysisSteps: AnalysisStep[] = [
   { agent: 'ATLAS', label: 'Geocode parcel', detail: 'Live lookup of address / APN / map text into coordinates.' },
   { agent: 'SCOUT', label: 'Road + access context', detail: 'OpenStreetMap road/building/water context around the parcel.' },
-  { agent: 'HYDRO', label: 'Flood/wetland screen', detail: 'Demo layer today; FEMA/NWI production layer next.' },
-  { agent: 'SOIL', label: 'Soil + ag fit', detail: 'Homestead/farm scenario scoring; NRCS soils planned.' },
-  { agent: 'POLICY', label: 'Programs + county script', detail: 'Ag valuation, USDA/FSA/NRCS, appraisal district questions.' },
+  { agent: 'FEMA', label: 'Flood hazard layer', detail: 'NFHL ArcGIS point query for flood zone / SFHA flags.' },
+  { agent: 'USDA', label: 'NRCS soil data', detail: 'Soil Data Access lookup for map unit, drainage, and farmland class.' },
+  { agent: 'PARCEL', label: 'County provider', detail: 'Provider abstraction for Regrid/Acres/county parcel APIs.' },
+  { agent: 'STRIPE', label: 'Checkout + PDF', detail: 'Checkout handoff and printable PDF report export.' },
   { agent: 'LEDGER', label: 'Decision packet', detail: 'Buyer verdict, costs, questions, exports, and source trail.' },
 ]
 
@@ -57,6 +61,21 @@ const fixtureParcel: LiveParcel = {
 }
 
 const initialFeatureCounts: FeatureCount = { roads: 3, waterways: 1, buildings: 2, amenities: 0 }
+const initialFlood: FloodData = { source: 'fallback', zone: 'X', subtype: 'Area of minimal flood hazard', sfha: 'OUT', risk: 'low', note: 'Fallback screen; live FEMA query runs after analysis.' }
+const initialSoil: SoilData = { source: 'fallback', mukey: 'demo', mapunit: 'Pasture-suitable loam fixture', drainage: 'Moderately well drained', farmland: 'Farmland of statewide importance', note: 'Fallback soil model; live USDA SDA query runs after analysis.' }
+
+function parcelProviderFor(parcel: LiveParcel): ParcelProvider {
+  const apiKey = import.meta.env.VITE_REGRID_API_KEY as string | undefined
+  const providerBase = import.meta.env.VITE_PARCEL_PROVIDER_URL as string | undefined
+  const q = encodeURIComponent(`${parcel.lat},${parcel.lon}`)
+  if (providerBase) {
+    return { provider: 'Configured parcel API', status: 'configured', message: 'Custom county/parcel provider URL configured via VITE_PARCEL_PROVIDER_URL.', url: `${providerBase}${providerBase.includes('?') ? '&' : '?'}lat=${parcel.lat}&lon=${parcel.lon}` }
+  }
+  if (apiKey) {
+    return { provider: 'Regrid-compatible', status: 'configured', message: 'Regrid key detected. Wire backend proxy before exposing secret keys client-side.', url: `https://app.regrid.com/us#b=admin&q=${q}` }
+  }
+  return { provider: 'County/Regrid/Acres handoff', status: 'missing-key', message: 'No parcel-provider key configured yet; using county + Regrid/Acres handoff links.', url: `https://app.regrid.com/us#b=admin&q=${q}` }
+}
 
 function statusLabel(status: 'green' | 'yellow' | 'red') {
   if (status === 'green') return 'Clear'
@@ -144,6 +163,78 @@ async function fetchFeatureCounts(lat: number, lon: number): Promise<FeatureCoun
   }
 }
 
+async function fetchFemaFlood(lat: number, lon: number): Promise<FloodData> {
+  const url = new URL('https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/28/query')
+  url.searchParams.set('f', 'json')
+  url.searchParams.set('geometry', `${lon},${lat}`)
+  url.searchParams.set('geometryType', 'esriGeometryPoint')
+  url.searchParams.set('inSR', '4326')
+  url.searchParams.set('spatialRel', 'esriSpatialRelIntersects')
+  url.searchParams.set('outFields', 'FLD_ZONE,ZONE_SUBTY,SFHA_TF')
+  url.searchParams.set('returnGeometry', 'false')
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 7000)
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+    if (!response.ok) throw new Error(`FEMA returned ${response.status}`)
+    const data = await response.json() as { features?: Array<{ attributes?: Record<string, string> }> }
+    const attrs = data.features?.[0]?.attributes
+    if (!attrs) return { ...initialFlood, source: 'live', note: 'FEMA NFHL returned no intersecting flood hazard polygon at this point.' }
+    const zone = attrs.FLD_ZONE ?? 'Unknown'
+    const sfha = attrs.SFHA_TF ?? 'Unknown'
+    const risk: FloodData['risk'] = sfha === 'T' || ['A', 'AE', 'AH', 'AO', 'VE', 'V'].includes(zone) ? 'high' : zone === 'X' ? 'low' : 'moderate'
+    return { source: 'live', zone, subtype: attrs.ZONE_SUBTY ?? 'n/a', sfha, risk, note: 'Live FEMA NFHL point intersection; verify with official panel before closing.' }
+  } catch (error) {
+    return { ...initialFlood, note: `FEMA live layer unavailable; fallback used. ${error instanceof Error ? error.message : ''}` }
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
+async function fetchUsdaSoil(lat: number, lon: number): Promise<SoilData> {
+  const point = `point(${lon} ${lat})`
+  const mukeyQuery = `SELECT mukey FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('${point}')`
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 8000)
+  try {
+    const mukeyResp = await fetch('https://sdmdataaccess.sc.egov.usda.gov/Tabular/post.rest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: mukeyQuery, format: 'JSON' }),
+      signal: controller.signal,
+    })
+    if (!mukeyResp.ok) throw new Error(`USDA mukey returned ${mukeyResp.status}`)
+    const mukeyData = await mukeyResp.json() as { Table?: string[][] }
+    const mukey = mukeyData.Table?.[0]?.[0]
+    if (!mukey) throw new Error('No USDA mukey for point')
+
+    const detailQuery = `SELECT TOP 1 mapunit.mukey, muname, drainagecl, farmlndcl FROM mapunit LEFT JOIN component ON component.mukey = mapunit.mukey WHERE mapunit.mukey = '${mukey}' ORDER BY comppct_r DESC`
+    const detailResp = await fetch('https://sdmdataaccess.sc.egov.usda.gov/Tabular/post.rest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: detailQuery, format: 'JSON' }),
+      signal: controller.signal,
+    })
+    if (!detailResp.ok) throw new Error(`USDA details returned ${detailResp.status}`)
+    const detailData = await detailResp.json() as { Table?: string[][] }
+    const row = detailData.Table?.[0]
+    return { source: 'live', mukey, mapunit: row?.[1] ?? 'USDA map unit found', drainage: row?.[2] ?? 'Drainage not returned', farmland: row?.[3] ?? 'Farmland class not returned', note: 'Live USDA Soil Data Access result; validate with Web Soil Survey for parcel-scale report.' }
+  } catch (error) {
+    return { ...initialSoil, note: `USDA live soil unavailable; fallback used. ${error instanceof Error ? error.message : ''}` }
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
+function openStripeCheckout() {
+  const checkoutUrl = import.meta.env.VITE_STRIPE_CHECKOUT_URL as string | undefined
+  if (checkoutUrl) {
+    window.location.href = checkoutUrl
+    return true
+  }
+  return false
+}
+
 function downloadFile(filename: string, content: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
@@ -165,6 +256,9 @@ function App() {
   const [stage, setStage] = useState(0)
   const [liveParcel, setLiveParcel] = useState<LiveParcel>(fixtureParcel)
   const [features, setFeatures] = useState<FeatureCount>(initialFeatureCounts)
+  const [flood, setFlood] = useState<FloodData>(initialFlood)
+  const [soil, setSoil] = useState<SoilData>(initialSoil)
+  const [parcelProvider, setParcelProvider] = useState<ParcelProvider>(parcelProviderFor(fixtureParcel))
   const [liveNote, setLiveNote] = useState('Ready to geocode via OpenStreetMap/Nominatim. Falls back to the Lockhart demo fixture if a live service times out.')
 
   const goal = goals.find((item) => item.key === selectedGoal) ?? goals[0]
@@ -176,9 +270,12 @@ function App() {
     `[live] geocoder source: ${liveParcel.source === 'live' ? 'OpenStreetMap / Nominatim' : 'Lockhart fixture fallback'}`,
     `[live] coordinates: ${liveParcel.lat.toFixed(5)}, ${liveParcel.lon.toFixed(5)}`,
     `[live] OSM context: ${features.roads} roads · ${features.waterways} waterways · ${features.buildings} buildings · ${features.amenities} amenities`,
+    `[fema] ${flood.source} zone ${flood.zone} · SFHA ${flood.sfha} · risk ${flood.risk}`,
+    `[usda] ${soil.source} mukey ${soil.mukey} · ${soil.mapunit}`,
+    `[parcel] ${parcelProvider.provider} · ${parcelProvider.status}`,
     `[screen] active layer: ${layer.label}`,
     checkoutOpen ? '[stripe] $19 test checkout staged' : '[stripe] paid report locked until user approval',
-  ], [checkoutOpen, features, layer.label, liveParcel, query])
+  ], [checkoutOpen, features, flood, layer.label, liveParcel, parcelProvider, query, soil])
 
   const packet = useMemo(() => buildProofPacket({
     goal: goal.prompt,
@@ -204,14 +301,24 @@ function App() {
       const place = extractPlace(query)
       const geocoded = await geocodePlace(place)
       setLiveParcel(geocoded)
-      const counts = await fetchFeatureCounts(geocoded.lat, geocoded.lon)
+      setParcelProvider(parcelProviderFor(geocoded))
+      const [counts, floodData, soilData] = await Promise.all([
+        fetchFeatureCounts(geocoded.lat, geocoded.lon),
+        fetchFemaFlood(geocoded.lat, geocoded.lon),
+        fetchUsdaSoil(geocoded.lat, geocoded.lon),
+      ])
       setFeatures(counts)
+      setFlood(floodData)
+      setSoil(soilData)
       setLiveNote(`Live geocode resolved: ${geocoded.displayName}`)
       setStage(analysisSteps.length)
       setStatus('ready')
     } catch (error) {
       setLiveParcel(fixtureParcel)
+      setParcelProvider(parcelProviderFor(fixtureParcel))
       setFeatures(initialFeatureCounts)
+      setFlood(initialFlood)
+      setSoil(initialSoil)
       setLiveNote(`Live service unavailable, using controlled demo fixture. ${error instanceof Error ? error.message : ''}`)
       setStage(analysisSteps.length)
       setStatus('ready')
@@ -221,8 +328,13 @@ function App() {
   }
 
   const fitScore = packet.fit_score
-  const exportJson = () => downloadFile('ParcelProof_LiveDecisionPacket.json', JSON.stringify({ ...packet, liveParcel, features }, null, 2), 'application/json')
-  const exportMarkdown = () => downloadFile('ParcelProof_LiveDecisionPacket.md', `${markdown}\n\n## Live Map Context\n- ${liveParcel.displayName}\n- Coordinates: ${liveParcel.lat}, ${liveParcel.lon}\n- OSM context: ${features.roads} roads, ${features.waterways} waterways, ${features.buildings} buildings, ${features.amenities} amenities\n`, 'text/markdown')
+  const liveReport = { ...packet, liveParcel, features, flood, soil, parcelProvider }
+  const exportJson = () => downloadFile('ParcelProof_LiveDecisionPacket.json', JSON.stringify(liveReport, null, 2), 'application/json')
+  const exportMarkdown = () => downloadFile('ParcelProof_LiveDecisionPacket.md', `${markdown}\n\n## Live Data Layers\n- ${liveParcel.displayName}\n- Coordinates: ${liveParcel.lat}, ${liveParcel.lon}\n- OSM context: ${features.roads} roads, ${features.waterways} waterways, ${features.buildings} buildings, ${features.amenities} amenities\n- FEMA: zone ${flood.zone}, SFHA ${flood.sfha}, risk ${flood.risk}\n- USDA: ${soil.mapunit}, drainage ${soil.drainage}, farmland ${soil.farmland}\n- Parcel provider: ${parcelProvider.provider} (${parcelProvider.status})\n`, 'text/markdown')
+  const exportPdf = () => window.print()
+  const startCheckout = () => {
+    if (!openStripeCheckout()) setCheckoutOpen(true)
+  }
 
   return (
     <main className="app-shell">
@@ -295,6 +407,11 @@ function App() {
               <button key={item.key} className={item.key === activeLayer ? `active ${item.status}` : item.status} onClick={() => setActiveLayer(item.key)}>{item.label}</button>
             ))}
           </div>
+          <div className="live-layer-grid">
+            <article><span>FEMA NFHL</span><b>Zone {flood.zone}</b><small>{flood.risk} risk · SFHA {flood.sfha}</small></article>
+            <article><span>USDA NRCS</span><b>{soil.mapunit}</b><small>{soil.drainage} · {soil.farmland}</small></article>
+            <article><span>Parcel API</span><b>{parcelProvider.status}</b><small>{parcelProvider.provider}</small></article>
+          </div>
         </div>
 
         <div className="panel compact-panel">
@@ -317,6 +434,8 @@ function App() {
           <p className="muted">{layer.summary}</p>
           <button onClick={exportJson}>Export JSON</button>
           <button className="ghost" onClick={exportMarkdown}>Export Markdown</button>
+          <button className="ghost" onClick={exportPdf}>Export PDF</button>
+          <a className="provider-link" href={parcelProvider.url} target="_blank" rel="noreferrer">Open parcel provider</a>
         </div>
       </section>
 
@@ -339,12 +458,18 @@ function App() {
             <div><b>Ask seller</b>{packet.seller_questions.slice(0, 3).map((q) => <p key={q}>• {q}</p>)}</div>
             <div><b>Ask county</b>{packet.county_questions.slice(0, 3).map((q) => <p key={q}>• {q}</p>)}</div>
           </div>
+          <div className="data-disclosures">
+            <p><b>FEMA:</b> {flood.note}</p>
+            <p><b>USDA:</b> {soil.note}</p>
+            <p><b>County parcel:</b> {parcelProvider.message}</p>
+          </div>
         </div>
         <div className="panel commerce-panel">
           <div className="section-label">Stripe rail</div>
           <h2>$19</h2>
-          <p>Land Reality Check report. Test mode; human approval required.</p>
-          <button onClick={() => setCheckoutOpen(true)}>Unlock report</button>
+          <p>Real Checkout handoff when VITE_STRIPE_CHECKOUT_URL is configured; otherwise local test modal for demo reliability.</p>
+          <button onClick={startCheckout}>Unlock report</button>
+          <button className="ghost" onClick={exportPdf}>Print / PDF</button>
         </div>
       </section>
 
