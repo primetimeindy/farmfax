@@ -1,69 +1,51 @@
-# Revenue Forge
+# ParcelProof
 
-**Commercial Autonomy Proof for Agentic Revenue Operations.**
+**Know what land can actually do before you buy.**
 
-Revenue Forge is a hackathon prototype for the Hermes Agent Accelerated Business Hackathon by Nous Research × NVIDIA × Stripe.
+ParcelProof is a hackathon prototype for a retail-safe land decision copilot. It helps everyday buyers, homesteaders, families inheriting land, and small farmers understand whether a parcel fits their real-life goal before they waste money, sign a contract, or inherit hidden risk.
 
-Most agents answer questions. Revenue Forge executes a governed commercial experiment: it finds the market, forges the offer, requests spend authority, opens a Stripe rail, and exports proof of every dollar and decision.
+Most map tools show parcel boundaries and ownership. ParcelProof turns parcel facts, map layers, policy context, and buyer goals into a plain-English **Land Decision Packet**.
 
 ## Core thesis
 
-> Hermes orchestrates. NVIDIA accelerates. Stripe settles. Revenue Forge proves every dollar and decision.
+> Hermes orchestrates. NVIDIA accelerates geospatial reasoning. Stripe powers paid reports. ParcelProof helps regular people avoid bad land decisions.
 
 ## What it demonstrates
 
-A founder enters a revenue objective and a hard budget cap. The system turns it into a governed revenue mission:
+A buyer enters a parcel/listing and chooses what they want the land to become. The system screens the parcel against practical real-life constraints:
 
-1. **PRIME** decomposes the objective.
-2. **SCOUT** scores reachable demand.
-3. **GROWTH** forges offer assets.
-4. **OPS** requests a **Spend Warrant** and blocks chargeable actions.
-5. The operator signs limited authority.
-6. **RAILS** opens a Stripe test payment rail.
-7. **LEDGER** issues a scale/hold/kill verdict.
-8. Revenue Forge exports a **Commercial Autonomy Proof Packet**.
+1. **PRIME** translates the buyer goal into a land-use hypothesis.
+2. **ATLAS** identifies the parcel, county, acreage, and map context.
+3. **SCOUT** checks access, flood, wetland, soil, and land-use risk layers.
+4. **WATER** explains well/septic feasibility and due-diligence costs.
+5. **POLICY** surfaces ag/timber valuation and USDA/FSA/NRCS opportunities.
+6. **LEDGER** issues a buy / negotiate / walk / research-more verdict.
+7. **RAILS** stages a Stripe test checkout for a paid report or expert review.
+8. ParcelProof exports a JSON/Markdown **Land Decision Packet**.
 
 ## Sponsor-native value
 
-### Nous Research
-Hermes Agent becomes the operating system for commercial agents: skills, tool calls, approvals, logs, and replayable workflows.
-
-### Stripe
-Stripe becomes the commerce control plane for agentic businesses: spend warrants, checkout sessions, live-charge locks, and attribution.
+### Nous Research / Hermes
+Hermes becomes the orchestration layer for real-life decision support: it coordinates parcel facts, user goals, public records, policy questions, and proof packets.
 
 ### NVIDIA
-NVIDIA becomes the governed accelerated runtime path for real commercial workloads: research scoring, generation, policy checks, and ROI decisions.
+Land decisions are geospatial, visual, document-heavy, and simulation-heavy: satellite imagery, vegetation/soil analysis, flood/fire risk, zoning OCR, and scenario scoring are natural accelerated-inference workloads.
 
-## Key UX primitives
+### Stripe
+Stripe powers a clear consumer/business model: $19 Land Reality Check reports, $99 due-diligence packets, expert-review checkout, and subscriptions for land brokers/realtors.
 
-- **Agent Circuit** — visual chain of PRIME, SCOUT, GROWTH, OPS, RAILS, LEDGER.
-- **Revenue Packet** — central artifact accumulating proof.
-- **Spend Warrant** — explicit approval gate before chargeable actions.
-- **Rail Receipt** — Stripe test checkout receipt.
-- **Living Ledger** — terminal-style audit trail.
-- **Proof Ledger** — sponsor-native chain of custody.
+## Current prototype
 
-## Proof packet
+The app includes:
 
-The prototype exports both:
-
-- `RevenueForge_ProofPacket_demo.json`
-- `RevenueForge_ProofPacket_demo.md`
-
-The typed builder lives in:
-
-```text
-src/proofPacket.ts
-```
-
-Proof events include:
-
-- `mission.created`
-- `market.scored`
-- `spend.warrant.requested`
-- `operator.approval.signed`
-- `stripe.checkout.created`
-- `ledger.verdict.issued`
+- Retail-first hero and parcel/listing input.
+- Goal templates: homestead, cabin, farm, inherited land, income potential.
+- Interactive parcel visualizer with layer toggles.
+- Risk scorecards for buildability, access, water/septic, flood/wetland, soil/ag, policy/programs, and income.
+- Due-diligence cost panel.
+- Stripe test checkout modal.
+- Sponsor proof section.
+- Source trail and exportable Land Decision Packet.
 
 ## Run locally
 
@@ -84,29 +66,14 @@ http://127.0.0.1:5177
 npm run build
 ```
 
-## Demo path
+## Key files
 
-1. Click **Forge next artifact** through the first stages.
-2. Stop at **Spend Warrant**.
-3. Click **Sign spend warrant**.
-4. Click **Raise rail receipt**.
-5. Scroll to **Commercial Autonomy Proof Ledger**.
-6. Click **Export JSON**.
+- `src/App.tsx` — ParcelProof interactive prototype.
+- `src/App.css` — premium geospatial command-center styling.
+- `src/proofPacket.ts` — typed Land Decision Packet builder and Markdown serializer.
+- `PARCELPROOF_FULL_SPECS.md` — full product/hackathon specs.
+- `LAND_HACKATHON_PIVOT_STRATEGY.md` — strategic pivot memo.
 
-Full script:
+## Important disclaimer
 
-```text
-DEMO_SCRIPT.md
-```
-
-## Repo docs
-
-- `MOAT.md` — strategic moat.
-- `COMMERCIAL_AUTONOMY_PROOF.md` — proof standard v0.1.
-- `UX_DIRECTION_REVENUE_FORGE.md` — design direction.
-- `DEMO_SCRIPT.md` — 90-second recording script.
-- `SUBMISSION.md` — hackathon submission brief.
-
-## Current status
-
-Prototype-ready. Next step is submission asset production: 1–3 minute demo video, tweet/writeup, Discord submission, and Typeform entry.
+ParcelProof is a screening and due-diligence assistant, not legal, survey, engineering, tax, lending, or insurance advice. Findings must be verified with county offices and licensed professionals before buying land.

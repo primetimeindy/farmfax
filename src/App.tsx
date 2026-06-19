@@ -1,152 +1,102 @@
-import { useMemo, useState, type CSSProperties } from 'react'
-import { buildProofPacket, proofPacketToMarkdown, sponsorStack } from './proofPacket'
+import { useMemo, useState } from 'react'
+import { baseScores, buildProofPacket, proofPacketToMarkdown, sponsorStack } from './proofPacket'
 import './App.css'
-import './proof.css'
 
-type Stage = {
-  id: string
-  agent: string
-  agentRole: string
-  section: string
-  title: string
-  headline: string
-  detail: string
-  kind: 'SIGNAL' | 'COPY PLATE' | 'WARRANT' | 'RAIL' | 'VERDICT' | 'BRIEF'
-  metrics: { label: string; value: string; tone?: 'good' | 'warn' | 'danger' | 'stripe' }[]
-  slips: { label: string; text: string }[]
-  ledger: string
+type GoalKey = 'homestead' | 'build' | 'farm' | 'inherit' | 'income'
+type LayerKey = 'access' | 'soil' | 'water' | 'flood' | 'policy'
+
+type Goal = {
+  key: GoalKey
+  label: string
+  prompt: string
+  boost: number
 }
 
-const stages: Stage[] = [
+type Layer = {
+  key: LayerKey
+  label: string
+  status: 'green' | 'yellow' | 'red'
+  summary: string
+  proof: string
+}
+
+const goals: Goal[] = [
   {
-    id: 'brief',
-    agent: 'PRIME',
-    agentRole: 'decomposes objective',
-    section: '01 BRIEF',
-    kind: 'BRIEF',
-    title: 'Objective decomposition stamped',
-    headline: 'The founder goal becomes a governed revenue mission.',
-    detail: 'PRIME turns the raw commercial objective into constraints, approval rules, and measurable success criteria. This is not a chat session. It is an operating warrant.',
-    metrics: [
-      { label: 'Hard cap', value: '$250', tone: 'warn' },
-      { label: 'Approval gates', value: '3', tone: 'good' },
-      { label: 'Target window', value: '72h' },
-    ],
-    slips: [
-      { label: 'MISSION', text: 'Generate qualified leads for a Hermes-powered agent ops product.' },
-      { label: 'CONSTRAINT', text: 'No chargeable action may run without signed operator authority.' },
-      { label: 'SUCCESS', text: 'Prove a path to 1 paid audit before scaling spend.' },
-    ],
-    ledger: 'PRIME stamped mission constraints — zero spend authority granted',
+    key: 'homestead',
+    label: 'Homestead + goats',
+    prompt: 'Build a small home, keep goats, drill a well, and qualify for an ag valuation.',
+    boost: 2,
   },
   {
-    id: 'market',
-    agent: 'SCOUT',
-    agentRole: 'scores reachable demand',
-    section: '02 MARKET',
-    kind: 'SIGNAL',
-    title: 'Market signal forged',
-    headline: 'SCOUT found a reachable wedge with pain now.',
-    detail: 'Instead of scraping a lead list, the agent scores demand by urgency, buying trigger, channel reachability, and ability to pay.',
-    metrics: [
-      { label: 'Accounts scored', value: '128' },
-      { label: 'Qualified', value: '31', tone: 'good' },
-      { label: 'Fit score', value: '82', tone: 'good' },
-    ],
-    slips: [
-      { label: 'ICP', text: 'Seed-stage AI infra teams shipping agent products.' },
-      { label: 'TRIGGER', text: 'Their agents need spending/provisioning rails without runaway risk.' },
-      { label: 'OBJECTION', text: 'Security, auditability, and proving ROI before budget expansion.' },
-    ],
-    ledger: 'SCOUT retained sources and scoring weights — 31 accounts passed threshold',
+    key: 'build',
+    label: 'Build a cabin',
+    prompt: 'Build a weekend cabin with driveway, septic, well, and power access.',
+    boost: -1,
   },
   {
-    id: 'assets',
-    agent: 'GROWTH',
-    agentRole: 'forges offer assets',
-    section: '03 ASSETS',
-    kind: 'COPY PLATE',
-    title: 'Copy plate forged',
-    headline: 'The offer is built around controlled autonomy, not AI novelty.',
-    detail: 'GROWTH produces a wedge, CTA, and outreach packet designed to test willingness to pay quickly.',
-    metrics: [
-      { label: 'Landing variants', value: '3' },
-      { label: 'Outbound snippets', value: '9' },
-      { label: 'CTA clarity', value: 'A-', tone: 'good' },
-    ],
-    slips: [
-      { label: 'CTA', text: 'Get a 10-minute Agent Ops Revenue Audit.' },
-      { label: 'SUBJECT', text: 'Your agent can spend. Can it prove ROI?' },
-      { label: 'HERO', text: 'Budgeted agents that turn workflows into revenue.' },
-    ],
-    ledger: 'GROWTH forged assets — no messages sent before approval',
+    key: 'farm',
+    label: 'Small farm',
+    prompt: 'Grow pasture, orchard rows, and a farm stand without over-improving the land.',
+    boost: 7,
   },
   {
-    id: 'spend',
-    agent: 'OPS',
-    agentRole: 'prices reversible actions',
-    section: '04 SPEND WARRANT',
-    kind: 'WARRANT',
-    title: 'Spend warrant blocked',
-    headline: 'The machine stops where money starts.',
-    detail: 'OPS stages chargeable actions behind a physical approval gate. The product moat is safe execution: budget cap, kill switch, and logged authority.',
-    metrics: [
-      { label: 'Lead enrichment', value: '$42', tone: 'warn' },
-      { label: 'Micro-boost', value: '$75', tone: 'warn' },
-      { label: 'Remaining cap', value: '$133', tone: 'good' },
-    ],
-    slips: [
-      { label: 'APPROVE', text: 'Enrich 31 leads only if cost remains under $1.50/account.' },
-      { label: 'HOLD', text: 'Reserve $75 boost until first 3 human replies arrive.' },
-      { label: 'REJECT', text: '$500 cold ad test exceeds sprint cap and is refused.' },
-    ],
-    ledger: 'OPS requested $117 warrant — chargeable actions physically blocked',
+    key: 'inherit',
+    label: 'Inherited land',
+    prompt: 'Decide whether to keep, lease, improve, or sell family land safely.',
+    boost: 4,
   },
   {
-    id: 'rail',
-    agent: 'RAILS',
-    agentRole: 'opens test checkout',
-    section: '05 PAYMENT RAIL',
-    kind: 'RAIL',
-    title: 'Payment rail opened',
-    headline: 'The revenue path is provisioned before demand is scaled.',
-    detail: 'RAILS creates the monetization surface: a Stripe test product, recurring price, and checkout receipt that can attribute revenue back to the experiment.',
-    metrics: [
-      { label: 'Price', value: '$49/mo', tone: 'stripe' },
-      { label: 'Mode', value: 'test' },
-      { label: 'Live charges', value: 'locked', tone: 'danger' },
-    ],
-    slips: [
-      { label: 'PRODUCT', text: 'Agent Ops Revenue Audit.' },
-      { label: 'CHECKOUT', text: 'cs_test_revops_72h staged for demo attribution.' },
-      { label: 'SAFETY', text: 'Live mode disabled until legal, billing, and operator gates pass.' },
-    ],
-    ledger: 'RAILS opened Stripe test rail — live charging remains disabled',
-  },
-  {
-    id: 'ledger',
-    agent: 'LEDGER',
-    agentRole: 'issues verdict',
-    section: '06 ROI LEDGER',
-    kind: 'VERDICT',
-    title: 'ROI verdict sealed',
-    headline: 'The agent recommends a commercial decision, not a vibe.',
-    detail: 'LEDGER compresses the experiment into a scale/hold/kill decision with expected CAC, break-even logic, and stop-loss thresholds.',
-    metrics: [
-      { label: 'Projected CAC', value: '$38', tone: 'good' },
-      { label: 'Break-even', value: '1 sale' },
-      { label: 'Verdict', value: 'HOLD→SCALE', tone: 'good' },
-    ],
-    slips: [
-      { label: 'NEXT', text: 'Approve enrichment only. Hold ads until 3 qualified replies.' },
-      { label: 'STOP', text: 'Pause if reply rate is below 4% after 50 sends.' },
-      { label: 'SCALE', text: 'Expand to $750 only if CAC stays under $60.' },
-    ],
-    ledger: 'LEDGER issued HOLD→SCALE verdict — every action replayable',
+    key: 'income',
+    label: 'Income potential',
+    prompt: 'Evaluate grazing, hunting, solar, timber, conservation, and short-stay income paths.',
+    boost: -3,
   },
 ]
 
-const agentStates = ['PRIME', 'SCOUT', 'GROWTH', 'OPS', 'RAILS', 'LEDGER']
+const layers: Layer[] = [
+  {
+    key: 'access',
+    label: 'Access',
+    status: 'yellow',
+    summary: 'Private road touches the parcel, but recorded easement is not verified.',
+    proof: 'Title/easement check required before offer.',
+  },
+  {
+    key: 'soil',
+    label: 'Soil',
+    status: 'green',
+    summary: 'Pasture-suitable soil with moderate drainage and workable slope.',
+    proof: 'USDA NRCS soil screen: pasture/goats/orchard plausible.',
+  },
+  {
+    key: 'water',
+    label: 'Water + septic',
+    status: 'yellow',
+    summary: 'Well/septic likely possible but unpriced; perc test is unresolved.',
+    proof: 'Budget $2.5k–$8k pre-close due diligence range.',
+  },
+  {
+    key: 'flood',
+    label: 'Flood / wetlands',
+    status: 'green',
+    summary: 'Proposed homesite sits outside the demo flood/wetland risk overlay.',
+    proof: 'FEMA + NWI screen clear near building pad; verify panel.',
+  },
+  {
+    key: 'policy',
+    label: 'Policy + programs',
+    status: 'green',
+    summary: 'Ag/timber valuation and NRCS support may apply if use-history rules are met.',
+    proof: 'County appraisal + FSA/NRCS calls needed.',
+  },
+]
+
+const dueDiligence = [
+  { label: 'Survey refresh', cost: '$1,200–$2,500', tone: 'yellow' },
+  { label: 'Perc + septic design', cost: '$650–$1,800', tone: 'yellow' },
+  { label: 'Well quote', cost: '$0–$250 quote', tone: 'green' },
+  { label: 'Title/easement review', cost: '$300–$900', tone: 'red' },
+]
 
 function downloadFile(filename: string, content: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType })
@@ -160,209 +110,242 @@ function downloadFile(filename: string, content: string, mimeType: string) {
   URL.revokeObjectURL(url)
 }
 
+function statusLabel(status: 'green' | 'yellow' | 'red') {
+  if (status === 'green') return 'Clear'
+  if (status === 'yellow') return 'Verify'
+  return 'Stop'
+}
+
 function App() {
-  const [objective, setObjective] = useState('Get 10 qualified paid-pilot conversations for a Hermes-powered agent ops product under a $250 cap. Require approval before spend.')
-  const [stageIndex, setStageIndex] = useState(0)
-  const [approved, setApproved] = useState(false)
-  const [railOpen, setRailOpen] = useState(false)
-  const current = stages[stageIndex]
+  const [selectedGoal, setSelectedGoal] = useState<GoalKey>('homestead')
+  const [activeLayer, setActiveLayer] = useState<LayerKey>('access')
+  const [checkoutOpen, setCheckoutOpen] = useState(false)
+  const [parcelInput, setParcelInput] = useState('12.4 acres near Lockhart, TX · APN R-18422-DEMO · $89,000')
 
-  const progress = Math.round(((stageIndex + 1) / stages.length) * 100)
-  const ledgerLines = useMemo(() => {
-    const base = stages.slice(0, stageIndex + 1).map((stage, index) => `[00:${String(12 + index * 11).padStart(2, '0')}] ${stage.ledger}`)
-    if (approved) base.push('[01:05] OPERATOR signed spend warrant — cap enforced at $250')
-    if (railOpen) base.push('[01:18] RAIL RECEIPT opened — Stripe test mode verified')
-    return base
-  }, [stageIndex, approved, railOpen])
+  const goal = goals.find((item) => item.key === selectedGoal) ?? goals[0]
+  const layer = layers.find((item) => item.key === activeLayer) ?? layers[0]
+  const ledgerLines = useMemo(() => [
+    '[00:04] PRIME translated buyer goal into land-use hypothesis',
+    '[00:12] ATLAS mapped parcel fixture and county/APN identity',
+    `[00:23] SCOUT checked active layer: ${layer.label}`,
+    '[00:37] LEDGER generated questions for seller, county, lender, and extension office',
+    checkoutOpen ? '[00:51] STRIPE test checkout staged for $19 Land Reality Check' : '[00:51] STRIPE checkout locked until buyer asks for full report',
+  ], [checkoutOpen, layer.label])
 
-  const proofPacket = useMemo(() => buildProofPacket({
-    objective,
-    approved,
-    currentStage: current.section,
-    finalStageReached: stageIndex === stages.length - 1,
+  const packet = useMemo(() => buildProofPacket({
+    goal: goal.prompt,
+    activeLayer: layer.label,
+    checkoutOpen,
     ledgerLines,
-  }), [approved, current.section, ledgerLines, objective, stageIndex])
+    scoreBoost: goal.boost,
+  }), [checkoutOpen, goal.boost, goal.prompt, layer.label, ledgerLines])
 
-  const proofMarkdown = useMemo(() => proofPacketToMarkdown(proofPacket), [proofPacket])
-
-  const exportJson = () => downloadFile('RevenueForge_ProofPacket_demo.json', JSON.stringify(proofPacket, null, 2), 'application/json')
-  const exportMarkdown = () => downloadFile('RevenueForge_ProofPacket_demo.md', proofMarkdown, 'text/markdown')
-
-  const nextStage = () => setStageIndex((index) => Math.min(stages.length - 1, index + 1))
-  const reset = () => {
-    setStageIndex(0)
-    setApproved(false)
-    setRailOpen(false)
-  }
+  const markdown = useMemo(() => proofPacketToMarkdown(packet), [packet])
+  const exportJson = () => downloadFile('ParcelProof_LandDecisionPacket_demo.json', JSON.stringify(packet, null, 2), 'application/json')
+  const exportMarkdown = () => downloadFile('ParcelProof_LandDecisionPacket_demo.md', markdown, 'text/markdown')
 
   return (
-    <main className="forge-shell">
-      <section className="forge-hero">
-        <div className="system-mark">
-          <span className="mark-dot" />
-          HERMES / NVIDIA / STRIPE HACKATHON BUILD
+    <main className="parcel-shell">
+      <section className="hero-panel">
+        <div className="navline">
+          <span className="pulse" />
+          PARCELPROOF / HERMES × NVIDIA × STRIPE
         </div>
         <div className="hero-grid">
           <div>
-            <h1>Revenue Forge Online</h1>
-            <p className="hero-line">A supervised agentic machine that finds the market, forges the offer, requests spend authority, opens the payment rail, and stamps every move into an ROI ledger.</p>
+            <p className="eyebrow">Carfax for land decisions</p>
+            <h1>Before you buy land, know what it can actually become.</h1>
+            <p className="hero-copy">
+              Paste a listing or parcel, choose your real-life goal, and get a plain-English reality check on buildability, access, water, soil, risk, policy, and income potential.
+            </p>
+            <div className="hero-actions">
+              <button onClick={() => setCheckoutOpen(true)}>Unlock $19 report</button>
+              <button className="ghost" onClick={exportMarkdown}>Export packet</button>
+            </div>
           </div>
-          <div className="mission-block">
-            <label>Loaded objective</label>
-            <textarea value={objective} onChange={(event) => setObjective(event.target.value)} />
-            <div className="mission-metrics">
-              <span><b>$250</b> cap</span>
-              <span><b>0</b> live charges</span>
-              <span><b>100%</b> replayable</span>
+          <div className="search-card">
+            <label>Paste listing, APN, address, or Acres-style map link</label>
+            <textarea value={parcelInput} onChange={(event) => setParcelInput(event.target.value)} />
+            <div className="parcel-facts">
+              <span><b>12.4</b> acres</span>
+              <span><b>$89k</b> list</span>
+              <span><b>{packet.fit_score}</b> fit score</span>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="machine-grid">
-        <aside className="agent-circuit machine-panel">
-          <div className="panel-kicker">Agent circuit</div>
-          {agentStates.map((agent, index) => {
-            const stage = stages[index]
-            const state = index < stageIndex ? 'stamped' : index === stageIndex ? (agent === 'OPS' && !approved ? 'approval' : 'working') : 'idle'
-            return (
-              <div className={`circuit-node ${state}`} key={agent}>
-                <div className="node-core">{agent.slice(0, 1)}</div>
-                <div className="node-copy">
-                  <strong>{agent}</strong>
-                  <span>{stage.agentRole}</span>
-                </div>
-                <em>{state}</em>
+      <section className="goal-strip">
+        {goals.map((item) => (
+          <button key={item.key} className={item.key === selectedGoal ? 'goal active' : 'goal'} onClick={() => setSelectedGoal(item.key)}>
+            <span>{item.label}</span>
+            <small>{item.prompt}</small>
+          </button>
+        ))}
+      </section>
+
+      <section className="command-grid">
+        <aside className="left-panel panel">
+          <div className="panel-title">Land research team</div>
+          {['PRIME', 'ATLAS', 'SCOUT', 'WATER', 'POLICY', 'LEDGER'].map((agent, index) => (
+            <div className="agent-row" key={agent}>
+              <div className="agent-orb">{index + 1}</div>
+              <div>
+                <strong>{agent}</strong>
+                <span>{['goal fit', 'parcel map', 'risk layers', 'well/septic', 'programs', 'verdict'][index]}</span>
               </div>
-            )
-          })}
+            </div>
+          ))}
         </aside>
 
-        <section className="forge-bay machine-panel">
-          <div className="packet-topbar">
-            <span>{current.section}</span>
-            <span>{progress}% forged</span>
+        <section className="map-panel panel">
+          <div className="map-topbar">
+            <span>Live parcel visualizer</span>
+            <strong>{layer.label} layer active</strong>
           </div>
-          <div className="packet-shell">
-            <div className="packet-spine">
-              {stages.map((stage, index) => (
-                <button key={stage.id} className={index === stageIndex ? 'active' : index < stageIndex ? 'done' : ''} onClick={() => setStageIndex(index)}>
-                  {stage.section.split(' ')[0]}
-                </button>
-              ))}
+          <div className={`parcel-map layer-${activeLayer}`}>
+            <div className="contour c1" />
+            <div className="contour c2" />
+            <div className="contour c3" />
+            <div className="flood-wash" />
+            <div className="soil-grid" />
+            <div className="road main-road">County Rd 214</div>
+            <div className="parcel-shape">
+              <span className="pin homesite">home</span>
+              <span className="pin water">well?</span>
+              <span className="pin gate">gate</span>
+              <span className="acre-label">12.4 AC<br />APN R-18422</span>
             </div>
-            <article className={`artifact-plate ${current.kind.toLowerCase().replace(' ', '-')}`}>
-              <div className="artifact-kind">{current.kind}</div>
-              <h2>{current.title}</h2>
-              <h3>{current.headline}</h3>
-              <p>{current.detail}</p>
-              <div className="instrument-row">
-                {current.metrics.map((metric) => (
-                  <div className={`instrument ${metric.tone ?? ''}`} key={metric.label}>
-                    <span>{metric.label}</span>
-                    <strong>{metric.value}</strong>
-                  </div>
-                ))}
-              </div>
-              <div className="evidence-stack">
-                {current.slips.map((slip) => (
-                  <div className="evidence-slip" key={slip.label}>
-                    <span>{slip.label}</span>
-                    <p>{slip.text}</p>
-                  </div>
-                ))}
-              </div>
-            </article>
+          </div>
+          <div className="layer-buttons">
+            {layers.map((item) => (
+              <button key={item.key} className={item.key === activeLayer ? `layer ${item.status} active` : `layer ${item.status}`} onClick={() => setActiveLayer(item.key)}>
+                {item.label}
+              </button>
+            ))}
           </div>
         </section>
 
-        <aside className="controls-rail machine-panel">
-          <div className="panel-kicker">Controls / consequences</div>
-          <div className="budget-gauge" style={{ '--progress': `${progress}%` } as CSSProperties}>
-            <span>Budget authority</span>
-            <strong>{approved ? '$117 armed' : '$0 armed'}</strong>
-            <div className="gauge-track"><i /></div>
-            <p>Hard cap remains $250. Agent cannot exceed warrant.</p>
+        <aside className="right-panel panel">
+          <div className="verdict-card">
+            <span>Verdict</span>
+            <strong>{packet.verdict.replace('_', ' ')}</strong>
+            <p>Do not write an offer until access/easement and septic feasibility are verified.</p>
           </div>
-          <div className={`warrant ${approved ? 'signed' : 'locked'}`}>
-            <span>{approved ? 'SIGNED WARRANT' : 'LOCKED WARRANT'}</span>
-            <strong>{approved ? 'Operator authority recorded' : 'Chargeable actions blocked'}</strong>
-            <button onClick={() => setApproved(true)}>{approved ? 'Warrant signed' : 'Sign spend warrant'}</button>
+          <div className="active-layer-card">
+            <span className={`status ${layer.status}`}>{statusLabel(layer.status)}</span>
+            <h3>{layer.label}</h3>
+            <p>{layer.summary}</p>
+            <small>{layer.proof}</small>
           </div>
-          <div className="rail-receipt">
-            <span>PAYMENT RAIL / TEST MODE</span>
-            <strong>Agent Ops Revenue Audit</strong>
-            <p>$49/mo · cs_test_revops_72h</p>
-            <button onClick={() => setRailOpen(true)}>Raise rail receipt</button>
-          </div>
+          <button onClick={exportJson}>Export JSON packet</button>
+          <button className="secondary" onClick={exportMarkdown}>Export Markdown packet</button>
         </aside>
       </section>
 
-      <section className="operator-bar machine-panel">
-        <button onClick={nextStage} disabled={stageIndex === stages.length - 1}>Forge next artifact</button>
-        <button className="secondary" onClick={() => setApproved(true)}>Arm $117 spend</button>
-        <button className="ghost" onClick={reset}>Reset machine</button>
-        <div className="verdict-dial"><span>Verdict</span><strong>{stageIndex === stages.length - 1 ? 'HOLD → SCALE' : 'FORGING'}</strong></div>
-      </section>
-
-      <section className="proof-ledger machine-panel">
-        <div className="proof-header">
-          <div>
-            <span className="panel-kicker">Sponsor-native proof layer</span>
-            <h2>Commercial Autonomy Proof Ledger</h2>
-            <p>Hermes orchestrates, NVIDIA accelerates, Stripe settles, and Revenue Forge proves every dollar and decision.</p>
-          </div>
-          <div className="proof-actions">
-            <button onClick={exportJson}>Export JSON</button>
-            <button className="ghost" onClick={exportMarkdown}>Export MD</button>
-          </div>
+      <section className="score-section">
+        <div className="section-head">
+          <p className="eyebrow">Plain-English reality check</p>
+          <h2>What regular buyers need to know before signing.</h2>
         </div>
-        <div className="sponsor-grid">
-          {sponsorStack.map((sponsor) => (
-            <article className="sponsor-card" key={sponsor.sponsor}>
-              <span>{sponsor.lane}</span>
-              <strong>{sponsor.sponsor}</strong>
-              <p>{sponsor.primitive}</p>
-              <em>{sponsor.proof}</em>
-              <small>{sponsor.value}</small>
+        <div className="score-grid">
+          {baseScores.map((score) => (
+            <article className={`score-card ${score.status}`} key={score.label}>
+              <div className="score-ring">{score.score}</div>
+              <div>
+                <span>{statusLabel(score.status)}</span>
+                <h3>{score.label}</h3>
+                <p>{score.finding}</p>
+                <small>{score.nextAction}</small>
+              </div>
             </article>
           ))}
         </div>
-        <div className="proof-chain">
-          {proofPacket.events.map((event, index) => (
-            <div className="proof-event" key={event.type}>
-              <b>{String(index + 1).padStart(2, '0')}</b>
-              <span>{event.type}</span>
-              <strong>{event.agent}</strong>
+      </section>
+
+      <section className="packet-grid">
+        <div className="packet panel">
+          <div className="panel-title">Land Decision Packet</div>
+          <h2>{packet.parcel.title}</h2>
+          <p>{goal.prompt}</p>
+          <div className="packet-meta">
+            <span>APN <b>{packet.parcel.apn}</b></span>
+            <span>County <b>{packet.parcel.county}</b></span>
+            <span>Due diligence <b>${packet.estimated_due_diligence_cost_usd.toLocaleString()}</b></span>
+          </div>
+          <div className="question-columns">
+            <div>
+              <h3>Ask the seller</h3>
+              {packet.seller_questions.slice(0, 3).map((question) => <p key={question}>• {question}</p>)}
             </div>
+            <div>
+              <h3>Ask the county</h3>
+              {packet.county_questions.slice(0, 3).map((question) => <p key={question}>• {question}</p>)}
+            </div>
+          </div>
+        </div>
+
+        <div className="costs panel">
+          <div className="panel-title">Costs before closing</div>
+          {dueDiligence.map((item) => (
+            <div className={`cost-row ${item.tone}`} key={item.label}>
+              <span>{item.label}</span>
+              <strong>{item.cost}</strong>
+            </div>
+          ))}
+          <div className="stripe-box">
+            <span>Stripe rail</span>
+            <strong>$19 Land Reality Check</strong>
+            <p>Test checkout for full buyer packet + expert-review upsell. Live charges locked in demo.</p>
+            <button onClick={() => setCheckoutOpen(true)}>Stage checkout</button>
+          </div>
+        </div>
+      </section>
+
+      <section className="sponsor-section panel">
+        <div>
+          <p className="eyebrow">Why sponsors care</p>
+          <h2>Useful to everyday users. Native to the sponsor stack.</h2>
+        </div>
+        <div className="sponsor-grid">
+          {sponsorStack.map((sponsor) => (
+            <article key={sponsor.sponsor}>
+              <span>{sponsor.lane}</span>
+              <h3>{sponsor.sponsor}</h3>
+              <p>{sponsor.value}</p>
+              <small>{sponsor.proof}</small>
+            </article>
           ))}
         </div>
       </section>
 
-      <section className="ledger-ticker">
-        <div className="ticker-label">Living Ledger</div>
+      <section className="ledger panel">
+        <div className="ticker-label">Source trail</div>
         <div className="ticker-lines">
-          {ledgerLines.map((line) => <span key={line}>{line}</span>)}
+          {packet.events.map((event) => (
+            <p key={event.id}><b>{event.agent}</b> / {event.type}: {event.result}</p>
+          ))}
+          {ledgerLines.map((line) => <p key={line}>{line}</p>)}
         </div>
       </section>
 
-      {railOpen && (
-        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Stripe rail receipt">
-          <div className="rail-modal">
+      {checkoutOpen && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="stripe-modal">
             <div className="modal-topline">
-              <span>PAYMENT RAIL / STRIPE TEST</span>
-              <button className="ghost mini" onClick={() => setRailOpen(false)}>Close</button>
+              <span>Stripe test checkout</span>
+              <button className="mini ghost" onClick={() => setCheckoutOpen(false)}>Close</button>
             </div>
             <div className="stripe-word">stripe</div>
-            <h2>Agent Ops Revenue Audit</h2>
-            <p>Recurring offer generated by RAILS and bound to the current revenue mission.</p>
+            <h2>Unlock Land Reality Check</h2>
+            <p>Demo checkout for the complete ParcelProof packet, source trail, and county call script. Live charges are disabled.</p>
             <div className="receipt-lines">
-              <div><span>Product</span><strong>Agent Ops Revenue Audit</strong></div>
-              <div><span>Price</span><strong>$49.00 / month</strong></div>
-              <div><span>Mode</span><strong>test</strong></div>
-              <div><span>Checkout</span><strong>cs_test_revops_72h</strong></div>
+              <div><span>Product</span><strong>ParcelProof Report</strong></div>
+              <div><span>Mode</span><strong>Test</strong></div>
+              <div><span>Price</span><strong>$19.00</strong></div>
+              <div><span>Session</span><strong>cs_test_land_12ac</strong></div>
             </div>
-            <div className="modal-lock">{approved ? 'Spend warrant signed. Live charging still disabled for demo safety.' : 'Live charging locked. Sign the spend warrant before provisioning paid actions.'}</div>
+            <div className="modal-lock">Human approval required before paid report or expert-review upsell.</div>
           </div>
         </div>
       )}
