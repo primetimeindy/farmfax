@@ -37,6 +37,12 @@ type TimelineItem = {
   status: 'now' | 'verify' | 'paid' | 'decision'
 }
 
+type AnalysisStep = {
+  agent: string
+  label: string
+  detail: string
+}
+
 const goals: Goal[] = [
   {
     key: 'homestead',
@@ -172,6 +178,16 @@ const timeline: TimelineItem[] = [
   },
 ]
 
+const analysisSteps: AnalysisStep[] = [
+  { agent: 'ATLAS', label: 'Reading parcel link', detail: 'Detecting county, acreage, APN, listing price, and rural context.' },
+  { agent: 'SCOUT', label: 'Checking access', detail: 'Looking for road frontage, private-road risk, and easement questions.' },
+  { agent: 'HYDRO', label: 'Checking flood + wetlands', detail: 'Screening demo FEMA/NWI overlays near the proposed homesite.' },
+  { agent: 'SOIL', label: 'Checking soil + slope', detail: 'Scoring pasture, orchard, drainage, and small-livestock fit.' },
+  { agent: 'WATER', label: 'Checking well + septic path', detail: 'Estimating perc-test, septic design, and well quote tasks before closing.' },
+  { agent: 'POLICY', label: 'Finding ag/program leads', detail: 'Generating county appraisal, FSA, NRCS, and extension-office questions.' },
+  { agent: 'LEDGER', label: 'Generating buyer packet', detail: 'Writing verdict, seller questions, county script, costs, and source trail.' },
+]
+
 function downloadFile(filename: string, content: string, mimeType: string) {
   const blob = new Blob([content], { type: mimeType })
   const url = URL.createObjectURL(blob)
@@ -195,7 +211,30 @@ function App() {
   const [activeLayer, setActiveLayer] = useState<LayerKey>('access')
   const [activeScenario, setActiveScenario] = useState('homestead-plan')
   const [checkoutOpen, setCheckoutOpen] = useState(false)
-  const [parcelInput, setParcelInput] = useState('12.4 acres near Lockhart, TX · APN R-18422-DEMO · $89,000')
+  const [parcelInput, setParcelInput] = useState('https://www.acres.com/plat-map/map?parcel=R-18422-DEMO · 12.4 acres near Lockhart, TX · $89,000')
+  const [analysisStage, setAnalysisStage] = useState(0)
+  const [analysisRunning, setAnalysisRunning] = useState(false)
+
+  const analysisComplete = analysisStage >= analysisSteps.length
+
+  const runAnalysis = () => {
+    if (analysisRunning) return
+    setAnalysisRunning(true)
+    setAnalysisStage(0)
+
+    let nextStage = 0
+    const advance = () => {
+      nextStage += 1
+      setAnalysisStage(nextStage)
+      if (nextStage < analysisSteps.length) {
+        window.setTimeout(advance, 430)
+      } else {
+        setAnalysisRunning(false)
+      }
+    }
+
+    window.setTimeout(advance, 280)
+  }
 
   const goal = goals.find((item) => item.key === selectedGoal) ?? goals[0]
   const layer = layers.find((item) => item.key === activeLayer) ?? layers[0]
@@ -235,7 +274,8 @@ function App() {
               Paste a listing or parcel, choose your real-life goal, and get a plain-English reality check on buildability, access, water, soil, risk, policy, and income potential.
             </p>
             <div className="hero-actions">
-              <button onClick={() => setCheckoutOpen(true)}>Unlock $19 report</button>
+              <button onClick={runAnalysis}>{analysisRunning ? 'Analyzing parcel…' : analysisComplete ? 'Re-run analysis' : 'Analyze parcel'}</button>
+              <button className="secondary" onClick={() => setCheckoutOpen(true)}>Unlock $19 report</button>
               <button className="ghost" onClick={exportMarkdown}>Export packet</button>
             </div>
           </div>
@@ -281,6 +321,30 @@ function App() {
             <small>{item.prompt}</small>
           </button>
         ))}
+      </section>
+
+      <section className={`analysis-flow panel ${analysisComplete ? 'complete' : ''}`}>
+        <div className="analysis-head">
+          <div>
+            <p className="eyebrow">Live AI due diligence run</p>
+            <h2>{analysisComplete ? 'Land Decision Packet generated.' : analysisRunning ? 'Research agents are checking the parcel.' : 'Paste a map link. Run the land screen.'}</h2>
+            <p>Fixture-backed for the hackathon, product-real in behavior: every agent leaves a source trail and every green light still shows what a human must verify.</p>
+          </div>
+          <button onClick={runAnalysis}>{analysisRunning ? 'Running…' : analysisComplete ? 'Run again' : 'Start analysis'}</button>
+        </div>
+        <div className="analysis-rail">
+          {analysisSteps.map((step, index) => {
+            const done = index < analysisStage
+            const active = index === analysisStage && analysisRunning
+            return (
+              <article className={done ? 'analysis-step done' : active ? 'analysis-step active' : 'analysis-step'} key={step.label}>
+                <span>{step.agent}</span>
+                <h3>{step.label}</h3>
+                <p>{step.detail}</p>
+              </article>
+            )
+          })}
+        </div>
       </section>
 
       <section className="command-grid">

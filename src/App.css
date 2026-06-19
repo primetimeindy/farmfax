@@ -132,7 +132,23 @@ textarea { width:100%; height:128px; resize:none; margin: 12px 0; border: 1px so
 .active-layer-card small, .sponsor-grid small { color: var(--mint); line-height:1.4; }
 .right-panel button { width:100%; margin-top: 8px; }
 
-.score-section, .scenario-section, .timeline-section, .packet-grid, .sponsor-section, .ledger { margin-top: 18px; }
+.score-section, .scenario-section, .timeline-section, .packet-grid, .sponsor-section, .ledger, .analysis-flow { margin-top: 18px; }
+.analysis-flow { padding: 20px; border-color: rgba(110,247,194,.26); background: radial-gradient(circle at 92% 0%, rgba(110,247,194,.13), transparent 34%), linear-gradient(145deg, rgba(14,25,18,.92), rgba(7,14,10,.9)); }
+.analysis-head { display:grid; grid-template-columns: 1fr auto; gap: 18px; align-items:center; margin-bottom: 14px; }
+.analysis-head h2 { max-width: 900px; }
+.analysis-head p:not(.eyebrow) { max-width: 860px; color:#b8c9ba; line-height:1.55; }
+.analysis-rail { display:grid; grid-template-columns: repeat(7,1fr); gap: 10px; }
+.analysis-step { position:relative; min-height: 172px; border:1px solid rgba(255,255,255,.1); border-radius: 18px; padding: 14px; background: rgba(0,0,0,.22); overflow:hidden; opacity:.58; }
+.analysis-step::after { content:""; position:absolute; inset:auto 12px 12px 12px; height:3px; border-radius:999px; background:rgba(255,255,255,.12); }
+.analysis-step span { color:var(--mint); font:1000 .7rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing:.12em; }
+.analysis-step h3 { margin-top:12px; letter-spacing:-.035em; }
+.analysis-step p { color:#b8c9ba; line-height:1.42; font-size:.92rem; }
+.analysis-step.active { opacity:1; border-color: rgba(255,202,103,.45); box-shadow:0 0 36px rgba(255,202,103,.09); }
+.analysis-step.active::after { background:linear-gradient(90deg, var(--amber), transparent); animation: scanbar 1s infinite; }
+.analysis-step.done { opacity:1; border-color:rgba(156,255,125,.24); }
+.analysis-step.done::after { background:var(--green); }
+.analysis-flow.complete { border-color:rgba(156,255,125,.4); box-shadow:0 30px 100px rgba(156,255,125,.08); }
+@keyframes scanbar { 0% { transform:translateX(-40%); opacity:.3; } 50% { opacity:1; } 100% { transform:translateX(40%); opacity:.45; } }
 .scenario-section { padding: 20px; display:grid; grid-template-columns: .72fr .72fr 1fr; gap: 16px; align-items: stretch; border-color: rgba(156,255,125,.22); }
 .scenario-copy p:not(.eyebrow) { color:#b8c9ba; line-height:1.55; font-size:1.03rem; }
 .scenario-grid { display:grid; gap:10px; }
@@ -214,5 +230,5 @@ textarea { width:100%; height:128px; resize:none; margin: 12px 0; border: 1px so
 .modal-lock { border-radius:16px; padding:14px; color:#fff; background:#101426; }
 
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
-@media (max-width: 1220px) { .hero-grid, .command-grid, .scenario-section, .timeline-section, .packet-grid, .sponsor-section { grid-template-columns: 1fr; } .score-grid, .goal-strip, .intel-ribbon, .sponsor-grid, .timeline-track { grid-template-columns: repeat(2,1fr); } }
-@media (max-width: 720px) { .parcel-shell { width: calc(100vw - 18px); } h1 { font-size: 3.05rem; } .parcel-facts, .packet-meta, .question-columns, .score-grid, .goal-strip, .intel-ribbon, .scenario-detail, .sponsor-grid, .timeline-track, .layer-buttons, .ledger { grid-template-columns: 1fr; } .map-topbar { align-items:flex-start; flex-direction:column; gap: 8px; } }
+@media (max-width: 1220px) { .hero-grid, .command-grid, .scenario-section, .timeline-section, .packet-grid, .sponsor-section { grid-template-columns: 1fr; } .score-grid, .goal-strip, .intel-ribbon, .sponsor-grid, .timeline-track, .analysis-rail { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 720px) { .parcel-shell { width: calc(100vw - 18px); } h1 { font-size: 3.05rem; } .parcel-facts, .packet-meta, .question-columns, .score-grid, .goal-strip, .intel-ribbon, .scenario-detail, .sponsor-grid, .timeline-track, .analysis-rail, .analysis-head, .layer-buttons, .ledger { grid-template-columns: 1fr; } .map-topbar { align-items:flex-start; flex-direction:column; gap: 8px; } }
