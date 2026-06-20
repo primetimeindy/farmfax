@@ -150,15 +150,15 @@ const catalogCandidates: CatalogCandidate[] = [
 const architectureStack = [
   {
     name: 'NVIDIA / Nemotron',
-    line: 'Judge-facing model layer for reading submitted evidence and turning it into plain buyer questions. It does not replace inspection.',
+    line: 'Planned reasoning layer for weighing submitted evidence and writing buyer questions. It does not certify the machine.',
   },
   {
     name: 'Hermes',
-    line: 'Workflow layer that routes capture → evidence check → report → export / hosted link.',
+    line: 'Planned orchestration for capture, evidence checks, report generation, export, and the hosted-report seam.',
   },
   {
     name: 'Stripe',
-    line: 'Optional hosted report link. Free PDF/JSON export stays available without paying.',
+    line: 'Current demo simulates the hosted-report payment path. PDF and JSON export remain buyer-owned.',
   },
 ]
 
@@ -847,41 +847,25 @@ function App() {
 
       <section className="hero-card farm-hero">
         <div className="hero-copy-block">
-          <p className="eyebrow">Pre-buy equipment check</p>
-          <div className="demo-badge">{activeScenario.demoBadge} · try your own photos</div>
+          <p className="eyebrow">Open condition intelligence for used farm equipment</p>
+          <div className="demo-badge">{activeScenario.demoBadge} · browser demo · no backend required</div>
           <h1>Check the machine before you buy.</h1>
           <p className="lede">
-            Take a guided phone walkthrough. FarmFax points out visible problems, missing proof, serial/PIN and hour-meter concerns,
-            then gives you plain seller questions before you send money or drive out.
+            FarmFax turns guided phone photos and short videos into an evidence-backed buyer report: visible condition,
+            missing proof, serial/PIN and hour-meter notes, seller questions, and buyer-owned JSON/PDF export.
           </p>
           <div className="hero-actions primary-actions">
             <button onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth' })}>Start photo checklist</button>
             <button className="ghost" onClick={() => document.getElementById('report')?.scrollIntoView({ behavior: 'smooth' })}>See buyer report</button>
+          </div>
+          <div className="judge-fast-path" aria-label="judge demo controls">
+            <span>Judges:</span>
             <button className="ghost judge-demo-button" data-qa="judge-demo-button" onClick={() => void runJudgeDemo()} disabled={isSampleVideoLoading}>
               {isSampleVideoLoading ? 'Running sample…' : 'Run judge demo'}
             </button>
             <button className="ghost" data-qa="sample-inspection-button" onClick={() => void runCompleteSampleInspection()} disabled={isSampleVideoLoading}>
               Load complete sample
             </button>
-          </div>
-          <div className="scenario-kicker">Try a sample report:</div>
-          <div className="scenario-switcher" aria-label="sample scenario selector">
-            {farmFaxScenarios.map((scenario) => (
-              <button
-                key={scenario.id}
-                className={scenario.id === scenarioState.selectedScenarioId ? 'active' : 'ghost'}
-                onClick={() => loadScenario(scenario.id as ScenarioId)}
-              >
-                <b>{scenario.label}</b>
-                <span>{scenario.description}</span>
-              </button>
-            ))}
-          </div>
-          <div className="principle-strip">
-            <span>Photos first</span>
-            <span>Plain questions</span>
-            <span>No guessing</span>
-            <span>Owner keeps report</span>
           </div>
         </div>
         <aside className="summary-card machine-card">
@@ -896,8 +880,51 @@ function App() {
         </aside>
       </section>
 
+      <section className="proof-strip" aria-label="what FarmFax gives buyers">
+        <article>
+          <span>01</span>
+          <b>Guided evidence</b>
+          <p>Seven required views beat cherry-picked listing photos: walkaround, serial plate, hours, hydraulics, tires, paint/welds, and engine bay.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <b>Photo + sampled video</b>
+          <p>Browser checks flag rust-tone, wet/leak signals, paint mismatch, and selected video frames — with visible confidence and limits.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <b>Unknowns stay unknown</b>
+          <p>Missing or weak evidence lowers confidence instead of letting AI invent a clean answer.</p>
+        </article>
+        <article>
+          <span>04</span>
+          <b>Buyer-owned report</b>
+          <p>Export JSON/PDF before paying for optional hosted sharing. No data lock-in.</p>
+        </article>
+      </section>
+
+      <section className="sample-selector panel" aria-label="sample inspection selector">
+        <div>
+          <span className="section-label">choose a sample inspection</span>
+          <h2>Run the story judges need to see.</h2>
+          <p className="muted">Use complete, risky, or missing-proof sample data — then replace it with your own phone photos and short videos.</p>
+        </div>
+        <div className="scenario-switcher" aria-label="sample scenario selector">
+          {farmFaxScenarios.map((scenario) => (
+            <button
+              key={scenario.id}
+              className={scenario.id === scenarioState.selectedScenarioId ? 'active' : 'ghost'}
+              onClick={() => loadScenario(scenario.id as ScenarioId)}
+            >
+              <b>{scenario.label}</b>
+              <span>{scenario.description}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
       <section className="architecture-row architecture-stack" aria-label="demo architecture stack">
-        <div className="stack-heading panel"><span>How the demo works</span><p>Buyer-first flow first. Technical stack is here for judges, but the farmer view stays simple.</p></div>
+        <div className="stack-heading panel"><span>Demo stack</span><p>The farmer sees a clean diligence flow. Judges can see which pieces run now and which sponsor seams are intentionally marked as planned or simulated.</p></div>
         {architectureStack.map((item) => (
           <article className="panel" key={item.name}>
             <span>{item.name}</span>
@@ -908,10 +935,10 @@ function App() {
 
       <section className="analysis-layout farm-layout" id="capture">
         <div className="panel capture-panel">
-          <div className="section-label">photo checklist</div>
-          <h2>Capture these 7 views.</h2>
+          <div className="section-label">guided evidence capture</div>
+          <h2>Seven views that reduce blind spots.</h2>
           <div className="capture-intro-row">
-            <p className="muted">Photos are enough. Add a short video when motion, sound, smoke, or hydraulics matter.</p>
+            <p className="muted">Start with photos. Add a short video when motion, sound, smoke, or hydraulics matter. FarmFax samples selected frames; it does not inspect full video.</p>
             <button className="ghost sample-video-button" data-qa="sample-video-button" type="button" onClick={() => void runSampleVideo('hydraulics')} disabled={isSampleVideoLoading}>
               {isSampleVideoLoading ? 'Checking sample…' : 'Try sample video'}
             </button>
@@ -983,8 +1010,8 @@ function App() {
         </div>
 
         <aside className="panel vision-panel">
-          <div className="section-label">what FarmFax noticed</div>
-          <h2>Visible clues from the photos.</h2>
+          <div className="section-label">visible condition signals</div>
+          <h2>What the submitted media suggests.</h2>
           <div className="overlay-card">
             <div className="tractor-silhouette">
               <span className="hotspot rust">rust</span>
@@ -1011,8 +1038,8 @@ function App() {
 
       <section className="packet-layout" id="catalog">
         <div className="panel catalog-panel">
-          <div className="section-label">paperwork check</div>
-          <h2>Does the machine match the paperwork?</h2>
+          <div className="section-label">identity and records</div>
+          <h2>Match the machine to the paper trail.</h2>
           <div className="identity-grid">
             <article>
               <span>serial / PIN shown</span>
@@ -1027,7 +1054,7 @@ function App() {
             <article>
               <span>external IDs</span>
               <b>dealer stock · auction lot · owner log</b>
-              <p>Future adapters preserve OEM/dealer/auction references without locking the record inside one system.</p>
+              <p>Future adapters can carry OEM, dealer, auction, and owner references without locking the record inside one system.</p>
             </article>
           </div>
           <div className="candidate-list">
@@ -1042,11 +1069,11 @@ function App() {
         </div>
 
         <aside className="panel lock-panel">
-          <div className="section-label">report ownership</div>
-          <h2>Save the report. Take it anywhere.</h2>
+          <div className="section-label">buyer-owned record</div>
+          <h2>Your report should not live inside a marketplace.</h2>
           <p>
-            FarmFax keeps the buyer packet portable. You can save PDF/JSON for your mechanic, lender, partner, seller follow-up, or future resale.
-            Paid hosting can help sharing, but it does not trap the machine history.
+            FarmFax keeps the buyer packet portable. Save PDF or JSON for your mechanic, lender, partner, seller follow-up, or future resale.
+            Paid hosting only makes sharing easier; it does not own the machine history.
           </p>
           <ul>
             <li>Save PDF for the deal folder</li>
@@ -1059,13 +1086,13 @@ function App() {
 
       <section className="packet-layout" id="report">
         <div className="panel report-panel">
-          <div className="section-label">buyer report</div>
-          <h2>What to check before buying.</h2>
+          <div className="section-label">buyer risk report</div>
+          <h2>A sharper pre-buy conversation.</h2>
           <div className="report-score">
             <strong>{report.condition_score}</strong>
             <div>
               <b>{report.make_model_guess.make} {report.make_model_guess.model}</b>
-              <p>Photo-screening score only. FarmFax helps you decide what to ask next; it is not a mechanical inspection, title check, appraisal, or guarantee.</p>
+              <p>Screening score from submitted media only. FarmFax helps you decide what to ask next; it is not a mechanical inspection, title check, appraisal, warranty, or guarantee.</p>
             </div>
           </div>
           <div className="deal-posture priority-action">
@@ -1083,7 +1110,7 @@ function App() {
               </article>
             ))}
           </div>
-          <div className="risk-disclosure">FarmFax only reviews submitted photos and information. It is not a mechanical inspection, title search, theft check, lien check, appraisal, warranty, or guarantee.</div>
+          <div className="risk-disclosure">FarmFax reviews submitted photos, short videos, and entered details only. It is not a mechanic inspection, title search, theft check, lien check, appraisal, repair estimate, warranty, or guarantee.</div>
           <div className="evidence-strip" data-qa="evidence-summary">
             <b>Evidence checked</b>
             <div>
@@ -1136,9 +1163,9 @@ function App() {
         </div>
 
         <aside className="panel commerce-panel">
-          <div className="section-label">save or share</div>
+          <div className="section-label">hosted report seam</div>
           <h2>$29</h2>
-          <p>Optional hosted report link for a seller, mechanic, lender, or partner. Your PDF/JSON export stays available without paying.</p>
+          <p>Optional hosted report link for a seller, mechanic, lender, or partner. In this demo, checkout is simulated. Your PDF/JSON export stays available without paying.</p>
           <div className="qr-share-block" data-qa="qr-share-block">
             <img src={assetUrl('/farmfax-qr.svg')} alt="QR code for FarmFax demo" data-qa="qr-code" />
             <div>
@@ -1154,13 +1181,13 @@ function App() {
       <section className="judge-proof-panel" data-qa="judge-proof-panel">
         <div className="trace-heading">
           <span>Judge proof</span>
-          <p>One screen showing what is working, what exports, and what stays honest.</p>
+          <p>One screen for the live mechanics, the open export, and the limits we refuse to blur.</p>
         </div>
         <div className="judge-proof-grid">
-          <article data-qa="judge-proof-item"><b>Live browser checks</b><p>Photo heuristics and selected video-frame sampling run in the demo.</p></article>
-          <article data-qa="judge-proof-item"><b>Open report</b><p>JSON and PDF export stay available before any paid hosted link.</p></article>
-          <article data-qa="judge-proof-item"><b>Hermes path</b><p>Capture → evidence check → report → export / hosted link is the planned workflow route.</p></article>
-          <article data-qa="judge-proof-item"><b>Truth labels</b><p>Nemotron is planned, Stripe checkout is simulated, and unsupported claims are listed in JSON.</p></article>
+          <article data-qa="judge-proof-item"><b>Browser evidence pass</b><p>Photo heuristics and selected video-frame sampling run in the demo.</p></article>
+          <article data-qa="judge-proof-item"><b>Buyer-owned export</b><p>JSON and PDF remain available before any paid hosted link.</p></article>
+          <article data-qa="judge-proof-item"><b>Hermes orchestration seam</b><p>Capture → evidence check → report → export / hosted link is the planned route.</p></article>
+          <article data-qa="judge-proof-item"><b>Honest sponsor labels</b><p>Nemotron reasoning is planned, Stripe checkout is simulated, and unsupported claims are listed in JSON.</p></article>
         </div>
         <div className="hero-actions">
           <button type="button" onClick={() => void runJudgeDemo()}>Run judge demo</button>
@@ -1172,7 +1199,7 @@ function App() {
       <section className="source-trail" data-qa="workflow-trace">
         <div className="trace-heading">
           <span>For judges: demo trace</span>
-          <p>What is live now, what is planned next, and where Hermes fits.</p>
+          <p>Live now, planned next, and where Hermes fits without pretending the prototype is more than it is.</p>
         </div>
         <div className="trace-grid">
           {workflowTrace.map((step) => (
@@ -1218,7 +1245,7 @@ function App() {
             <div className="modal-topline"><span>Hosted report demo</span><button className="ghost" onClick={() => setStripeOpen(false)}>close</button></div>
             <div className="stripe-word">FarmFax</div>
             <h2>Save your FarmFax report</h2>
-            <p>Free export stays yours. The paid option creates a clean hosted link for seller follow-up, mechanic review, lender sharing, or partner approval. It does not certify the machine.</p>
+            <p>Free export stays yours. The paid option creates a clean hosted link for seller follow-up, mechanic review, lender sharing, or partner approval. Checkout is simulated in this demo and does not certify the machine.</p>
             <div className="receipt">
               <span>Report</span><b>{report.report_id}</b>
               <span>Price</span><b>$29.00</b>
