@@ -129,15 +129,15 @@ const catalogCandidates: CatalogCandidate[] = [
 const architectureStack = [
   {
     name: 'NVIDIA / Nemotron',
-    line: 'Multimodal reasoning over captured evidence: defect crops, OCR fields, checklist completeness, and buyer questions.',
+    line: 'Judge-facing model layer for reading submitted evidence and turning it into plain buyer questions. It does not replace inspection.',
   },
   {
     name: 'Hermes',
-    line: 'Workflow orchestrator: phone intake → CV/OCR modules → Nemotron report → export/payment/audit trail.',
+    line: 'Workflow layer that routes capture → evidence check → report → export / hosted link.',
   },
   {
     name: 'Stripe',
-    line: 'Paid hosted report links, review workflow, dealer/shop branding — without holding equipment records hostage.',
+    line: 'Optional hosted report link. Free PDF/JSON export stays available without paying.',
   },
 ]
 
@@ -145,6 +145,10 @@ function stateLabel(state: CaptureState) {
   if (state === 'accepted') return 'photo received'
   if (state === 'review') return 'retake recommended'
   return 'still needed'
+}
+
+function slotTitle(slots: CaptureSlot[], slotId: SlotId) {
+  return slots.find((slot) => slot.id === slotId)?.title ?? slotId
 }
 
 function severityWeight(severity: Severity) {
@@ -447,6 +451,7 @@ function App() {
   const activeScenario = farmFaxScenarios.find((scenario) => scenario.id === scenarioState.selectedScenarioId) ?? farmFaxScenarios[0]
   const [equipmentType, setEquipmentType] = useState('tractor')
   const [stripeOpen, setStripeOpen] = useState(false)
+  const [isSampleVideoLoading, setIsSampleVideoLoading] = useState(false)
   const [selectedFinding, setSelectedFinding] = useState<Finding>(findings[0])
   const [cameraSlot, setCameraSlot] = useState<CaptureSlot | null>(null)
   const [cameraError, setCameraError] = useState('')
@@ -531,6 +536,39 @@ function App() {
     portability: 'Core record exports as JSON/PDF; paid hosting does not own the equipment history.',
   }), [report, reportSeed.hourMeter, slots])
 
+  const workflowTrace = useMemo(() => [
+    {
+      status: 'working demo',
+      label: '7-view capture checklist',
+      detail: `${acceptedCount}/7 accepted · ${reviewCount} need review · ${missing.length} missing`,
+    },
+    {
+      status: 'working demo',
+      label: 'Photo + selected video-frame check',
+      detail: `${analyzedSlots.length}/7 slots checked · ${slots.filter((slot) => slot.mediaType === 'video').length} video source${slots.filter((slot) => slot.mediaType === 'video').length === 1 ? '' : 's'}`,
+    },
+    {
+      status: 'working demo',
+      label: 'Buyer risk report',
+      detail: `${report.risk_summary.filter((risk) => risk.severity === 'red').length} red · ${report.risk_summary.filter((risk) => risk.severity === 'yellow').length} yellow · ${report.buyer_questions.length} seller questions`,
+    },
+    {
+      status: 'planned',
+      label: 'Nemotron evidence reasoning',
+      detail: 'Turns submitted evidence, OCR, missing proof, and findings into plain buyer questions.',
+    },
+    {
+      status: 'planned',
+      label: 'Hermes workflow routing',
+      detail: 'Routes capture → evidence check → report → export / hosted link.',
+    },
+    {
+      status: 'simulated',
+      label: 'Stripe hosted report',
+      detail: 'Payment screen only; free JSON/PDF export stays with the owner.',
+    },
+  ], [acceptedCount, analyzedSlots.length, missing.length, report.buyer_questions.length, report.risk_summary, reviewCount, slots])
+
   function nextUploadRequest(slotId: SlotId) {
     uploadRequestRef.current[slotId] += 1
     setMediaErrors((current) => ({ ...current, [slotId]: undefined }))
@@ -570,6 +608,33 @@ function App() {
     }
   }
 
+  async function runSampleVideo(slotId: SlotId = 'hydraulics', options: { scrollToReport?: boolean } = {}) {
+    setIsSampleVideoLoading(true)
+    const requestId = nextUploadRequest(slotId)
+    try {
+      const response = await fetch('/farmfax-video-fixture.mp4')
+      if (!response.ok) throw new Error('Sample video fixture could not be loaded.')
+      const blob = await response.blob()
+      const file = new File([blob], 'farmfax-video-fixture.mp4', { type: blob.type || 'video/mp4' })
+      await saveSlotVideo(slotId, file, requestId)
+      const targetId = options.scrollToReport ? 'report' : 'capture'
+      window.setTimeout(() => document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100)
+    } catch (error) {
+      if (!isCurrentUpload(slotId, requestId)) return
+      setMediaErrors((current) => ({
+        ...current,
+        [slotId]: error instanceof Error ? error.message : 'Sample video could not be checked. Upload photos instead.',
+      }))
+    } finally {
+      if (isCurrentUpload(slotId, requestId)) setIsSampleVideoLoading(false)
+    }
+  }
+
+  async function runJudgeDemo() {
+    loadScenario('risky-tractor')
+    await runSampleVideo('hydraulics', { scrollToReport: true })
+  }
+
   function updateSlotMedia(slotId: SlotId, event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     event.target.value = ''
@@ -600,6 +665,7 @@ function App() {
       engine: 0,
     }
     setMediaErrors({})
+    setIsSampleVideoLoading(false)
     setScenarioState(createScenarioState(scenarioId))
   }
 
@@ -723,6 +789,9 @@ function App() {
           <div className="hero-actions primary-actions">
             <button onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth' })}>Start photo checklist</button>
             <button className="ghost" onClick={() => document.getElementById('report')?.scrollIntoView({ behavior: 'smooth' })}>See buyer report</button>
+            <button className="ghost judge-demo-button" data-qa="judge-demo-button" onClick={() => void runJudgeDemo()} disabled={isSampleVideoLoading}>
+              {isSampleVideoLoading ? 'Running sample…' : 'Run judge demo'}
+            </button>
           </div>
           <div className="scenario-kicker">Try a sample report:</div>
           <div className="scenario-switcher" aria-label="sample scenario selector">
@@ -770,7 +839,12 @@ function App() {
         <div className="panel capture-panel">
           <div className="section-label">photo checklist</div>
           <h2>Capture these 7 views.</h2>
-          <p className="muted">Photos are enough. Add a short video when motion, sound, smoke, or hydraulics matter.</p>
+          <div className="capture-intro-row">
+            <p className="muted">Photos are enough. Add a short video when motion, sound, smoke, or hydraulics matter.</p>
+            <button className="ghost sample-video-button" data-qa="sample-video-button" type="button" onClick={() => void runSampleVideo('hydraulics')} disabled={isSampleVideoLoading}>
+              {isSampleVideoLoading ? 'Checking sample…' : 'Try sample video'}
+            </button>
+          </div>
           <div className="equipment-toggle" aria-label="equipment type">
             {['tractor', 'skid steer', 'trailer', 'implement'].map((type) => (
               <button key={type} className={equipmentType === type ? 'active' : 'ghost'} disabled={type !== 'tractor'} onClick={() => type === 'tractor' && setEquipmentType(type)}>{type}{type !== 'tractor' ? ' soon' : ''}</button>
@@ -809,10 +883,10 @@ function App() {
                     </div>
                     <input accept="image/*,video/*" capture="environment" type="file" onChange={(event) => updateSlotMedia(slot.id, event)} />
                   </label>
-                  {slot.image && !slot.analysis && <small className="analysis-pending">analyzing pixels…</small>}
+                  {slot.image && !slot.analysis && <small className="analysis-pending">checking image…</small>}
                   {slot.analysis && (
                     <div className="analysis-mini">
-                      <b>{slot.mediaType === 'video' ? 'sampled video frame' : `${slot.analysis.confidence}% photo check`}</b>
+                      <b>{slot.mediaType === 'video' ? 'sampled video check' : `${slot.analysis.confidence}% photo check`}</b>
                       <span>rust {slot.analysis.rustPct}%</span>
                       <span>wet {slot.analysis.wetPct}%</span>
                       <span>paint {slot.analysis.paintVariance}/100</span>
@@ -821,7 +895,7 @@ function App() {
                   {slot.video && (
                     <div className="video-summary">
                       <b>{slot.video.frameCount} frames checked</b>
-                      <span>Most concerning frame: {slot.video.posterTime.toFixed(1)}s</span>
+                      <span>Frame to review: {slot.video.posterTime.toFixed(1)}s</span>
                       <div className="video-frame-strip" aria-label="sampled video frames">
                         {slot.video.frames.map((frame) => (
                           <img key={`${slot.id}-${frame.time}`} src={frame.image} alt={`${slot.title} sampled at ${frame.time.toFixed(1)} seconds`} />
@@ -939,6 +1013,15 @@ function App() {
             ))}
           </div>
           <div className="risk-disclosure">FarmFax only reviews submitted photos and information. It is not a mechanical inspection, title search, theft check, lien check, appraisal, warranty, or guarantee.</div>
+          <div className="evidence-strip" data-qa="evidence-summary">
+            <b>Evidence checked</b>
+            <div>
+              {report.visual_analysis.length ? report.visual_analysis.slice(0, 5).map((item) => (
+                <span key={item.slot}>{slotTitle(slots, item.slot)} · {item.source === 'video_frame' ? `${item.frameCount} video frames` : `${item.confidence}% photo`}</span>
+              )) : <span>No live photo or video checked yet</span>}
+              {report.missing_evidence.length > 0 && <span>{report.missing_evidence.length} view{report.missing_evidence.length === 1 ? '' : 's'} still needed</span>}
+            </div>
+          </div>
           <div className="question-grid">
             {report.buyer_questions.map((question) => (
               <div key={question}><b>ask seller before deposit</b><p>{question}</p></div>
@@ -976,7 +1059,7 @@ function App() {
             </div>
           </details>
           <div className="hero-actions">
-            <button onClick={exportReport}>Download full report</button>
+            <button onClick={exportReport}>Download JSON report</button>
             <button className="ghost" onClick={() => window.print()}>Print / save PDF</button>
           </div>
         </div>
@@ -989,13 +1072,20 @@ function App() {
         </aside>
       </section>
 
-      <section className="source-trail">
-        <b>audit trail</b>
-        <p>[phone] guided capture slots · accepted {acceptedCount}/7 · missing {missing.length}</p>
-        <p>[implemented] browser photo + sampled-video frame checks · analyzed {analyzedSlots.length}/7 slots · masks render over evidence photos or selected video frames</p>
-        <p>[planned] Nemotron multimodal reasoning over findings, OCR, missing evidence, and buyer questions</p>
-        <p>[planned] Hermes orchestration for capture → detection → catalog → report → export/payment</p>
-        <p>[simulated] Stripe workflow payments only; record ownership and export rights stay with the machine owner</p>
+      <section className="source-trail" data-qa="workflow-trace">
+        <div className="trace-heading">
+          <span>For judges: demo trace</span>
+          <p>What is live now, what is planned next, and where Hermes fits.</p>
+        </div>
+        <div className="trace-grid">
+          {workflowTrace.map((step) => (
+            <article key={step.label} className={`trace-step ${step.status.replaceAll(' ', '-')}`}>
+              <span>{step.status}</span>
+              <b>{step.label}</b>
+              <p>{step.detail}</p>
+            </article>
+          ))}
+        </div>
       </section>
 
       {cameraSlot && (
