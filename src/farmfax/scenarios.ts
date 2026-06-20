@@ -22,6 +22,23 @@ export type ImageAnalysis = {
   summary: string
 }
 
+export type MediaType = 'image' | 'video'
+
+export type VideoFrameAnalysis = {
+  time: number
+  image: string
+  analysis: ImageAnalysis
+}
+
+export type VideoAnalysis = {
+  duration: number
+  frameCount: number
+  posterTime: number
+  frames: VideoFrameAnalysis[]
+  aggregate: ImageAnalysis
+  summary: string
+}
+
 export type CaptureSlot = {
   id: SlotId
   title: string
@@ -30,6 +47,8 @@ export type CaptureSlot = {
   state: CaptureState
   image?: string
   analysis?: ImageAnalysis
+  video?: VideoAnalysis
+  mediaType?: MediaType
 }
 
 export type Finding = {
@@ -111,8 +130,8 @@ export type ScenarioState = {
 
 export type ScenarioAction =
   | { type: 'load-scenario'; scenarioId: ScenarioId }
-  | { type: 'replace-slot-image'; slotId: SlotId; image: string; analysis?: ImageAnalysis }
-  | { type: 'set-slot-analysis'; slotId: SlotId; image: string; analysis: ImageAnalysis }
+  | { type: 'replace-slot-image'; slotId: SlotId; image: string; analysis?: ImageAnalysis; mediaType?: MediaType; video?: VideoAnalysis }
+  | { type: 'set-slot-analysis'; slotId: SlotId; image: string; analysis: ImageAnalysis; mediaType?: MediaType; video?: VideoAnalysis }
   | { type: 'mark-slot-review'; slotId: SlotId }
   | { type: 'clear-slot'; slotId: SlotId }
 
@@ -437,7 +456,7 @@ export function scenarioReducer(state: ScenarioState, action: ScenarioAction): S
         ...state,
         slots: state.slots.map((slot) =>
           slot.id === action.slotId
-            ? { ...slot, image: action.image, state: 'accepted', analysis: action.analysis }
+            ? { ...slot, image: action.image, state: 'accepted', analysis: action.analysis, video: action.video, mediaType: action.mediaType ?? 'image' }
             : slot,
         ),
       }
@@ -446,7 +465,7 @@ export function scenarioReducer(state: ScenarioState, action: ScenarioAction): S
         ...state,
         slots: state.slots.map((slot) =>
           slot.id === action.slotId && slot.image === action.image
-            ? { ...slot, analysis: action.analysis }
+            ? { ...slot, analysis: action.analysis, video: action.video, mediaType: action.mediaType ?? slot.mediaType ?? 'image' }
             : slot,
         ),
       }
@@ -459,7 +478,7 @@ export function scenarioReducer(state: ScenarioState, action: ScenarioAction): S
       return {
         ...state,
         slots: state.slots.map((slot) =>
-          slot.id === action.slotId ? { ...slot, state: 'missing', image: undefined, analysis: undefined } : slot,
+          slot.id === action.slotId ? { ...slot, state: 'missing', image: undefined, analysis: undefined, video: undefined, mediaType: undefined } : slot,
         ),
       }
     default:

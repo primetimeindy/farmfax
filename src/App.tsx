@@ -19,6 +19,21 @@ type ImageAnalysis = {
   summary: string
 }
 
+type VideoFrameAnalysis = {
+  time: number
+  image: string
+  analysis: ImageAnalysis
+}
+
+type VideoAnalysis = {
+  duration: number
+  frameCount: number
+  posterTime: number
+  frames: VideoFrameAnalysis[]
+  aggregate: ImageAnalysis
+  summary: string
+}
+
 type CaptureSlot = {
   id: SlotId
   title: string
@@ -27,6 +42,8 @@ type CaptureSlot = {
   state: CaptureState
   image?: string
   analysis?: ImageAnalysis
+  video?: VideoAnalysis
+  mediaType?: 'image' | 'video'
 }
 
 type Finding = {
@@ -77,7 +94,7 @@ type FarmFaxReport = {
   condition_score: number
   confidence: number
   findings: Finding[]
-  visual_analysis: Array<{ slot: SlotId; rustPct: number; wetPct: number; paintVariance: number; confidence: number; summary: string }>
+  visual_analysis: Array<{ slot: SlotId; source: 'photo' | 'video_frame'; rustPct: number; wetPct: number; paintVariance: number; confidence: number; summary: string; frameCount?: number; worstFrameTime?: number }>
   risk_summary: RiskCard[]
   buyer_questions: string[]
   missing_evidence: string[]
@@ -315,6 +332,113 @@ function analyzeImageHeuristics(imageSrc: string): Promise<ImageAnalysis> {
   })
 }
 
+function videoFrameRisk(frame: VideoFrameAnalysis) {
+  return frame.analysis.rustPct * 1.3 + frame.analysis.wetPct * 1.5 + frame.analysis.paintVariance * 0.35
+}
+
+function mediaEvent(element: HTMLMediaElement, eventName: keyof HTMLMediaElementEventMap, timeoutMs = 7000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const timeout = window.setTimeout(() => {
+      cleanup()
+      reject(new Error('Video took too long to load. Try a shorter clip or use photos.'))
+    }, timeoutMs)
+    const cleanup = () => {
+      window.clearTimeout(timeout)
+      element.removeEventListener(eventName, onEvent)
+      element.removeEventListener('error', onError)
+    }
+    const onEvent = () => {
+      cleanup()
+      resolve()
+    }
+    const onError = () => {
+      cleanup()
+      reject(new Error('This video could not be read in this browser. Use photos instead.'))
+    }
+    element.addEventListener(eventName, onEvent, { once: true })
+    element.addEventListener('error', onError, { once: true })
+  })
+}
+
+async function seekVideoFrame(video: HTMLVideoElement, time: number) {
+  const target = Math.min(Math.max(time, 0), Math.max(0, video.duration - 0.05))
+  if (Math.abs(video.currentTime - target) < 0.03) return
+  const seeked = mediaEvent(video, 'seeked')
+  video.currentTime = target
+  await seeked
+}
+
+function drawVideoFrame(video: HTMLVideoElement) {
+  const sourceWidth = video.videoWidth || 640
+  const sourceHeight = video.videoHeight || 360
+  if (!sourceWidth || !sourceHeight) throw new Error('Video frame has no readable size.')
+  const width = Math.min(640, sourceWidth)
+  const height = Math.max(1, Math.round((sourceHeight / sourceWidth) * width))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const context = canvas.getContext('2d')
+  if (!context) throw new Error('Canvas unavailable for video sampling.')
+  context.drawImage(video, 0, 0, width, height)
+  return canvas.toDataURL('image/jpeg', 0.82)
+}
+
+function videoSampleTimes(duration: number) {
+  if (!Number.isFinite(duration) || duration <= 0) return []
+  return Array.from(new Set([0.2, 0.4, 0.6, 0.8]
+    .map((pct) => Math.min(duration - 0.05, Math.max(0.05, duration * pct)))
+    .map((time) => Math.round(time * 10) / 10)))
+    .slice(0, 4)
+}
+
+async function analyzeVideoFile(file: File): Promise<{ poster: string; video: VideoAnalysis }> {
+  const objectUrl = URL.createObjectURL(file)
+  const video = document.createElement('video')
+  video.preload = 'metadata'
+  video.muted = true
+  video.playsInline = true
+  video.src = objectUrl
+
+  try {
+    await mediaEvent(video, 'loadedmetadata')
+    const duration = Number.isFinite(video.duration) ? video.duration : 0
+    const sampleTimes = videoSampleTimes(duration)
+    if (!sampleTimes.length) throw new Error('Video has no readable duration. Use a short photo sequence instead.')
+
+    const frames: VideoFrameAnalysis[] = []
+    for (const time of sampleTimes) {
+      await seekVideoFrame(video, time)
+      const image = drawVideoFrame(video)
+      const analysis = await analyzeImageHeuristics(image)
+      frames.push({ time, image, analysis })
+      await new Promise((resolve) => window.setTimeout(resolve, 0))
+    }
+    if (!frames.length) throw new Error('No video frames could be checked.')
+
+    const worstFrame = frames.reduce((worst, frame) => (videoFrameRisk(frame) > videoFrameRisk(worst) ? frame : worst), frames[0])
+    const aggregate: ImageAnalysis = {
+      ...worstFrame.analysis,
+      summary: worstFrame.analysis.summary,
+    }
+    return {
+      poster: worstFrame.image,
+      video: {
+        duration,
+        frameCount: frames.length,
+        posterTime: worstFrame.time,
+        frames,
+        aggregate,
+        summary: `${frames.length} frames checked · most concerning frame ${worstFrame.time.toFixed(1)}s · ${aggregate.summary}`,
+      },
+    }
+  } finally {
+    video.pause()
+    video.removeAttribute('src')
+    video.load()
+    URL.revokeObjectURL(objectUrl)
+  }
+}
+
 function App() {
   const [scenarioState, setScenarioState] = useState(() => createScenarioState('risky-tractor'))
   const slots = scenarioState.slots
@@ -331,6 +455,16 @@ function App() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const cameraRequestRef = useRef(0)
+  const uploadRequestRef = useRef<Record<SlotId, number>>({
+    walkaround: 0,
+    serial: 0,
+    hours: 0,
+    hydraulics: 0,
+    tires: 0,
+    paint: 0,
+    engine: 0,
+  })
+  const [mediaErrors, setMediaErrors] = useState<Partial<Record<SlotId, string>>>({})
 
   const acceptedCount = slots.filter((slot) => slot.state === 'accepted').length
   const reviewCount = slots.filter((slot) => slot.state === 'review').length
@@ -368,11 +502,14 @@ function App() {
     findings,
     visual_analysis: analyzedSlots.map((slot) => ({
       slot: slot.id,
+      source: slot.mediaType === 'video' ? 'video_frame' : 'photo',
       rustPct: slot.analysis!.rustPct,
       wetPct: slot.analysis!.wetPct,
       paintVariance: slot.analysis!.paintVariance,
       confidence: slot.analysis!.confidence,
-      summary: slot.analysis!.summary,
+      summary: slot.video ? slot.video.summary : slot.analysis!.summary,
+      frameCount: slot.video?.frameCount,
+      worstFrameTime: slot.video?.posterTime,
     })),
     risk_summary: riskSummary,
     buyer_questions: reportSeed.buyerQuestions,
@@ -394,19 +531,76 @@ function App() {
     portability: 'Core record exports as JSON/PDF; paid hosting does not own the equipment history.',
   }), [report, reportSeed.hourMeter, slots])
 
-  async function saveSlotImage(slotId: SlotId, image: string) {
-    setScenarioState((current) => scenarioReducer(current, { type: 'replace-slot-image', slotId, image }))
-    const analysis = await analyzeImageHeuristics(image)
-    setScenarioState((current) => scenarioReducer(current, { type: 'set-slot-analysis', slotId, image, analysis }))
+  function nextUploadRequest(slotId: SlotId) {
+    uploadRequestRef.current[slotId] += 1
+    setMediaErrors((current) => ({ ...current, [slotId]: undefined }))
+    return uploadRequestRef.current[slotId]
   }
 
-  function updateSlotImage(slotId: SlotId, event: ChangeEvent<HTMLInputElement>) {
+  function isCurrentUpload(slotId: SlotId, requestId: number) {
+    return uploadRequestRef.current[slotId] === requestId
+  }
+
+  async function saveSlotImage(slotId: SlotId, image: string, requestId = nextUploadRequest(slotId)) {
+    if (!isCurrentUpload(slotId, requestId)) return
+    setScenarioState((current) => scenarioReducer(current, { type: 'replace-slot-image', slotId, image, mediaType: 'image' }))
+    const analysis = await analyzeImageHeuristics(image)
+    if (!isCurrentUpload(slotId, requestId)) return
+    setScenarioState((current) => scenarioReducer(current, { type: 'set-slot-analysis', slotId, image, analysis, mediaType: 'image' }))
+  }
+
+  async function saveSlotVideo(slotId: SlotId, file: File, requestId: number) {
+    try {
+      const { poster, video } = await analyzeVideoFile(file)
+      if (!isCurrentUpload(slotId, requestId)) return
+      setScenarioState((current) => scenarioReducer(current, {
+        type: 'replace-slot-image',
+        slotId,
+        image: poster,
+        analysis: video.aggregate,
+        mediaType: 'video',
+        video,
+      }))
+    } catch (error) {
+      if (!isCurrentUpload(slotId, requestId)) return
+      setMediaErrors((current) => ({
+        ...current,
+        [slotId]: error instanceof Error ? error.message : 'Video could not be checked. Use photos instead.',
+      }))
+    }
+  }
+
+  function updateSlotMedia(slotId: SlotId, event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => saveSlotImage(slotId, String(reader.result))
-    reader.readAsDataURL(file)
     event.target.value = ''
+    if (!file) return
+    const requestId = nextUploadRequest(slotId)
+    if (file.type.startsWith('video/')) {
+      void saveSlotVideo(slotId, file, requestId)
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      setMediaErrors((current) => ({ ...current, [slotId]: 'Use a photo or short video file.' }))
+      return
+    }
+    const reader = new FileReader()
+    reader.onload = () => void saveSlotImage(slotId, String(reader.result), requestId)
+    reader.onerror = () => setMediaErrors((current) => ({ ...current, [slotId]: 'Photo could not be read. Try another file.' }))
+    reader.readAsDataURL(file)
+  }
+
+  function loadScenario(scenarioId: ScenarioId) {
+    uploadRequestRef.current = {
+      walkaround: 0,
+      serial: 0,
+      hours: 0,
+      hydraulics: 0,
+      tires: 0,
+      paint: 0,
+      engine: 0,
+    }
+    setMediaErrors({})
+    setScenarioState(createScenarioState(scenarioId))
   }
 
   function stopCamera() {
@@ -486,10 +680,11 @@ function App() {
   }, [findings])
 
   useEffect(() => {
+    const videoElement = videoRef.current
     return () => {
       streamRef.current?.getTracks().forEach((track) => track.stop())
       streamRef.current = null
-      if (videoRef.current) videoRef.current.srcObject = null
+      if (videoElement) videoElement.srcObject = null
     }
   }, [])
 
@@ -535,7 +730,7 @@ function App() {
               <button
                 key={scenario.id}
                 className={scenario.id === scenarioState.selectedScenarioId ? 'active' : 'ghost'}
-                onClick={() => setScenarioState(createScenarioState(scenario.id as ScenarioId))}
+                onClick={() => loadScenario(scenario.id as ScenarioId)}
               >
                 <b>{scenario.label}</b>
                 <span>{scenario.description}</span>
@@ -574,8 +769,8 @@ function App() {
       <section className="analysis-layout farm-layout" id="capture">
         <div className="panel capture-panel">
           <div className="section-label">photo checklist</div>
-          <h2>Take these 7 photos.</h2>
-          <p className="muted">Use the rear camera. If a seller skips a required photo, FarmFax marks the risk instead of guessing.</p>
+          <h2>Capture these 7 views.</h2>
+          <p className="muted">Photos are enough. Add a short video when motion, sound, smoke, or hydraulics matter.</p>
           <div className="equipment-toggle" aria-label="equipment type">
             {['tractor', 'skid steer', 'trailer', 'implement'].map((type) => (
               <button key={type} className={equipmentType === type ? 'active' : 'ghost'} disabled={type !== 'tractor'} onClick={() => type === 'tractor' && setEquipmentType(type)}>{type}{type !== 'tractor' ? ' soon' : ''}</button>
@@ -594,7 +789,12 @@ function App() {
                   <button className="camera-button" type="button" onClick={() => openCamera(slot)}>Take photo</button>
                   <label>
                     <div className="capture-preview">
-                      {slot.image ? <img src={slot.image} alt={`${slot.title} capture`} /> : <div className="phone-placeholder">Tap to upload</div>}
+                      {slot.image ? (
+                        <>
+                          <img src={slot.image} alt={`${slot.title} capture`} />
+                          {slot.mediaType === 'video' && <span className="video-badge">video sampled</span>}
+                        </>
+                      ) : <div className="phone-placeholder">Tap to upload photo or video</div>}
                       {slot.analysis && (
                         <div className="heuristic-mask" aria-label="browser-side rust paint leak heuristic overlay">
                           {slot.analysis.cells.map((cell, index) => (
@@ -607,17 +807,30 @@ function App() {
                         </div>
                       )}
                     </div>
-                    <input accept="image/*" capture="environment" type="file" onChange={(event) => updateSlotImage(slot.id, event)} />
+                    <input accept="image/*,video/*" capture="environment" type="file" onChange={(event) => updateSlotMedia(slot.id, event)} />
                   </label>
                   {slot.image && !slot.analysis && <small className="analysis-pending">analyzing pixels…</small>}
                   {slot.analysis && (
                     <div className="analysis-mini">
-                      <b>{slot.analysis.confidence}% CV</b>
+                      <b>{slot.mediaType === 'video' ? 'sampled video frame' : `${slot.analysis.confidence}% photo check`}</b>
                       <span>rust {slot.analysis.rustPct}%</span>
                       <span>wet {slot.analysis.wetPct}%</span>
                       <span>paint {slot.analysis.paintVariance}/100</span>
                     </div>
                   )}
+                  {slot.video && (
+                    <div className="video-summary">
+                      <b>{slot.video.frameCount} frames checked</b>
+                      <span>Most concerning frame: {slot.video.posterTime.toFixed(1)}s</span>
+                      <div className="video-frame-strip" aria-label="sampled video frames">
+                        {slot.video.frames.map((frame) => (
+                          <img key={`${slot.id}-${frame.time}`} src={frame.image} alt={`${slot.title} sampled at ${frame.time.toFixed(1)} seconds`} />
+                        ))}
+                      </div>
+                      <small>Video check samples selected frames only. It does not inspect every moment.</small>
+                    </div>
+                  )}
+                  {mediaErrors[slot.id] && <small className="media-error">{mediaErrors[slot.id]}</small>}
                 </div>
               </article>
             ))}
@@ -758,8 +971,8 @@ function App() {
             <div className="analysis-ledger">
               <b>Evidence ledger</b>
               {report.visual_analysis.length ? report.visual_analysis.map((item) => (
-                <p key={item.slot}>[{item.slot}] {item.summary} · confidence {item.confidence}%</p>
-              )) : <p>No live slot image analyzed yet. Capture/upload a photo to run the local heuristic pass.</p>}
+                <p key={item.slot}>[{item.slot}] {item.source === 'video_frame' ? `video checked · ${item.summary}` : `photo checked · ${item.summary}`}</p>
+              )) : <p>No live slot image analyzed yet. Capture/upload a photo or short video to run the local check.</p>}
             </div>
           </details>
           <div className="hero-actions">
@@ -779,7 +992,7 @@ function App() {
       <section className="source-trail">
         <b>audit trail</b>
         <p>[phone] guided capture slots · accepted {acceptedCount}/7 · missing {missing.length}</p>
-        <p>[implemented] browser HSV/wet/paint heuristics · analyzed {analyzedSlots.length}/7 slots · masks render over evidence photos</p>
+        <p>[implemented] browser photo + sampled-video frame checks · analyzed {analyzedSlots.length}/7 slots · masks render over evidence photos or selected video frames</p>
         <p>[planned] Nemotron multimodal reasoning over findings, OCR, missing evidence, and buyer questions</p>
         <p>[planned] Hermes orchestration for capture → detection → catalog → report → export/payment</p>
         <p>[simulated] Stripe workflow payments only; record ownership and export rights stay with the machine owner</p>
@@ -800,9 +1013,9 @@ function App() {
             <div className="camera-actions">
               <button onClick={captureFrame} disabled={!!cameraError || isCameraStarting}>Capture evidence photo</button>
               <label className="upload-button">
-                Upload fallback
-                <input accept="image/*" capture="environment" type="file" onChange={(event) => {
-                  updateSlotImage(cameraSlot.id, event)
+                Upload photo/video
+                <input accept="image/*,video/*" capture="environment" type="file" onChange={(event) => {
+                  updateSlotMedia(cameraSlot.id, event)
                   closeCamera()
                 }} />
               </label>
