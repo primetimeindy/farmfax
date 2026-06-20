@@ -6,7 +6,11 @@ Say:
 
 > “Buying used farm equipment is a trust problem. A tractor can look fine in a listing and still hide leaks, repaint, corrosion, missing safety evidence, questionable hours, or a serial plate you never checked. FarmFax turns a phone walkthrough into an open buyer risk report before you buy the story.”
 
-Show the hero line: **Scan the machine before you buy the story.**
+Open:
+
+```text
+https://primetimeindy.github.io/farmfax-demo/
+```
 
 ## 0:20 — Product thesis
 
@@ -16,100 +20,119 @@ Say:
 
 Point to:
 
-- Evidence-first.
-- Open schema.
-- Repair-friendly.
+- Phone-first capture.
+- Evidence checked.
+- Open JSON/PDF export.
 - No data hostage.
 
-## 0:40 — Guided phone capture
+## 0:40 — Deterministic judge demo
 
-Scroll to **phone-guided inspection**.
+Click **Load complete sample**.
+
+Say:
+
+> “For judging, this button runs a deterministic sample inspection: it loads a complete tractor report and runs a short hydraulic video through the same browser video sampler.”
+
+Point to:
+
+- `4 frames checked`.
+- `Frame to review`.
+- Thumbnail strip.
+- Guardrail: selected frames only.
+
+Important line:
+
+> “Video helps with motion, sound, smoke, and hydraulics, but FarmFax does not pretend to inspect every moment of the video.”
+
+## 1:15 — Guided evidence capture
+
+Scroll to **Capture these 7 views** if needed.
 
 Say:
 
 > “The phone is the input device, but guided capture is the moat. FarmFax asks for the exact evidence a buyer needs: walkaround, serial/PIN plate, hour meter, hydraulics, tires or tracks, paint/body panels, and engine bay.”
 
-Action:
+Point to:
 
-- Show the capture cards.
-- If demo images are ready, upload/capture one image to trigger local CV.
-- If not, point to the sample report badge and explain that sample evidence keeps the judge flow reliable.
+- Photo/video inputs.
+- `Try sample video`.
+- Required evidence slots.
+- Missing/retake states.
 
 Important line:
 
 > “Better inputs beat fancier model claims. Missing evidence increases uncertainty instead of letting the AI guess.”
 
-## 1:15 — Local CV and visual evidence
+## 1:50 — Buyer risk report
 
-Show **browser CV + planned Nemotron layer** and the overlays.
+Scroll to **What to check before buying**.
 
 Say:
 
-> “This browser demo runs local image heuristics for rust-tone pixels, wet or leak-like regions, and paint variance. In production, NVIDIA-accelerated CV and Nemotron-style reasoning can upgrade these into multi-image defect crops and structured explanations.”
+> “The output is not a chatbot answer. It is a buyer risk report: visible condition score, paperwork risk, safety and repair risk, evidence completeness, hour plausibility, negotiation leverage, seller questions, and a record of what was actually checked.”
 
 Point to:
-
-- Rust / leak / paint / tread hotspots.
-- Per-slot CV confidence.
-- Evidence overlay masks if uploaded images are available.
-
-Guardrail line:
-
-> “FarmFax reports visible evidence. It is not pretending to certify internal mechanical condition.”
-
-## 1:50 — Identity and hour risk
-
-Scroll to **serial code + visual catalog**.
-
-Say:
-
-> “A buyer should not trust a listing until identity evidence is cross-checked. FarmFax treats serial/PIN plates, hour meters, model clues, dealer stock numbers, auction lots, and service records as evidence with confidence — not magic universal truth.”
-
-Point to:
-
-- OCR serial/PIN.
-- Hour meter confidence.
-- Make/model candidate list.
-- Anti vendor lock-in panel.
-
-## 2:20 — Buyer risk report
-
-Scroll to **consolidated FarmFax report**.
-
-Say:
-
-> “The output is not a chatbot answer. It is a buyer risk report: visible condition score, identity risk, safety risk, evidence completeness, negotiation leverage, seller questions, missing evidence, and a ledger of what was actually analyzed.”
-
-Point to these exact sections:
 
 1. Visible-condition score.
-2. Compact risk strip.
-3. Deal posture.
-4. Buyer leverage questions.
-5. Missing evidence and guardrail.
-6. Browser CV ledger.
+2. Recommended next step.
+3. Compact risk strip.
+4. **Evidence checked** summary.
+5. Buyer questions.
+6. Missing-proof and guardrail copy.
 
 Important line:
 
-> “Unknowns stay unknown. If the engine bay or cold-start evidence is missing, FarmFax says so instead of inventing certainty.”
+> “Unknowns stay unknown. FarmFax reports submitted evidence and missing proof — not certification.”
 
-## 2:55 — Export and Stripe
+## 2:35 — Judge proof and workflow trace
 
-Click **Download report JSON** and/or **Print / save PDF**.
-
-Then click **Open Stripe checkout demo**.
+Scroll to **Judge proof** and **For judges: demo trace**.
 
 Say:
 
-> “The open record exports as JSON or PDF. Stripe monetizes hosted report links, seller share pages, dealer branding, and expert review — but export remains available without paying. The business model is workflow, not data captivity.”
+> “This is where we keep the sponsor story honest. The browser photo and video checks are working in the demo. Hermes orchestration and Nemotron reasoning are labeled as planned backend seams. Stripe is represented by a simulated hosted-report modal. The JSON says the same thing.”
 
-## 3:20 — Sponsor close
+Point to:
+
+- Live browser checks.
+- Open report.
+- Hermes path.
+- Truth labels.
+- Working demo / planned / simulated trace cards.
+
+## 3:10 — Export and share
+
+Click **Download JSON report**.
 
 Say:
 
-> “For Hermes, FarmFax is physical-world workflow orchestration: capture, CV, reasoning, provenance, export, and commerce. For NVIDIA, it is a multimodal inspection workload. For Stripe, it is paid trust infrastructure for equipment commerce.”
+> “The open record exports as JSON or PDF. The JSON includes input sources and demo truth, so a judge or future integrator can see exactly what was implemented, planned, or simulated.”
 
-## 3:40 — Final line
+Open technical details if useful and point to:
+
+```text
+input_sources
+demo_truth
+unsupported_claims
+```
+
+Then show:
+
+- **Print / save PDF**.
+- QR/share block.
+- **Save hosted report** modal.
+
+Say:
+
+> “Stripe monetizes hosted report links, seller share pages, dealer branding, and expert review — but export remains available without paying. The business model is workflow, not data captivity.”
+
+## 3:45 — Sponsor close
+
+Say:
+
+> “For Hermes, FarmFax is physical-world workflow orchestration: capture, evidence checks, reasoning, export, and commerce. For NVIDIA/Nemotron, it is a multimodal inspection workload. For Stripe, it is paid trust infrastructure for equipment commerce.”
+
+## Final line
 
 Say:
 
@@ -119,19 +142,19 @@ Say:
 
 Answer:
 
-> “It is Carfax-like in user value, not in claims. We are not claiming authoritative title, lien, theft, service, or ownership history yet. The hackathon wedge is visual condition plus portable evidence. Authoritative feeds can plug into the same open report later.”
+> “It is Carfax-like in user value, not in claims. We are not claiming authoritative title, lien, theft, service, or ownership history yet. The hackathon wedge is visible condition plus portable evidence. Authoritative feeds can plug into the same open report later.”
 
 ## If judges ask: “What is live vs demo?”
 
 Answer:
 
-> “The current prototype is a local React/Vite demo. Capture slots, image upload, local rust/wet/paint heuristics, overlays, report scoring, JSON export, print/PDF, and Stripe-style checkout modal are implemented. OCR/model integrations are represented as confidence-gated report fields and are the next backend seam.”
+> “The live prototype is a deployed React/Vite app. Capture slots, image/video upload, browser rust/wet/paint checks, selected video-frame sampling, overlays, report scoring, JSON export, print/PDF, QR/share, and the hosted-report modal are implemented. Hermes orchestration and Nemotron reasoning are planned backend seams. Stripe checkout is simulated.”
 
 ## If judges ask: “What prevents AI slop?”
 
 Answer:
 
-> “Every finding needs evidence, confidence, and a limitation. Missing views lower certainty. The report explicitly avoids certification language. The scoring rubric is open and inspectable.”
+> “Every finding needs evidence, confidence, and a limitation. Missing views lower certainty. The report explicitly avoids certification language. The exported JSON includes unsupported claims so the product cannot silently overstate what it knows.”
 
 ## If judges ask: “How does it make money?”
 

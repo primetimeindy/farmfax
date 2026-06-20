@@ -2,62 +2,70 @@
 
 ## Build status
 
+- [x] Public source repo exists: https://github.com/primetimeindy/farmfax
+- [x] Public deployed app exists: https://primetimeindy.github.io/farmfax-demo/
 - [x] React/Vite production build passes with `npm run build`.
+- [x] Demo verification passes with `npm run verify:demo`.
+- [x] GitHub Actions runs `npm run verify:demo` on push/PR.
 - [x] App title is FarmFax: `FarmFax — Open Equipment Condition Reports`.
-- [x] Main UI is FarmFax, not ParcelProof/Revenue Forge.
-- [x] README rewritten for FarmFax.
-- [x] Submission brief rewritten for FarmFax.
-- [x] Final demo script rewritten for FarmFax.
-- [x] Deploy notes added for FarmFax.
+- [x] Main UI is FarmFax, not old concepts.
+- [x] Old ParcelProof/Revenue Forge/land concept docs are quarantined under `archive/old-concepts/`.
 
 ## Required submission assets
 
-- [x] `README.md` — project overview, winning thesis, sponsor story, run/build commands, safety guardrails.
+- [x] `README.md` — project overview, live URL, source URL, winning thesis, sponsor story, run/build/verify commands, safety guardrails.
 - [x] `SUBMISSION.md` — hackathon brief with title, one-liner, problem, solution, sponsor mapping, moat, demo path, non-claims.
 - [x] `FINAL_DEMO_SCRIPT.md` — 3–4 minute judge script plus Q&A answers.
-- [x] `DEPLOY_NOTES.md` — local build/deploy/verification notes and env seam for Stripe hosted checkout.
-- [x] `FARMFAX_PIVOT_STRATEGY.md` — deeper strategic memo.
-- [x] `docs/FARMFAX_MVP_TECH_ARCHITECTURE.md` — technical architecture reference.
+- [x] `DEPLOY_NOTES.md` — GitHub Pages deploy/verification notes and backend/Stripe seams.
+- [x] `FINAL_SUBMISSION_CHECKLIST.md` — this readiness checklist.
+- [x] `public/farmfax-qr.svg` — QR to the public demo.
+- [x] `scripts/verify-demo.mjs` — local demo verification.
+- [x] `assets/submission/01-hero.png` — final hero screenshot.
+- [x] `assets/submission/02-buyer-report-evidence.png` — final report/evidence screenshot.
+- [x] `assets/submission/03-judge-proof-trace.png` — final judge proof / trace screenshot.
+- [x] `assets/submission/farmfax-demo-video.mp4` — 60-second silent demo video asset.
 
 ## Required demo path
 
-1. Open local or deployed app.
-2. Show hero: **Scan the machine before you buy the story.**
-3. State thesis: **Carfax tells you what paperwork says happened. FarmFax shows you what the machine is telling you right now.**
-4. Show guided phone capture slots.
-5. Upload/capture at least one image if available; otherwise call out sample evidence.
-6. Show local rust/wet/paint CV heuristics and evidence overlays.
-7. Show serial/PIN, hour meter, make/model candidate panel.
-8. Show anti-vendor-lock open schema panel.
-9. Show buyer risk report: score, risk strip, deal posture, buyer leverage questions, missing evidence, evidence ledger.
-10. Export JSON and/or print/save PDF.
-11. Open Stripe checkout demo.
-12. Close on open report ownership and sponsor-native architecture.
+1. Open https://primetimeindy.github.io/farmfax-demo/.
+2. Show hero and state thesis: **Carfax tells you what paperwork says happened. FarmFax shows you what the machine is telling you right now.**
+3. Click **Load complete sample**.
+4. Show sampled hydraulic video: `4 frames checked`, `Frame to review`, thumbnail strip, selected-frame guardrail.
+5. Show guided 7-view capture checklist and `Try sample video`.
+6. Show buyer report: score, risk strip, recommended next step, **Evidence checked**, buyer leverage questions, missing-proof guardrail.
+7. Show **Judge proof**.
+8. Show **For judges: demo trace** with working/planned/simulated labels.
+9. Export JSON and point to `input_sources`, `demo_truth`, and `unsupported_claims`.
+10. Print/save PDF if requested.
+11. Show QR/share block.
+12. Open hosted report modal and explain Stripe-style monetization without locking export.
 
 ## Exact sections judges should see
 
-- Hero: “Scan the machine before you buy the story.”
-- Demo architecture stack.
-- Phone-guided inspection.
-- Open CV + Nemotron pass.
-- Serial code + visual catalog.
-- Anti vendor lock-in.
-- Consolidated FarmFax report.
-- Stripe rail.
-- Audit trail.
+- Hero: “Check the machine before you buy.”
+- Run judge demo / Load complete sample buttons.
+- Capture these 7 views.
+- Sampled video check.
+- Evidence checked summary.
+- Buyer risk report.
+- Judge proof.
+- For judges: demo trace.
+- QR/share block.
+- Download JSON report.
+- Hosted report modal.
 
 ## Sponsor proof points
 
 ### Nous / Hermes
 
-- Orchestrates capture completeness, CV/OCR evidence, reasoning, report generation, provenance, export, and payment handoff.
-- Demonstrates AI agents in a physical-world workflow instead of another chat interface.
+- Physical-world workflow route: capture → evidence check → report → export / hosted link.
+- Shows what is working now and what Hermes would orchestrate next.
 - Produces durable proof artifacts with explicit limits.
 
 ### NVIDIA / Nemotron
 
-- Multimodal inspection workload: photos, defect crops, segmentation overlays, OCR, and structured reasoning.
-- Clear upgrade path from local browser heuristics to GPU-accelerated CV and Nemotron-generated structured reports.
+- Multimodal inspection workload: photos, selected video frames, overlays, OCR-ready serial/hour evidence, checklist completeness, and structured reasoning.
+- Clear upgrade path from browser heuristics to GPU-accelerated CV and Nemotron-generated structured reports.
 - Physical economy use case with recurring inference demand.
 
 ### Stripe
@@ -68,24 +76,25 @@
 
 ## Submission one-liner
 
-FarmFax turns a guided phone walkthrough into an open, evidence-backed buyer risk report for used farm equipment — visible-condition scoring, identity/hour evidence, safety flags, missing proof, leverage questions, JSON/PDF export, and Stripe-hosted sharing without data lock-in.
+FarmFax turns guided phone photos and short videos into an open, evidence-backed buyer risk report for used farm equipment — visible-condition scoring, identity/hour evidence, safety flags, missing proof, leverage questions, JSON/PDF export, and Stripe-hosted sharing without data lock-in.
 
 ## Winning narrative
 
-Used farm equipment is bought through trust gaps: listings are incomplete, inspections are inconsistent, records are fragmented, and a bad purchase can cost tens of thousands of dollars. FarmFax starts with the buyer’s phone and creates the first portable evidence layer: what was captured, what visible defects were found, how confident the system is, what is missing, and what the buyer should ask next. It is not a fake certification; it is a practical, open, extensible inspection report that makes the market more trustworthy.
+Used farm equipment is bought through trust gaps: listings are incomplete, inspections are inconsistent, records are fragmented, and a bad purchase can cost tens of thousands of dollars. FarmFax starts with the buyer’s phone and creates a portable evidence layer: what was captured, what visible defects were found, how confident the system is, what is missing, and what the buyer should ask next. It is not a fake certification; it is a practical, open, extensible inspection report that makes the market more trustworthy.
 
 ## Safety copy
 
-FarmFax is an AI-assisted screening aid, not a certified mechanic inspection, title/lien search, theft determination, appraisal, safety certification, warranty, or repair estimate. Findings must be verified with the seller, service records, and a qualified mechanic before purchase or operation.
+FarmFax is an AI-assisted screening aid, not a certified mechanic inspection, title/lien search, theft determination, appraisal, safety certification, warranty, repair estimate, or full-video inspection. Findings must be verified with the seller, service records, and a qualified mechanic before purchase or operation.
 
 ## Product roadmap if asked
 
 1. Add real OCR pipeline for serial/PIN plates, hour meters, model decals, and service documents.
 2. Add NVIDIA-accelerated defect detection for rust, leaks, weld repairs, tire/track wear, missing guards, and frame/bucket deformation.
-3. Add structured Nemotron report generation from multi-image evidence.
-4. Add open report schema package and self-hosted API.
-5. Add seller response workflow and mechanic/dealer review via Stripe Checkout.
-6. Add equipment-history connectors: OEM portals, dealer CRMs, auction listings, service PDFs, insurance/finance/lien providers where available.
+3. Add structured Nemotron report generation from multi-image/video-frame evidence.
+4. Add Hermes/OpenEye-style visual session tracking for pass/fail/uncertain capture-step verification.
+5. Add open report schema package and self-hosted API.
+6. Add seller response workflow and mechanic/dealer review via Stripe Checkout.
+7. Add equipment-history connectors: OEM portals, dealer CRMs, auction listings, service PDFs, insurance/finance/lien providers where available.
 
 ## Killer closing line
 
