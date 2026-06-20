@@ -96,6 +96,16 @@ h3 { margin:0 0 8px; }
 .slot-media-actions { display:grid; gap:8px; align-content:start; }
 .camera-button { width:100%; padding:9px 10px; font-size:.78rem; }
 .capture-slot img { width:100%; height:100%; min-height: 108px; object-fit:cover; display:block; }
+.capture-preview { position:relative; min-height:108px; overflow:hidden; }
+.heuristic-mask { position:absolute; inset:0; pointer-events:none; }
+.mask-cell { position:absolute; width:12.5%; height:16.66%; border-radius:8px; opacity:.58; mix-blend-mode:screen; box-shadow:0 0 14px currentColor; }
+.mask-cell.rust { color:#ff7b2f; background:rgba(255,123,47,.58); }
+.mask-cell.wet { color:#65a7ff; background:rgba(55,92,150,.62); }
+.mask-cell.paint { color:#ffca67; background:rgba(255,202,103,.54); }
+.analysis-pending { color:var(--amber) !important; font:900 .68rem/1.2 ui-monospace, monospace; text-transform:uppercase; }
+.analysis-mini { display:grid; grid-template-columns:1fr 1fr; gap:5px; border:1px solid rgba(110,247,194,.18); border-radius:12px; padding:7px; background:rgba(0,0,0,.24); }
+.analysis-mini b { color:var(--mint); grid-column:1 / -1; font-size:.78rem; }
+.analysis-mini span { color:#c4d4c6; font:900 .66rem/1 ui-monospace, monospace; text-transform:uppercase; letter-spacing:.04em; }
 .phone-placeholder { height:100%; min-height:108px; display:grid; place-items:center; padding:12px; color:var(--muted); text-align:center; font-weight:900; }
 .overlay-card { border:1px solid rgba(255,255,255,.10); border-radius:20px; background:linear-gradient(135deg, rgba(40,55,45,.9), rgba(0,0,0,.35)); padding:12px; }
 .tractor-silhouette { position:relative; height:250px; border-radius:18px; overflow:hidden; background:
@@ -138,6 +148,9 @@ h3 { margin:0 0 8px; }
 .question-grid { display:grid; grid-template-columns: repeat(2,1fr); gap: 12px; margin-top: 13px; }
 .question-grid p { margin: 10px 0 0; }
 .data-disclosures { margin-top:12px; }
+.analysis-ledger { margin-top:12px; border:1px solid rgba(110,247,194,.16); border-radius:16px; padding:12px; background:rgba(110,247,194,.045); }
+.analysis-ledger b { color:var(--mint); font:1000 .72rem/1 ui-monospace, monospace; text-transform:uppercase; letter-spacing:.12em; }
+.analysis-ledger p { margin:8px 0 0; color:#c4d4c6; font-size:.9rem; line-height:1.35; }
 .data-disclosures p { margin:7px 0; color:#b9c9bb; font-size:.92rem; }
 .commerce-panel { border-color:rgba(99,91,255,.36); }
 .commerce-panel h2 { color:#c9c5ff; font-size:5rem; }

@@ -6,6 +6,17 @@ type CaptureState = 'accepted' | 'review' | 'missing'
 type Severity = 'green' | 'yellow' | 'red'
 type SlotId = 'walkaround' | 'serial' | 'hours' | 'hydraulics' | 'tires' | 'paint' | 'engine'
 
+type AnalysisCell = { x: number; y: number; kind: 'rust' | 'wet' | 'paint' }
+
+type ImageAnalysis = {
+  rustPct: number
+  wetPct: number
+  paintVariance: number
+  confidence: number
+  cells: AnalysisCell[]
+  summary: string
+}
+
 type CaptureSlot = {
   id: SlotId
   title: string
@@ -13,6 +24,7 @@ type CaptureSlot = {
   why: string
   state: CaptureState
   image?: string
+  analysis?: ImageAnalysis
 }
 
 type Finding = {
@@ -42,6 +54,7 @@ type FarmFaxReport = {
   condition_score: number
   confidence: number
   findings: Finding[]
+  visual_analysis: Array<{ slot: SlotId; rustPct: number; wetPct: number; paintVariance: number; confidence: number; summary: string }>
   buyer_questions: string[]
   missing_evidence: string[]
   open_record_guarantee: string
@@ -186,6 +199,104 @@ function severityWeight(severity: Severity) {
   return -2
 }
 
+function rgbToHsv(r: number, g: number, b: number) {
+  const rn = r / 255
+  const gn = g / 255
+  const bn = b / 255
+  const max = Math.max(rn, gn, bn)
+  const min = Math.min(rn, gn, bn)
+  const delta = max - min
+  let h = 0
+  if (delta !== 0) {
+    if (max === rn) h = ((gn - bn) / delta) % 6
+    else if (max === gn) h = (bn - rn) / delta + 2
+    else h = (rn - gn) / delta + 4
+    h *= 60
+    if (h < 0) h += 360
+  }
+  const s = max === 0 ? 0 : delta / max
+  return { h, s, v: max }
+}
+
+function analyzeImageHeuristics(imageSrc: string): Promise<ImageAnalysis> {
+  return new Promise((resolve) => {
+    const image = new Image()
+    image.onload = () => {
+      const width = 160
+      const height = Math.max(90, Math.round((image.height / image.width) * width))
+      const canvas = document.createElement('canvas')
+      canvas.width = width
+      canvas.height = height
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
+      if (!ctx) {
+        resolve({ rustPct: 0, wetPct: 0, paintVariance: 0, confidence: 0, cells: [], summary: 'analysis unavailable' })
+        return
+      }
+      ctx.drawImage(image, 0, 0, width, height)
+      const data = ctx.getImageData(0, 0, width, height).data
+      let rust = 0
+      let wet = 0
+      let saturated = 0
+      const hueByCell = new Map<string, number[]>()
+      const flagged = new Map<string, AnalysisCell>()
+      const cols = 8
+      const rows = 6
+      for (let y = 0; y < height; y += 2) {
+        for (let x = 0; x < width; x += 2) {
+          const idx = (y * width + x) * 4
+          const { h, s, v } = rgbToHsv(data[idx], data[idx + 1], data[idx + 2])
+          const cellX = Math.min(cols - 1, Math.floor((x / width) * cols))
+          const cellY = Math.min(rows - 1, Math.floor((y / height) * rows))
+          const cellKey = `${cellX}-${cellY}`
+          const isRust = h >= 8 && h <= 45 && s > 0.28 && v > 0.16
+          const isWet = v < 0.23 && s > 0.12 && !(h >= 190 && h <= 250)
+          if (isRust) {
+            rust += 1
+            flagged.set(`${cellKey}-rust`, { x: cellX, y: cellY, kind: 'rust' })
+          }
+          if (isWet) {
+            wet += 1
+            flagged.set(`${cellKey}-wet`, { x: cellX, y: cellY, kind: 'wet' })
+          }
+          if (s > 0.25 && v > 0.22) {
+            saturated += 1
+            const list = hueByCell.get(cellKey) ?? []
+            list.push(h)
+            hueByCell.set(cellKey, list)
+          }
+        }
+      }
+      const sampleCount = Math.ceil(width / 2) * Math.ceil(height / 2)
+      const cellMeans = Array.from(hueByCell.entries())
+        .filter(([, hues]) => hues.length > 18)
+        .map(([key, hues]) => ({ key, hue: hues.reduce((sum, value) => sum + value, 0) / hues.length }))
+      const avgHue = cellMeans.length ? cellMeans.reduce((sum, item) => sum + item.hue, 0) / cellMeans.length : 0
+      const hueStd = cellMeans.length ? Math.sqrt(cellMeans.reduce((sum, item) => sum + Math.pow(item.hue - avgHue, 2), 0) / cellMeans.length) : 0
+      const paintVariance = Math.min(100, Math.round((hueStd / 75) * 100))
+      if (paintVariance > 28 && saturated > sampleCount * 0.08) {
+        cellMeans
+          .filter((item) => Math.abs(item.hue - avgHue) > 35)
+          .slice(0, 10)
+          .forEach((item) => {
+            const [x, y] = item.key.split('-').map(Number)
+            flagged.set(`${item.key}-paint`, { x, y, kind: 'paint' })
+          })
+      }
+      const rustPct = Math.round((rust / sampleCount) * 1000) / 10
+      const wetPct = Math.round((wet / sampleCount) * 1000) / 10
+      const confidence = Math.min(92, Math.max(35, Math.round(44 + rustPct * 1.5 + wetPct * 1.2 + paintVariance * 0.35)))
+      const summary = [
+        rustPct > 2 ? `${rustPct}% rust-tone pixels` : 'low rust-tone signal',
+        wetPct > 5 ? `${wetPct}% dark/wet signal` : 'low leak-tone signal',
+        paintVariance > 30 ? `paint variance ${paintVariance}/100` : 'paint variance low',
+      ].join(' · ')
+      resolve({ rustPct, wetPct, paintVariance, confidence, cells: Array.from(flagged.values()).slice(0, 28), summary })
+    }
+    image.onerror = () => resolve({ rustPct: 0, wetPct: 0, paintVariance: 0, confidence: 0, cells: [], summary: 'image could not be analyzed' })
+    image.src = imageSrc
+  })
+}
+
 function App() {
   const [slots, setSlots] = useState<CaptureSlot[]>(initialSlots)
   const [equipmentType, setEquipmentType] = useState('tractor')
@@ -200,6 +311,7 @@ function App() {
 
   const acceptedCount = slots.filter((slot) => slot.state === 'accepted').length
   const reviewCount = slots.filter((slot) => slot.state === 'review').length
+  const analyzedSlots = slots.filter((slot) => slot.analysis)
   const missing = slots.filter((slot) => slot.state === 'missing')
   const conditionScore = useMemo(() => {
     const penalty = findings.reduce((sum, finding) => sum + severityWeight(finding.severity), 0) + missing.length * 5
@@ -216,6 +328,14 @@ function App() {
     condition_score: conditionScore,
     confidence: 78,
     findings,
+    visual_analysis: analyzedSlots.map((slot) => ({
+      slot: slot.id,
+      rustPct: slot.analysis!.rustPct,
+      wetPct: slot.analysis!.wetPct,
+      paintVariance: slot.analysis!.paintVariance,
+      confidence: slot.analysis!.confidence,
+      summary: slot.analysis!.summary,
+    })),
     buyer_questions: [
       'Can you provide service records for hydraulic hoses/cylinders in the last 24 months?',
       'Has the right rear panel or loader arm ever been repainted, welded, or replaced?',
@@ -225,11 +345,15 @@ function App() {
     missing_evidence: missing.map((slot) => slot.title),
     open_record_guarantee: 'Core FarmFax records export as JSON/PDF. Paid hosting can end; the machine history still moves with the owner.',
     sponsor_stack: sponsorStack.map((item) => item.name),
-  }), [conditionScore, equipmentType, missing])
+  }), [analyzedSlots, conditionScore, equipmentType, missing])
 
-  function saveSlotImage(slotId: SlotId, image: string) {
+  async function saveSlotImage(slotId: SlotId, image: string) {
     setSlots((current) => current.map((slot) => slot.id === slotId
-      ? { ...slot, image, state: 'accepted' }
+      ? { ...slot, image, state: 'accepted', analysis: undefined }
+      : slot))
+    const analysis = await analyzeImageHeuristics(image)
+    setSlots((current) => current.map((slot) => slot.id === slotId
+      ? { ...slot, analysis }
       : slot))
   }
 
@@ -388,9 +512,31 @@ function App() {
                 <div className="slot-media-actions">
                   <button className="camera-button" type="button" onClick={() => openCamera(slot)}>Open camera</button>
                   <label>
-                    {slot.image ? <img src={slot.image} alt={`${slot.title} capture`} /> : <div className="phone-placeholder">upload fallback</div>}
+                    <div className="capture-preview">
+                      {slot.image ? <img src={slot.image} alt={`${slot.title} capture`} /> : <div className="phone-placeholder">upload fallback</div>}
+                      {slot.analysis && (
+                        <div className="heuristic-mask" aria-label="browser-side rust paint leak heuristic overlay">
+                          {slot.analysis.cells.map((cell, index) => (
+                            <span
+                              className={`mask-cell ${cell.kind}`}
+                              key={`${cell.kind}-${cell.x}-${cell.y}-${index}`}
+                              style={{ left: `${cell.x * 12.5}%`, top: `${cell.y * 16.66}%` }}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <input accept="image/*" capture="environment" type="file" onChange={(event) => updateSlotImage(slot.id, event)} />
                   </label>
+                  {slot.image && !slot.analysis && <small className="analysis-pending">analyzing pixels…</small>}
+                  {slot.analysis && (
+                    <div className="analysis-mini">
+                      <b>{slot.analysis.confidence}% CV</b>
+                      <span>rust {slot.analysis.rustPct}%</span>
+                      <span>wet {slot.analysis.wetPct}%</span>
+                      <span>paint {slot.analysis.paintVariance}/100</span>
+                    </div>
+                  )}
                 </div>
               </article>
             ))}
@@ -493,6 +639,12 @@ function App() {
             <p><b>Open record:</b> {report.open_record_guarantee}</p>
             <p><b>Guardrail:</b> FarmFax reports visible evidence and confidence. Unknowns stay unknown.</p>
           </div>
+          <div className="analysis-ledger">
+            <b>Browser CV ledger</b>
+            {report.visual_analysis.length ? report.visual_analysis.map((item) => (
+              <p key={item.slot}>[{item.slot}] {item.summary} · confidence {item.confidence}%</p>
+            )) : <p>No live slot image analyzed yet. Capture/upload a photo to run the local heuristic pass.</p>}
+          </div>
           <div className="hero-actions">
             <button onClick={exportReport}>Download report JSON</button>
             <button className="ghost" onClick={() => window.print()}>Print / save PDF</button>
@@ -510,7 +662,7 @@ function App() {
       <section className="source-trail">
         <b>audit trail</b>
         <p>[phone] guided capture slots · accepted {acceptedCount}/7 · missing {missing.length}</p>
-        <p>[cv] rust/paint/leak/wear detectors are evidence-first and confidence-scored</p>
+        <p>[cv] local browser HSV/texture heuristics · analyzed {analyzedSlots.length}/7 slots · rust/paint/wet masks render over evidence photos</p>
         <p>[nemotron] structured multimodal reasoning over findings, OCR, missing evidence, and buyer questions</p>
         <p>[hermes] orchestrates capture → detection → catalog → report → export/payment</p>
         <p>[stripe] workflow payments only; record ownership and export rights stay with the machine owner</p>

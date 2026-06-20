@@ -6,3 +6,5 @@
 2026-06-19T20:33:45.590388 Implemented FarmFax app pivot. Build passed. Browser smoke verified hero, capture, serial catalog, consolidated report, Stripe modal, zero JS console errors.
 
 2026-06-19T20:55:01-05:00 Added real phone capture: getUserMedia rear-camera modal per evidence slot, canvas still capture, permission-denied handling, and upload fallback. Verified build and browser modal.
+
+2026-06-19T21:00:27-05:00 Added browser CV heuristics: uploaded/captured images run HSV-based rust-tone, dark/wet, and paint-variance analysis; slot thumbnails render heatmap cells and report JSON includes visual_analysis. Browser smoke used synthetic rusty image: 86% CV, 14.4% rust, 8.5% wet, 24 overlay masks.
