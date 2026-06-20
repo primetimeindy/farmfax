@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
+import { createScenarioState, farmFaxScenarios, scenarioReducer } from './farmfax/scenarios'
+import type { ScenarioId, ScenarioReportSeed } from './farmfax/scenarios'
 import './App.css'
 
 type CaptureState = 'accepted' | 'review' | 'missing'
@@ -83,93 +85,6 @@ type FarmFaxReport = {
   integration_stack: string[]
 }
 
-const initialSlots: CaptureSlot[] = [
-  {
-    id: 'walkaround',
-    title: '360° walkaround',
-    prompt: 'Slow phone video or four photos: front, left, rear, right.',
-    why: 'Establishes baseline body condition and prevents cherry-picked seller photos.',
-    state: 'accepted',
-  },
-  {
-    id: 'serial',
-    title: 'Serial / PIN plate',
-    prompt: 'Move close, avoid glare, capture the entire plate and nearby decals.',
-    why: 'Cross-references make/model family and anchors the portable equipment record.',
-    state: 'accepted',
-  },
-  {
-    id: 'hours',
-    title: 'Hour meter + dashboard',
-    prompt: 'Capture ignition-on hour meter, warning lights, and display glass.',
-    why: 'Flags odometer/hour inconsistency and creates negotiation evidence.',
-    state: 'accepted',
-  },
-  {
-    id: 'hydraulics',
-    title: 'Hydraulic lines / cylinders',
-    prompt: 'Capture lift cylinders, hoses, couplers, wet spots, and ground underneath.',
-    why: 'Hydraulic seepage can turn a cheap deal into an expensive repair.',
-    state: 'review',
-  },
-  {
-    id: 'tires',
-    title: 'Tires / tracks / undercarriage',
-    prompt: 'Capture tread depth, sidewalls, cracks, lugs, and uneven wear.',
-    why: 'Tires and tracks are visible, expensive, and often hidden in listings.',
-    state: 'accepted',
-  },
-  {
-    id: 'paint',
-    title: 'Paint / body / welds',
-    prompt: 'Capture loader arms, hood panels, frame rails, welds, dents, repaint zones.',
-    why: 'Paint mismatch can signal cosmetic repaint, repaired collision, or replacement panels.',
-    state: 'review',
-  },
-  {
-    id: 'engine',
-    title: 'Engine bay / cold start',
-    prompt: 'Capture engine bay plus 10s start video if available.',
-    why: 'Visual AI cannot certify internals, but can flag leaks, smoke context, and missing evidence.',
-    state: 'missing',
-  },
-]
-
-const findings: Finding[] = [
-  {
-    severity: 'yellow',
-    category: 'Rust / corrosion',
-    finding: 'Moderate corrosion clusters around loader arm mount and lower step bracket.',
-    confidence: 74,
-    evidence: 'walkaround',
-    nextStep: 'Ask for close-up photos after pressure wash; inspect pins and bushings in person.',
-  },
-  {
-    severity: 'red',
-    category: 'Hydraulic leak evidence',
-    finding: 'Dark wet streak pattern near right lift cylinder; could be seepage or fresh grease.',
-    confidence: 68,
-    evidence: 'hydraulics',
-    nextStep: 'Ask whether cylinder seals or hoses were replaced; run loader through full cycle.',
-  },
-  {
-    severity: 'yellow',
-    category: 'Paint mismatch',
-    finding: 'Rear quarter panel color distribution differs from hood and loader arms.',
-    confidence: 63,
-    evidence: 'paint',
-    nextStep: 'Ask about repaint, collision, storm damage, or panel replacement history.',
-  },
-  {
-    severity: 'green',
-    category: 'Tire wear',
-    finding: 'Visible tread/lug wear appears serviceable; no obvious sidewall cracking in provided shot.',
-    confidence: 71,
-    evidence: 'tires',
-    nextStep: 'Measure tread depth and check inside sidewalls before purchase.',
-  },
-]
-
 const catalogCandidates: CatalogCandidate[] = [
   {
     make: 'John Deere',
@@ -237,7 +152,7 @@ function riskSeverity(level: RiskLevel): Severity {
   return 'green'
 }
 
-function buildRiskSummary(slots: CaptureSlot[], baseFindings: Finding[], analyzedCount: number): RiskCard[] {
+function buildRiskSummary(slots: CaptureSlot[], baseFindings: Finding[], analyzedCount: number, reportSeed: ScenarioReportSeed): RiskCard[] {
   const missing = slots.filter((slot) => slot.state === 'missing')
   const needsReview = slots.filter((slot) => slot.state === 'review')
   const accepted = slots.filter((slot) => slot.state === 'accepted')
@@ -252,7 +167,7 @@ function buildRiskSummary(slots: CaptureSlot[], baseFindings: Finding[], analyze
   const paintShift = slots.some((slot) => (slot.analysis?.paintVariance ?? 0) > 35)
 
   const evidenceFactors: RiskFactor[] = [
-    ...missing.map((slot) => ({ label: `${slot.title} missing`, points: slot.id === 'engine' || slot.id === 'serial' || slot.id === 'hours' ? 18 : 10, evidence: slot.id, explanation: 'Required view is absent, so FarmFax increases uncertainty instead of guessing.' })),
+    ...missing.map((slot) => ({ label: `${slot.title} missing`, points: slot.id === 'engine' || slot.id === 'serial' || slot.id === 'hours' ? 22 : 10, evidence: slot.id, explanation: 'Required view is absent, so FarmFax increases uncertainty instead of guessing.' })),
     ...needsReview.map((slot) => ({ label: `${slot.title} needs review`, points: slot.id === 'hydraulics' || slot.id === 'paint' ? 9 : 5, evidence: slot.id, explanation: 'Evidence exists but needs a cleaner capture before treating it as fully trusted.' })),
   ]
   if (analyzedCount < accepted.length) evidenceFactors.push({ label: 'Some accepted slots lack CV pass', points: 8, evidence: 'browser_cv', explanation: 'Accepted evidence should ideally include local rust/wet/paint analysis.' })
@@ -260,17 +175,18 @@ function buildRiskSummary(slots: CaptureSlot[], baseFindings: Finding[], analyze
   const evidenceLevel = riskLevel(evidenceScore)
 
   const identityFactors: RiskFactor[] = []
-  if (serial?.state === 'missing') identityFactors.push({ label: 'Serial/PIN plate missing', points: 35, evidence: 'serial', explanation: 'Machine identity cannot be anchored without readable plate evidence.' })
+  if (serial?.state === 'missing') identityFactors.push({ label: 'Serial/PIN plate missing', points: 50, evidence: 'serial', explanation: 'Machine identity cannot be anchored without readable plate evidence.' })
   if (serial?.state === 'review') identityFactors.push({ label: 'Serial/PIN plate needs cleaner capture', points: 18, evidence: 'serial', explanation: 'Glare, blur, crop, or paint around the plate can reduce confidence.' })
   identityFactors.push({ label: 'Paperwork match not verified', points: 14, evidence: 'bill_of_sale', explanation: 'Serial/PIN still needs bill of sale, lien/title, dealer, or service-record confirmation.' })
-  if (catalogCandidates[0].confidence < 85) identityFactors.push({ label: 'Catalog match not definitive', points: 8, evidence: 'catalog', explanation: `Top make/model match is ${catalogCandidates[0].confidence}%, useful but not a certification.` })
+  if (reportSeed.makeModelGuess.confidence < 85) identityFactors.push({ label: 'Catalog match not definitive', points: 8, evidence: 'catalog', explanation: `Top make/model match is ${reportSeed.makeModelGuess.confidence}%, useful but not a certification.` })
   const identityScore = clampScore(identityFactors.reduce((sum, factor) => sum + factor.points, 0))
   const identityLevel = riskLevel(identityScore)
 
   const hourFactors: RiskFactor[] = []
   if (hours?.state === 'missing') hourFactors.push({ label: 'Hour meter missing', points: 35, evidence: 'hours', explanation: 'Displayed hours cannot be anchored without dashboard evidence.' })
   if (hours?.state === 'review') hourFactors.push({ label: 'Hour meter needs confirmation', points: 16, evidence: 'hours', explanation: 'Hour OCR/capture confidence is not high enough for reliance.' })
-  hourFactors.push({ label: 'No service records near 1,842h shown', points: 12, evidence: 'service_records', explanation: 'Maintenance records should reconcile displayed hours and wear.' })
+  const hourLabel = reportSeed.hourMeter == null ? 'unknown hours' : `${reportSeed.hourMeter.toLocaleString()}h`
+  hourFactors.push({ label: `No service records near ${hourLabel} shown`, points: 12, evidence: 'service_records', explanation: 'Maintenance records should reconcile displayed hours and wear.' })
   if ((highRust || highWet || paintShift) && hours?.state !== 'missing') hourFactors.push({ label: 'Visible wear should be reconciled with hours', points: 12, evidence: 'cv_findings', explanation: 'Rust/wet/paint signals do not prove hour rollback, but they justify record review.' })
   const hourScore = clampScore(hourFactors.reduce((sum, factor) => sum + factor.points, 0))
   const hourLevel = riskLevel(hourScore)
@@ -296,7 +212,7 @@ function buildRiskSummary(slots: CaptureSlot[], baseFindings: Finding[], analyze
     { id: 'identity', label: 'Identity / fraud risk', score: identityScore, level: identityLevel, severity: riskSeverity(identityLevel), verdict: identityLevel === 'high' ? 'Identity evidence has serious gaps or conflicts.' : identityLevel === 'medium' ? 'Serial/model cues are plausible, but paperwork match is unverified.' : 'Identity evidence aligns in submitted capture.', evidence: 'serial plate · catalog match · paperwork not checked', buyerAction: 'Compare PIN plate to bill of sale, lien/title paperwork, dealer stock record, and service invoices.', factors: identityFactors },
     { id: 'safety', label: 'Safety / weld / structural', score: safetyScore, level: safetyLevel, severity: riskSeverity(safetyLevel), verdict: safetyLevel === 'high' ? 'Inspect before purchase or operation.' : safetyLevel === 'medium' ? 'Potential safety/repair concerns need closer inspection.' : 'No obvious safety-critical issue in supplied evidence.', evidence: `${redFindings.length} red flag · engine ${engine?.state ?? 'unknown'} · hydraulics ${hydraulics?.state ?? 'unknown'}`, buyerAction: 'Inspect welds, pins, mounts, guards, hoses, loader arms, frame rails, and operator safety equipment.', factors: safetyFactors },
     { id: 'evidence', label: 'Evidence completeness', score: evidenceScore, level: evidenceLevel, severity: riskSeverity(evidenceLevel), verdict: evidenceLevel === 'high' ? 'Major required evidence is missing.' : evidenceLevel === 'medium' ? 'Mostly complete, but important views still need review.' : 'Capture checklist is strong for a pre-purchase screen.', evidence: `${accepted.length}/7 accepted · ${missing.length} missing · ${analyzedCount}/7 CV analyzed`, buyerAction: 'Ask seller for missing or cleaner captures before relying on the report.', factors: evidenceFactors },
-    { id: 'hours', label: 'Hour-meter plausibility', score: hourScore, level: hourLevel, severity: riskSeverity(hourLevel), verdict: hourLevel === 'high' ? 'Hour evidence has serious conflicts or missing proof.' : hourLevel === 'medium' ? 'Displayed hours should be reconciled with records and visible wear.' : 'Hour evidence appears usable, pending normal record review.', evidence: '1,842h OCR · service records not supplied', buyerAction: 'Ask for service invoices, ECU/dealer diagnostics if available, and prior auction/dealer listings.', factors: hourFactors },
+    { id: 'hours', label: 'Hour-meter plausibility', score: hourScore, level: hourLevel, severity: riskSeverity(hourLevel), verdict: hourLevel === 'high' ? 'Hour evidence has serious conflicts or missing proof.' : hourLevel === 'medium' ? 'Displayed hours should be reconciled with records and visible wear.' : 'Hour evidence appears usable, pending normal record review.', evidence: `${hourLabel} OCR · service records not supplied`, buyerAction: 'Ask for service invoices, ECU/dealer diagnostics if available, and prior auction/dealer listings.', factors: hourFactors },
     { id: 'leverage', label: 'Negotiation leverage', score: leverageScore, level: leverageLevel, severity: riskSeverity(leverageLevel), verdict: leverageLevel === 'high' ? 'Strong evidence-backed leverage for repair demand or contingency.' : leverageLevel === 'medium' ? 'Moderate leverage from visible issues and unanswered proof.' : 'Limited visible leverage; use report mainly for diligence.', evidence: `${redFindings.length} red · ${yellowFindings.length} yellow · ${missing.length} missing`, buyerAction: 'Use findings to request records, additional captures, inspection contingency, or seller concession — not as an appraisal.', factors: leverageFactors },
   ]
 }
@@ -400,7 +316,11 @@ function analyzeImageHeuristics(imageSrc: string): Promise<ImageAnalysis> {
 }
 
 function App() {
-  const [slots, setSlots] = useState<CaptureSlot[]>(initialSlots)
+  const [scenarioState, setScenarioState] = useState(() => createScenarioState('risky-tractor'))
+  const slots = scenarioState.slots
+  const findings = scenarioState.findings
+  const reportSeed = scenarioState.reportSeed
+  const activeScenario = farmFaxScenarios.find((scenario) => scenario.id === scenarioState.selectedScenarioId) ?? farmFaxScenarios[0]
   const [equipmentType, setEquipmentType] = useState('tractor')
   const [stripeOpen, setStripeOpen] = useState(false)
   const [selectedFinding, setSelectedFinding] = useState<Finding>(findings[0])
@@ -416,22 +336,28 @@ function App() {
   const reviewCount = slots.filter((slot) => slot.state === 'review').length
   const analyzedSlots = slots.filter((slot) => slot.analysis)
   const missing = slots.filter((slot) => slot.state === 'missing')
-  const riskSummary = useMemo(() => buildRiskSummary(slots, findings, analyzedSlots.length), [slots, analyzedSlots.length])
-  const dealPosture = riskSummary.some((risk) => risk.severity === 'red') ? 'Proceed with inspection conditions' : riskSummary.some((risk) => risk.severity === 'yellow') ? 'Proceed after seller follow-up' : 'Proceed with normal diligence'
+  const riskSummary = useMemo(() => buildRiskSummary(slots, findings, analyzedSlots.length, reportSeed), [slots, findings, analyzedSlots.length, reportSeed])
+  const dealPosture = missing.some((slot) => slot.id === 'serial' || slot.id === 'hours')
+    ? 'Do not deposit or travel until seller supplies missing evidence'
+    : riskSummary.some((risk) => risk.severity === 'red')
+      ? 'Proceed with inspection conditions'
+      : riskSummary.some((risk) => risk.severity === 'yellow')
+        ? 'Proceed after seller follow-up'
+        : 'Proceed with normal diligence'
   const conditionScore = useMemo(() => {
     const penalty = findings.reduce((sum, finding) => sum + severityWeight(finding.severity), 0) + missing.length * 5
-    return Math.max(0, Math.min(100, 94 - penalty + acceptedCount * 2))
-  }, [acceptedCount, missing.length])
+    return Math.round(Math.max(0, Math.min(100, reportSeed.conditionScore - penalty * 0.15 + acceptedCount)))
+  }, [acceptedCount, findings, missing.length, reportSeed.conditionScore])
 
   const report: FarmFaxReport = useMemo(() => ({
-    report_id: 'ffx-demo-5075e-1842h',
+    report_id: reportSeed.reportId,
     schema_version: 'farmfax.report.v0.1-open',
-    equipment_type: equipmentType,
-    serial_number: 'LV5075E7P0D18422',
-    hour_meter: 1842,
-    make_model_guess: catalogCandidates[0],
+    equipment_type: reportSeed.equipmentType,
+    serial_number: reportSeed.serialNumber,
+    hour_meter: reportSeed.hourMeter ?? 0,
+    make_model_guess: reportSeed.makeModelGuess,
     condition_score: conditionScore,
-    confidence: 78,
+    confidence: reportSeed.confidence,
     findings,
     visual_analysis: analyzedSlots.map((slot) => ({
       slot: slot.id,
@@ -442,25 +368,29 @@ function App() {
       summary: slot.analysis!.summary,
     })),
     risk_summary: riskSummary,
-    buyer_questions: [
-      'Can you provide service records for hydraulic hoses/cylinders in the last 24 months?',
-      'Has the right rear panel or loader arm ever been repainted, welded, or replaced?',
-      'Can you send a cold-start video and photo of the engine bay after 10 minutes of operation?',
-      'Does the serial/PIN plate match the bill of sale, lien/title paperwork, and dealer stock record?',
-    ],
+    buyer_questions: reportSeed.buyerQuestions,
     missing_evidence: missing.map((slot) => slot.title),
-    open_record_commitment: 'Core FarmFax records export as JSON/PDF. Paid hosting can end; the machine history still moves with the owner.',
+    open_record_commitment: reportSeed.openRecordCommitment,
     integration_stack: architectureStack.map((item) => item.name),
-  }), [analyzedSlots, conditionScore, equipmentType, missing, riskSummary])
+  }), [analyzedSlots, conditionScore, findings, missing, reportSeed, riskSummary])
+
+  const openRecordPreview = useMemo(() => ({
+    schema: report.schema_version,
+    equipment_identity: {
+      type: report.equipment_type,
+      serial_pin: report.serial_number,
+      make_model_guess: `${report.make_model_guess.make} ${report.make_model_guess.model}`,
+      hour_meter: reportSeed.hourMeter ?? 'unknown',
+    },
+    evidence: report.visual_analysis.length ? report.visual_analysis.map((item) => ({ slot: item.slot, summary: item.summary, confidence: item.confidence })) : slots.map((slot) => ({ slot: slot.id, state: slot.state, has_image: Boolean(slot.image) })),
+    risk_summary: report.risk_summary.map((risk) => ({ id: risk.id, score: risk.score, level: risk.level, action: risk.buyerAction })),
+    portability: 'Core record exports as JSON/PDF; paid hosting does not own the equipment history.',
+  }), [report, reportSeed.hourMeter, slots])
 
   async function saveSlotImage(slotId: SlotId, image: string) {
-    setSlots((current) => current.map((slot) => slot.id === slotId
-      ? { ...slot, image, state: 'accepted', analysis: undefined }
-      : slot))
+    setScenarioState((current) => scenarioReducer(current, { type: 'replace-slot-image', slotId, image }))
     const analysis = await analyzeImageHeuristics(image)
-    setSlots((current) => current.map((slot) => slot.id === slotId && slot.image === image
-      ? { ...slot, analysis }
-      : slot))
+    setScenarioState((current) => scenarioReducer(current, { type: 'set-slot-analysis', slotId, image, analysis }))
   }
 
   function updateSlotImage(slotId: SlotId, event: ChangeEvent<HTMLInputElement>) {
@@ -545,6 +475,10 @@ function App() {
   }
 
   useEffect(() => {
+    setSelectedFinding(findings[0])
+  }, [findings])
+
+  useEffect(() => {
     return () => {
       streamRef.current?.getTracks().forEach((track) => track.stop())
       streamRef.current = null
@@ -578,13 +512,25 @@ function App() {
       <section className="hero-card farm-hero">
         <div className="hero-copy-block">
           <p className="eyebrow">Carfax for farm equipment — without locked data</p>
-          <div className="demo-badge">Demo sample report · upload/capture photos to replace sample evidence</div>
+          <div className="demo-badge">{activeScenario.demoBadge} · upload/capture photos to override</div>
           <h1>Scan the machine before you buy the story.</h1>
           <p className="lede">
             FarmFax turns a phone walkthrough into an open, evidence-backed condition report for tractors, skid steers,
             trailers, implements, and other working equipment. It cross-references serial/PIN plates, make/model clues,
             visible defects, and maintenance evidence — then exports a portable record the owner controls.
           </p>
+          <div className="scenario-switcher" aria-label="sample scenario selector">
+            {farmFaxScenarios.map((scenario) => (
+              <button
+                key={scenario.id}
+                className={scenario.id === scenarioState.selectedScenarioId ? 'active' : 'ghost'}
+                onClick={() => setScenarioState(createScenarioState(scenario.id as ScenarioId))}
+              >
+                <b>{scenario.label}</b>
+                <span>{scenario.description}</span>
+              </button>
+            ))}
+          </div>
           <div className="hero-actions">
             <button onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth' })}>Run guided inspection</button>
             <button className="ghost" onClick={exportReport}>Export open JSON</button>
@@ -599,7 +545,7 @@ function App() {
         <aside className="summary-card machine-card">
           <span>visible condition</span>
           <strong>{conditionScore}</strong>
-          <p>{catalogCandidates[0].make} {catalogCandidates[0].model} · {report.hour_meter.toLocaleString()} hrs · report confidence {report.confidence}%</p>
+          <p>{report.make_model_guess.make} {report.make_model_guess.model} · {reportSeed.hourMeter == null ? 'hours unknown' : `${report.hour_meter.toLocaleString()} hrs`} · report confidence {report.confidence}%</p>
           <div className="mini-stats">
             <div><b>{acceptedCount}</b><span>captures</span></div>
             <div><b>{reviewCount}</b><span>review</span></div>
@@ -672,7 +618,7 @@ function App() {
         </div>
 
         <aside className="panel vision-panel">
-          <div className="section-label">open cv + nemotron pass</div>
+          <div className="section-label">browser CV + planned Nemotron layer</div>
           <h2>Evidence, not vibes.</h2>
           <div className="overlay-card">
             <div className="tractor-silhouette">
@@ -710,7 +656,7 @@ function App() {
             </article>
             <article>
               <span>hour meter</span>
-              <b>{report.hour_meter.toLocaleString()} hrs</b>
+              <b>{reportSeed.hourMeter == null ? 'Unknown' : `${report.hour_meter.toLocaleString()} hrs`}</b>
               <p>Dashboard OCR confidence 79%. Ask for service records around this hour mark.</p>
             </article>
             <article>
@@ -720,7 +666,7 @@ function App() {
             </article>
           </div>
           <div className="candidate-list">
-            {catalogCandidates.map((candidate) => (
+            {[report.make_model_guess, ...catalogCandidates.filter((candidate) => `${candidate.make}-${candidate.model}` !== `${report.make_model_guess.make}-${report.make_model_guess.model}`)].map((candidate) => (
               <article key={`${candidate.make}-${candidate.model}`}>
                 <div><b>{candidate.make} {candidate.model}</b><span>{candidate.confidence}%</span></div>
                 <p>{candidate.family}</p>
@@ -749,7 +695,7 @@ function App() {
       <section className="packet-layout" id="report">
         <div className="panel report-panel">
           <div className="section-label">consolidated FarmFax report</div>
-          <h2>Buyer packet generated.</h2>
+          <h2>Buyer risk report generated.</h2>
           <div className="report-score">
             <strong>{report.condition_score}</strong>
             <div>
@@ -775,13 +721,20 @@ function App() {
           </div>
           <div className="question-grid">
             {report.buyer_questions.map((question) => (
-              <div key={question}><b>ask seller</b><p>{question}</p></div>
+              <div key={question}><b>buyer leverage question</b><p>{question}</p></div>
             ))}
           </div>
           <div className="data-disclosures">
             <p><b>Missing evidence:</b> {report.missing_evidence.length ? report.missing_evidence.join(', ') : 'none'}</p>
             <p><b>Open record:</b> {report.open_record_commitment}</p>
             <p><b>Guardrail:</b> FarmFax reports visible evidence, confidence, and missing proof. Unknowns stay unknown.</p>
+          </div>
+          <div className="open-record-preview">
+            <div>
+              <span>open record JSON preview</span>
+              <b>Portable by default</b>
+            </div>
+            <pre>{JSON.stringify(openRecordPreview, null, 2)}</pre>
           </div>
           <div className="risk-factor-grid">
             {report.risk_summary.filter((risk) => risk.factors.length).slice(0, 4).map((risk) => (
@@ -794,7 +747,7 @@ function App() {
             ))}
           </div>
           <div className="analysis-ledger">
-            <b>Browser CV ledger</b>
+            <b>Evidence ledger</b>
             {report.visual_analysis.length ? report.visual_analysis.map((item) => (
               <p key={item.slot}>[{item.slot}] {item.summary} · confidence {item.confidence}%</p>
             )) : <p>No live slot image analyzed yet. Capture/upload a photo to run the local heuristic pass.</p>}
@@ -816,10 +769,10 @@ function App() {
       <section className="source-trail">
         <b>audit trail</b>
         <p>[phone] guided capture slots · accepted {acceptedCount}/7 · missing {missing.length}</p>
-        <p>[cv] local browser HSV/texture heuristics · analyzed {analyzedSlots.length}/7 slots · rust/paint/wet masks render over evidence photos</p>
-        <p>[nemotron] structured multimodal reasoning over findings, OCR, missing evidence, and buyer questions</p>
-        <p>[hermes] orchestrates capture → detection → catalog → report → export/payment</p>
-        <p>[stripe] workflow payments only; record ownership and export rights stay with the machine owner</p>
+        <p>[implemented] browser HSV/wet/paint heuristics · analyzed {analyzedSlots.length}/7 slots · masks render over evidence photos</p>
+        <p>[planned] Nemotron multimodal reasoning over findings, OCR, missing evidence, and buyer questions</p>
+        <p>[planned] Hermes orchestration for capture → detection → catalog → report → export/payment</p>
+        <p>[simulated] Stripe workflow payments only; record ownership and export rights stay with the machine owner</p>
       </section>
 
       {cameraSlot && (

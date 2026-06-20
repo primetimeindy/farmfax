@@ -1,51 +1,43 @@
-# ParcelProof
+# FarmFax
 
-**Know what land can actually do before you buy.**
+**Open-source AI-assisted pre-purchase condition reports for used farm equipment.**
 
-ParcelProof is a hackathon prototype for a retail-safe land decision copilot. It helps everyday buyers, homesteaders, families inheriting land, and small farmers understand whether a parcel fits their real-life goal before they waste money, sign a contract, or inherit hidden risk.
+FarmFax turns a phone walkthrough into an evidence-backed buyer risk report for tractors, skid steers, trailers, implements, and other working equipment. The demo uses guided capture slots, local browser-side CV heuristics for rust/wet/paint signals, serial/hour evidence, identity/risk scoring, buyer leverage questions, open JSON/PDF export, and a Stripe-hosted-report upsell that does **not** lock up the underlying record.
 
-Most map tools show parcel boundaries and ownership. ParcelProof turns parcel facts, map layers, policy context, and buyer goals into a plain-English **Land Decision Packet**.
+## Winning thesis
 
-## Core thesis
+> Carfax tells you what paperwork says happened. FarmFax shows you what the machine is telling you right now — with evidence, confidence, missing proof, and an open record the owner controls.
 
-> Hermes orchestrates. NVIDIA accelerates geospatial reasoning. Stripe powers paid reports. ParcelProof helps regular people avoid bad land decisions.
+## Why now
 
-## What it demonstrates
+Used farm equipment moves through auctions, dealers, private sellers, Facebook Marketplace, and shop PDFs. Buyers are staring at expensive machines with fragmented records and no portable evidence trail. FarmFax starts with the most credible wedge: visible condition and buyer risk from a guided phone inspection.
 
-A buyer enters a parcel/listing and chooses what they want the land to become. The system screens the parcel against practical real-life constraints:
+## What the demo shows
 
-1. **PRIME** translates the buyer goal into a land-use hypothesis.
-2. **ATLAS** identifies the parcel, county, acreage, and map context.
-3. **SCOUT** checks access, flood, wetland, soil, and land-use risk layers.
-4. **WATER** explains well/septic feasibility and due-diligence costs.
-5. **POLICY** surfaces ag/timber valuation and USDA/FSA/NRCS opportunities.
-6. **LEDGER** issues a buy / negotiate / walk / research-more verdict.
-7. **RAILS** stages a Stripe test checkout for a paid report or expert review.
-8. ParcelProof exports a JSON/Markdown **Land Decision Packet**.
+1. **Phone-guided capture** — required views for walkaround, serial/PIN plate, hour meter, hydraulics, tires/tracks, paint/body panels, and engine bay.
+2. **Local CV pass** — browser heuristics analyze uploaded images for rust-tone pixels, wet/leak-like regions, and paint variance; overlays render on evidence photos.
+3. **Identity and usage risk** — serial/PIN and hour-meter evidence are treated as confidence-gated inputs, not universal truth.
+4. **Buyer risk report** — compact risk cards for identity/fraud risk, safety/structural risk, evidence completeness, and negotiation leverage.
+5. **Open export** — JSON download and browser print/PDF preserve buyer ownership of the report.
+6. **Stripe monetization path** — hosted share links, dealer/shop branding, and review workflow are paid; export remains available without payment.
 
-## Sponsor-native value
+## Sponsor-native story
 
 ### Nous Research / Hermes
-Hermes becomes the orchestration layer for real-life decision support: it coordinates parcel facts, user goals, public records, policy questions, and proof packets.
 
-### NVIDIA
-Land decisions are geospatial, visual, document-heavy, and simulation-heavy: satellite imagery, vegetation/soil analysis, flood/fire risk, zoning OCR, and scenario scoring are natural accelerated-inference workloads.
+Hermes is the orchestration layer for a physical-world AI workflow: capture checklist → CV/OCR evidence → risk reasoning → buyer questions → export/payment handoff. The product is not a chatbot; it is a governed inspection workflow with provenance.
+
+### NVIDIA / Nemotron
+
+FarmFax is a vision-heavy workload: multi-image reasoning, segmentation overlays, OCR, defect crops, and structured report generation. Nemotron-style reasoning can turn visual evidence and checklist completeness into transparent JSON reports while GPU-accelerated CV improves defect detection over time.
 
 ### Stripe
-Stripe powers a clear consumer/business model: $19 Land Reality Check reports, $99 due-diligence packets, expert-review checkout, and subscriptions for land brokers/realtors.
 
-## Current prototype
+Stripe powers the business model without creating the vendor lock-in FarmFax opposes: paid hosted report links, seller share pages, dealer/shop branding, expert review, and subscription workflows. Core JSON/PDF export remains open.
 
-The app includes:
+## Safety and trust guardrails
 
-- Retail-first hero and parcel/listing input.
-- Goal templates: homestead, cabin, farm, inherited land, income potential.
-- Interactive parcel visualizer with layer toggles.
-- Risk scorecards for buildability, access, water/septic, flood/wetland, soil/ag, policy/programs, and income.
-- Due-diligence cost panel.
-- Stripe test checkout modal.
-- Sponsor proof section.
-- Source trail and exportable Land Decision Packet.
+FarmFax is an AI-assisted screening aid, not a certified mechanic inspection, title/lien search, appraisal, theft determination, safety certification, warranty, or repair estimate. Every finding should show evidence, confidence, limits, and the next buyer action. Unknowns stay unknown.
 
 ## Run locally
 
@@ -66,14 +58,19 @@ http://127.0.0.1:5177
 npm run build
 ```
 
+Verified production build output:
+
+```text
+✓ built in 52ms
+```
+
 ## Key files
 
-- `src/App.tsx` — ParcelProof interactive prototype.
-- `src/App.css` — premium geospatial command-center styling.
-- `src/proofPacket.ts` — typed Land Decision Packet builder and Markdown serializer.
-- `PARCELPROOF_FULL_SPECS.md` — full product/hackathon specs.
-- `LAND_HACKATHON_PIVOT_STRATEGY.md` — strategic pivot memo.
-
-## Important disclaimer
-
-ParcelProof is a screening and due-diligence assistant, not legal, survey, engineering, tax, lending, or insurance advice. Findings must be verified with county offices and licensed professionals before buying land.
+- `src/App.tsx` — FarmFax interactive prototype, capture workflow, local CV heuristics, report builder, export/payment UI.
+- `src/App.css` — FarmFax command-center visual system and print styles.
+- `SUBMISSION.md` — hackathon submission brief.
+- `FINAL_DEMO_SCRIPT.md` — 3-minute judge demo script.
+- `FINAL_SUBMISSION_CHECKLIST.md` — asset and readiness checklist.
+- `DEPLOY_NOTES.md` — deployment, environment, and verification notes.
+- `FARMFAX_PIVOT_STRATEGY.md` — strategic pivot memo and MVP scope.
+- `docs/FARMFAX_MVP_TECH_ARCHITECTURE.md` — deeper technical architecture.

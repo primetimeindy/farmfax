@@ -1,61 +1,92 @@
-# ParcelProof — Final Hackathon Submission Checklist
+# FarmFax — Final Hackathon Submission Checklist
 
 ## Build status
-- [x] React/Vite production build passes.
-- [x] Browser loads ParcelProof title.
-- [x] No browser JavaScript errors.
-- [x] Main demo flow exists: paste parcel link → analyze parcel → agent run → dashboard → packet → Stripe test checkout.
+
+- [x] React/Vite production build passes with `npm run build`.
+- [x] App title is FarmFax: `FarmFax — Open Equipment Condition Reports`.
+- [x] Main UI is FarmFax, not ParcelProof/Revenue Forge.
+- [x] README rewritten for FarmFax.
+- [x] Submission brief rewritten for FarmFax.
+- [x] Final demo script rewritten for FarmFax.
+- [x] Deploy notes added for FarmFax.
+
+## Required submission assets
+
+- [x] `README.md` — project overview, winning thesis, sponsor story, run/build commands, safety guardrails.
+- [x] `SUBMISSION.md` — hackathon brief with title, one-liner, problem, solution, sponsor mapping, moat, demo path, non-claims.
+- [x] `FINAL_DEMO_SCRIPT.md` — 3–4 minute judge script plus Q&A answers.
+- [x] `DEPLOY_NOTES.md` — local build/deploy/verification notes and env seam for Stripe hosted checkout.
+- [x] `FARMFAX_PIVOT_STRATEGY.md` — deeper strategic memo.
+- [x] `docs/FARMFAX_MVP_TECH_ARCHITECTURE.md` — technical architecture reference.
 
 ## Required demo path
-1. Open local app.
-2. Show hero and tagline: **Before you buy land, know what it can actually become.**
-3. Keep demo parcel URL in input.
-4. Select **Homestead + goats**.
-5. Click **Analyze parcel**.
-6. Narrate agent run.
-7. Click map layers.
-8. Show scenario simulator.
-9. Show buyer action path.
-10. Show Land Decision Packet.
-11. Click **Stage checkout** or **Unlock $19 report**.
-12. Close on sponsor story.
+
+1. Open local or deployed app.
+2. Show hero: **Scan the machine before you buy the story.**
+3. State thesis: **Carfax tells you what paperwork says happened. FarmFax shows you what the machine is telling you right now.**
+4. Show guided phone capture slots.
+5. Upload/capture at least one image if available; otherwise call out sample evidence.
+6. Show local rust/wet/paint CV heuristics and evidence overlays.
+7. Show serial/PIN, hour meter, make/model candidate panel.
+8. Show anti-vendor-lock open schema panel.
+9. Show buyer risk report: score, risk strip, deal posture, buyer leverage questions, missing evidence, evidence ledger.
+10. Export JSON and/or print/save PDF.
+11. Open Stripe checkout demo.
+12. Close on open report ownership and sponsor-native architecture.
+
+## Exact sections judges should see
+
+- Hero: “Scan the machine before you buy the story.”
+- Demo architecture stack.
+- Phone-guided inspection.
+- Open CV + Nemotron pass.
+- Serial code + visual catalog.
+- Anti vendor lock-in.
+- Consolidated FarmFax report.
+- Stripe rail.
+- Audit trail.
 
 ## Sponsor proof points
 
 ### Nous / Hermes
-- Orchestrates multiple specialized agents.
-- Converts user intent into a concrete due-diligence workflow.
-- Produces a source-trailed decision packet, not just chat.
 
-### NVIDIA
-- Natural production path for accelerated geospatial/visual/document inference.
-- Parcel analysis involves map overlays, satellite/vegetation, OCR, flood/wetland/soil/risk layers, and scenario scoring.
+- Orchestrates capture completeness, CV/OCR evidence, reasoning, report generation, provenance, export, and payment handoff.
+- Demonstrates AI agents in a physical-world workflow instead of another chat interface.
+- Produces durable proof artifacts with explicit limits.
+
+### NVIDIA / Nemotron
+
+- Multimodal inspection workload: photos, defect crops, segmentation overlays, OCR, and structured reasoning.
+- Clear upgrade path from local browser heuristics to GPU-accelerated CV and Nemotron-generated structured reports.
+- Physical economy use case with recurring inference demand.
 
 ### Stripe
-- Paid reports and expert-review checkout are obvious and consumer-friendly.
-- Demo has $19 Land Reality Check and $99+ due-diligence upsell path.
+
+- Hosted report links, seller share pages, dealer/shop branding, expert review, and subscription workflow.
+- Paid workflow does not gate core JSON/PDF export.
+- Clean business model for trust infrastructure in equipment commerce.
 
 ## Submission one-liner
-ParcelProof is Carfax for land decisions: paste a parcel or listing, choose what you want the land to become, and get a plain-English reality check on buildability, access, water, soil, flood/wetland risk, policy programs, income potential, and the questions to ask before buying.
 
-## Technical stack
-- React + TypeScript + Vite.
-- Fixture-backed parcel data for controlled hackathon demo.
-- Typed Land Decision Packet builder.
-- Markdown + JSON packet export.
-- Stripe-style test checkout modal.
-- Source trail / proof ledger.
+FarmFax turns a guided phone walkthrough into an open, evidence-backed buyer risk report for used farm equipment — visible-condition scoring, identity/hour evidence, safety flags, missing proof, leverage questions, JSON/PDF export, and Stripe-hosted sharing without data lock-in.
+
+## Winning narrative
+
+Used farm equipment is bought through trust gaps: listings are incomplete, inspections are inconsistent, records are fragmented, and a bad purchase can cost tens of thousands of dollars. FarmFax starts with the buyer’s phone and creates the first portable evidence layer: what was captured, what visible defects were found, how confident the system is, what is missing, and what the buyer should ask next. It is not a fake certification; it is a practical, open, extensible inspection report that makes the market more trustworthy.
 
 ## Safety copy
-ParcelProof is a screening and due-diligence assistant. It is not legal, survey, engineering, tax, lending, insurance, or investment advice. Buyers must verify findings with county offices and licensed professionals before purchasing land.
+
+FarmFax is an AI-assisted screening aid, not a certified mechanic inspection, title/lien search, theft determination, appraisal, safety certification, warranty, or repair estimate. Findings must be verified with the seller, service records, and a qualified mechanic before purchase or operation.
 
 ## Product roadmap if asked
-1. Connect parcel/APN provider: Regrid, Acres partnership/export, county GIS, ReportAll, ATTOM.
-2. Add FEMA flood, USDA NRCS soils, NWI wetlands, USGS elevation, wildfire/land cover.
-3. Add county permitting/zoning document retrieval and OCR.
-4. Add report payments through Stripe Checkout.
-5. Add expert-review marketplace: land brokers, surveyors, septic/well professionals, rural attorneys.
-6. Add broker/realtor subscription.
+
+1. Add real OCR pipeline for serial/PIN plates, hour meters, model decals, and service documents.
+2. Add NVIDIA-accelerated defect detection for rust, leaks, weld repairs, tire/track wear, missing guards, and frame/bucket deformation.
+3. Add structured Nemotron report generation from multi-image evidence.
+4. Add open report schema package and self-hosted API.
+5. Add seller response workflow and mechanic/dealer review via Stripe Checkout.
+6. Add equipment-history connectors: OEM portals, dealer CRMs, auction listings, service PDFs, insurance/finance/lien providers where available.
 
 ## Killer closing line
-Buying land is emotional. ParcelProof makes it evidence-based before the buyer signs.
+
+FarmFax does not ask buyers to trust an AI. It asks them to trust evidence, confidence, missing proof, and an open report they can take anywhere.

@@ -12,3 +12,5 @@
 2026-06-19T21:21:13-05:00 Added FarmFax buyer-risk layer after agent critique: identity/fraud evidence, safety/weld/structural, evidence completeness, hour-meter plausibility, negotiation leverage, deal posture, factor explanations, JSON export risk_summary. Verified build and browser synthetic CV risk escalation: safety red 70/100, deal posture inspection conditions, 24 masks, zero JS errors.
 
 2026-06-19T21:30:52-05:00 Agent-reviewed and hardened risk layer: added demo/sample labeling, disabled unimplemented equipment modes, changed sponsor language to architecture stack, removed verified/guarantee monetization copy, added score heuristic disclosure, fixed stale async CV analysis, fixed camera cleanup race/contrast. Build and browser smoke passed.
+
+2026-06-20T02:56:39Z Scenario engine sprint complete: challenger agents forced deterministic demo paths and overclaim guardrails. Implemented clean/risky/incomplete seller listing scenarios, open record preview, submission docs, camera/Stripe smoke checks, and missing-evidence no-deposit posture. Build/browser verified before commit.
