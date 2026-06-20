@@ -1,571 +1,462 @@
 import { useMemo, useState } from 'react'
-import { baseScores, buildProofPacket, proofPacketToMarkdown, sponsorStack } from './proofPacket'
+import type { ChangeEvent } from 'react'
 import './App.css'
 
-type GoalKey = 'homestead' | 'build' | 'farm' | 'inherit' | 'income'
-type LayerKey = 'access' | 'soil' | 'water' | 'flood' | 'policy'
-type Status = 'idle' | 'loading' | 'ready' | 'error'
+type CaptureState = 'accepted' | 'review' | 'missing'
+type Severity = 'green' | 'yellow' | 'red'
+type SlotId = 'walkaround' | 'serial' | 'hours' | 'hydraulics' | 'tires' | 'paint' | 'engine'
 
-type Goal = { key: GoalKey; label: string; prompt: string; boost: number }
-type Layer = { key: LayerKey; label: string; status: 'green' | 'yellow' | 'red'; summary: string; proof: string }
-type LiveParcel = {
-  query: string
-  displayName: string
-  lat: number
-  lon: number
-  county: string
-  state: string
-  boundingBox?: string[]
-  source: 'live' | 'fixture'
+type CaptureSlot = {
+  id: SlotId
+  title: string
+  prompt: string
+  why: string
+  state: CaptureState
+  image?: string
 }
-type FeatureCount = { roads: number; waterways: number; buildings: number; amenities: number }
-type FloodData = { source: 'live' | 'fallback'; zone: string; subtype: string; sfha: string; risk: 'low' | 'moderate' | 'high'; note: string }
-type SoilData = { source: 'live' | 'fallback'; mukey: string; mapunit: string; drainage: string; farmland: string; note: string }
-type ParcelProvider = { provider: string; status: 'configured' | 'missing-key' | 'fallback'; message: string; url: string }
-type ParcelBoundary = { source: 'live' | 'fallback'; propId: string; oldPropId: string; objectId: number | null; areaSqFt: number | null; perimeterFt: number | null; rings: number[][][]; note: string }
-type AnalysisStep = { agent: string; label: string; detail: string }
 
-const goals: Goal[] = [
-  { key: 'homestead', label: 'Homestead + goats', prompt: 'Build a small home, keep goats, drill a well, and qualify for an ag valuation.', boost: 2 },
-  { key: 'build', label: 'Build a cabin', prompt: 'Build a weekend cabin with driveway, septic, well, and power access.', boost: -1 },
-  { key: 'farm', label: 'Small farm', prompt: 'Grow pasture, orchard rows, and a farm stand without over-improving the land.', boost: 7 },
-  { key: 'inherit', label: 'Inherited land', prompt: 'Decide whether to keep, lease, improve, or sell family land safely.', boost: 4 },
-  { key: 'income', label: 'Income paths', prompt: 'Evaluate grazing, hunting, solar, timber, conservation, and short-stay income paths.', boost: -3 },
+type Finding = {
+  severity: Severity
+  category: string
+  finding: string
+  confidence: number
+  evidence: SlotId
+  nextStep: string
+}
+
+type CatalogCandidate = {
+  make: string
+  model: string
+  family: string
+  confidence: number
+  basis: string
+}
+
+type FarmFaxReport = {
+  report_id: string
+  schema_version: string
+  equipment_type: string
+  serial_number: string
+  hour_meter: number
+  make_model_guess: CatalogCandidate
+  condition_score: number
+  confidence: number
+  findings: Finding[]
+  buyer_questions: string[]
+  missing_evidence: string[]
+  open_record_guarantee: string
+  sponsor_stack: string[]
+}
+
+const initialSlots: CaptureSlot[] = [
+  {
+    id: 'walkaround',
+    title: '360° walkaround',
+    prompt: 'Slow phone video or four photos: front, left, rear, right.',
+    why: 'Establishes baseline body condition and prevents cherry-picked seller photos.',
+    state: 'accepted',
+  },
+  {
+    id: 'serial',
+    title: 'Serial / PIN plate',
+    prompt: 'Move close, avoid glare, capture the entire plate and nearby decals.',
+    why: 'Cross-references make/model family and anchors the portable equipment record.',
+    state: 'accepted',
+  },
+  {
+    id: 'hours',
+    title: 'Hour meter + dashboard',
+    prompt: 'Capture ignition-on hour meter, warning lights, and display glass.',
+    why: 'Flags odometer/hour inconsistency and creates negotiation evidence.',
+    state: 'accepted',
+  },
+  {
+    id: 'hydraulics',
+    title: 'Hydraulic lines / cylinders',
+    prompt: 'Capture lift cylinders, hoses, couplers, wet spots, and ground underneath.',
+    why: 'Hydraulic seepage can turn a cheap deal into an expensive repair.',
+    state: 'review',
+  },
+  {
+    id: 'tires',
+    title: 'Tires / tracks / undercarriage',
+    prompt: 'Capture tread depth, sidewalls, cracks, lugs, and uneven wear.',
+    why: 'Tires and tracks are visible, expensive, and often hidden in listings.',
+    state: 'accepted',
+  },
+  {
+    id: 'paint',
+    title: 'Paint / body / welds',
+    prompt: 'Capture loader arms, hood panels, frame rails, welds, dents, repaint zones.',
+    why: 'Paint mismatch can signal cosmetic repaint, repaired collision, or replacement panels.',
+    state: 'review',
+  },
+  {
+    id: 'engine',
+    title: 'Engine bay / cold start',
+    prompt: 'Capture engine bay plus 10s start video if available.',
+    why: 'Visual AI cannot certify internals, but can flag leaks, smoke context, and missing evidence.',
+    state: 'missing',
+  },
 ]
 
-const layers: Layer[] = [
-  { key: 'access', label: 'Access', status: 'yellow', summary: 'Road context is visible, but recorded access/easement still needs title verification.', proof: 'Live map context + human title check required.' },
-  { key: 'soil', label: 'Soil', status: 'green', summary: 'Pasture/homestead suitability is plausible; production connects USDA NRCS soil series.', proof: 'Fixture soil model; NRCS integration next.' },
-  { key: 'water', label: 'Water + septic', status: 'yellow', summary: 'Well/septic path is a pre-close cost risk. Perc test and well quote remain unresolved.', proof: 'County + septic pro verification required.' },
-  { key: 'flood', label: 'Flood / wetlands', status: 'green', summary: 'No fatal flood/wetland flag in this screen; production connects FEMA + NWI layers.', proof: 'Risk screen, not survey certainty.' },
-  { key: 'policy', label: 'Policy', status: 'green', summary: 'Ag valuation, EQIP, grazing, and conservation programs may apply if local criteria are met.', proof: 'County appraisal + FSA/NRCS call script generated.' },
+const findings: Finding[] = [
+  {
+    severity: 'yellow',
+    category: 'Rust / corrosion',
+    finding: 'Moderate corrosion clusters around loader arm mount and lower step bracket.',
+    confidence: 74,
+    evidence: 'walkaround',
+    nextStep: 'Ask for close-up photos after pressure wash; inspect pins and bushings in person.',
+  },
+  {
+    severity: 'red',
+    category: 'Hydraulic leak evidence',
+    finding: 'Dark wet streak pattern near right lift cylinder; could be seepage or fresh grease.',
+    confidence: 68,
+    evidence: 'hydraulics',
+    nextStep: 'Ask whether cylinder seals or hoses were replaced; run loader through full cycle.',
+  },
+  {
+    severity: 'yellow',
+    category: 'Paint mismatch',
+    finding: 'Rear quarter panel color distribution differs from hood and loader arms.',
+    confidence: 63,
+    evidence: 'paint',
+    nextStep: 'Ask about repaint, collision, storm damage, or panel replacement history.',
+  },
+  {
+    severity: 'green',
+    category: 'Tire wear',
+    finding: 'Visible tread/lug wear appears serviceable; no obvious sidewall cracking in provided shot.',
+    confidence: 71,
+    evidence: 'tires',
+    nextStep: 'Measure tread depth and check inside sidewalls before purchase.',
+  },
 ]
 
-const analysisSteps: AnalysisStep[] = [
-  { agent: 'ATLAS', label: 'Geocode parcel', detail: 'Live lookup of address / APN / map text into coordinates.' },
-  { agent: 'SCOUT', label: 'Road + access context', detail: 'OpenStreetMap road/building/water context around the parcel.' },
-  { agent: 'FEMA', label: 'Flood hazard layer', detail: 'NFHL ArcGIS point query for flood zone / SFHA flags.' },
-  { agent: 'USDA', label: 'NRCS soil data', detail: 'Soil Data Access lookup for map unit, drainage, and farmland class.' },
-  { agent: 'PARCEL', label: 'County provider', detail: 'Provider abstraction for Regrid/Acres/county parcel APIs.' },
-  { agent: 'STRIPE', label: 'Checkout + PDF', detail: 'Checkout handoff and printable PDF report export.' },
-  { agent: 'LEDGER', label: 'Decision packet', detail: 'Buyer verdict, costs, questions, exports, and source trail.' },
+const catalogCandidates: CatalogCandidate[] = [
+  {
+    make: 'John Deere',
+    model: '5075E',
+    family: '5E Utility Tractor',
+    confidence: 82,
+    basis: 'OCR pattern LV5075E + green/yellow body + loader geometry + decal family',
+  },
+  {
+    make: 'John Deere',
+    model: '5065E',
+    family: '5E Utility Tractor',
+    confidence: 61,
+    basis: 'Similar serial prefix and chassis silhouette; needs plate confirmation',
+  },
+  {
+    make: 'Massey Ferguson',
+    model: '4707',
+    family: '4700 Series',
+    confidence: 18,
+    basis: 'False-positive fallback from utility tractor proportions; color evidence weak',
+  },
 ]
 
-const fixtureParcel: LiveParcel = {
-  query: '12.4 acres near Lockhart, TX',
-  displayName: 'Lockhart, Caldwell County, Texas, United States',
-  lat: 29.8849,
-  lon: -97.669999,
-  county: 'Caldwell County',
-  state: 'Texas',
-  source: 'fixture',
+const sponsorStack = [
+  {
+    name: 'NVIDIA / Nemotron',
+    line: 'Multimodal reasoning over captured evidence: defect crops, OCR fields, checklist completeness, and buyer questions.',
+  },
+  {
+    name: 'Hermes',
+    line: 'Workflow orchestrator: phone intake → CV/OCR modules → Nemotron report → export/payment/audit trail.',
+  },
+  {
+    name: 'Stripe',
+    line: 'Paid verification, hosted report links, dealer/shop subscriptions — without holding equipment records hostage.',
+  },
+]
+
+function stateLabel(state: CaptureState) {
+  if (state === 'accepted') return 'accepted'
+  if (state === 'review') return 'needs review'
+  return 'missing'
 }
 
-const initialFeatureCounts: FeatureCount = { roads: 3, waterways: 1, buildings: 2, amenities: 0 }
-const initialFlood: FloodData = { source: 'fallback', zone: 'X', subtype: 'Area of minimal flood hazard', sfha: 'OUT', risk: 'low', note: 'Fallback screen; live FEMA query runs after analysis.' }
-const initialSoil: SoilData = { source: 'fallback', mukey: 'demo', mapunit: 'Pasture-suitable loam fixture', drainage: 'Moderately well drained', farmland: 'Farmland of statewide importance', note: 'Fallback soil model; live USDA SDA query runs after analysis.' }
-const initialBoundary: ParcelBoundary = {
-  source: 'fallback',
-  propId: 'R-18422-DEMO',
-  oldPropId: 'fixture',
-  objectId: null,
-  areaSqFt: null,
-  perimeterFt: null,
-  rings: [[[-97.67358, 29.88314], [-97.67322, 29.88320], [-97.67316, 29.88290], [-97.67358, 29.88283], [-97.67367, 29.88326], [-97.67358, 29.88314]]],
-  note: 'Demo parcel polygon; live Caldwell CAD boundary query runs after analysis.',
-}
-
-function parcelProviderFor(parcel: LiveParcel): ParcelProvider {
-  const apiKey = import.meta.env.VITE_REGRID_API_KEY as string | undefined
-  const providerBase = import.meta.env.VITE_PARCEL_PROVIDER_URL as string | undefined
-  const q = encodeURIComponent(`${parcel.lat},${parcel.lon}`)
-  if (providerBase) {
-    return { provider: 'Configured parcel API', status: 'configured', message: 'Custom county/parcel provider URL configured via VITE_PARCEL_PROVIDER_URL.', url: `${providerBase}${providerBase.includes('?') ? '&' : '?'}lat=${parcel.lat}&lon=${parcel.lon}` }
-  }
-  if (apiKey) {
-    return { provider: 'Regrid-compatible', status: 'configured', message: 'Regrid key detected. Wire backend proxy before exposing secret keys client-side.', url: `https://app.regrid.com/us#b=admin&q=${q}` }
-  }
-  return { provider: 'Caldwell CAD public ArcGIS + Regrid handoff', status: 'configured', message: 'Live Caldwell CAD parcel boundary layer enabled; owner name not exposed by this public layer, so ownership links to CAD/Regrid handoff.', url: `https://app.regrid.com/us#b=admin&q=${q}` }
-}
-
-function statusLabel(status: 'green' | 'yellow' | 'red') {
-  if (status === 'green') return 'Clear'
-  if (status === 'yellow') return 'Verify'
-  return 'Stop'
-}
-
-function extractPlace(input: string) {
-  const cleaned = input
-    .replace(/https?:\/\/\S+/g, ' ')
-    .replace(/parcel=[^\s·]+/gi, ' ')
-    .replace(/[·|]/g, ' ')
-    .replace(/\$[\d,]+/g, ' ')
-    .replace(/\bAPN\b|\bparcel\b|DEMO/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  if (/lockhart/i.test(cleaned)) return 'Lockhart, Caldwell County, Texas'
-  if (cleaned.length > 8) return cleaned
-  return 'Lockhart, Caldwell County, Texas'
-}
-
-async function geocodePlace(query: string): Promise<LiveParcel> {
-  const url = new URL('https://nominatim.openstreetmap.org/search')
-  url.searchParams.set('format', 'jsonv2')
-  url.searchParams.set('limit', '1')
-  url.searchParams.set('addressdetails', '1')
-  url.searchParams.set('q', query)
-
-  const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 6500)
-  try {
-    const response = await fetch(url, { signal: controller.signal })
-    if (!response.ok) throw new Error(`Geocoder returned ${response.status}`)
-    const results = await response.json() as Array<{ lat: string; lon: string; display_name: string; boundingbox?: string[]; address?: Record<string, string> }>
-    const first = results[0]
-    if (!first) throw new Error('No geocoder result')
-    return {
-      query,
-      displayName: first.display_name,
-      lat: Number(first.lat),
-      lon: Number(first.lon),
-      county: first.address?.county ?? first.address?.state_district ?? 'County unknown',
-      state: first.address?.state ?? first.address?.region ?? 'State unknown',
-      boundingBox: first.boundingbox,
-      source: 'live',
-    }
-  } finally {
-    window.clearTimeout(timeout)
-  }
-}
-
-async function fetchFeatureCounts(lat: number, lon: number): Promise<FeatureCount> {
-  const query = `
-    [out:json][timeout:5];
-    (
-      way(around:1800,${lat},${lon})["highway"];
-      way(around:1800,${lat},${lon})["waterway"];
-      way(around:1800,${lat},${lon})["building"];
-      node(around:1800,${lat},${lon})["amenity"];
-    );
-    out tags 80;
-  `
-  const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 6500)
-  try {
-    const response = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      body: new URLSearchParams({ data: query }),
-      signal: controller.signal,
-    })
-    if (!response.ok) throw new Error(`Overpass returned ${response.status}`)
-    const data = await response.json() as { elements?: Array<{ tags?: Record<string, string> }> }
-    const elements = data.elements ?? []
-    return {
-      roads: elements.filter((item) => item.tags?.highway).length,
-      waterways: elements.filter((item) => item.tags?.waterway).length,
-      buildings: elements.filter((item) => item.tags?.building).length,
-      amenities: elements.filter((item) => item.tags?.amenity).length,
-    }
-  } catch {
-    return initialFeatureCounts
-  } finally {
-    window.clearTimeout(timeout)
-  }
-}
-
-async function fetchFemaFlood(lat: number, lon: number): Promise<FloodData> {
-  const url = new URL('https://hazards.fema.gov/gis/nfhl/rest/services/public/NFHL/MapServer/28/query')
-  url.searchParams.set('f', 'json')
-  url.searchParams.set('geometry', `${lon},${lat}`)
-  url.searchParams.set('geometryType', 'esriGeometryPoint')
-  url.searchParams.set('inSR', '4326')
-  url.searchParams.set('spatialRel', 'esriSpatialRelIntersects')
-  url.searchParams.set('outFields', 'FLD_ZONE,ZONE_SUBTY,SFHA_TF')
-  url.searchParams.set('returnGeometry', 'false')
-  const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 7000)
-  try {
-    const response = await fetch(url, { signal: controller.signal })
-    if (!response.ok) throw new Error(`FEMA returned ${response.status}`)
-    const data = await response.json() as { features?: Array<{ attributes?: Record<string, string> }> }
-    const attrs = data.features?.[0]?.attributes
-    if (!attrs) return { ...initialFlood, source: 'live', note: 'FEMA NFHL returned no intersecting flood hazard polygon at this point.' }
-    const zone = attrs.FLD_ZONE ?? 'Unknown'
-    const sfha = attrs.SFHA_TF ?? 'Unknown'
-    const risk: FloodData['risk'] = sfha === 'T' || ['A', 'AE', 'AH', 'AO', 'VE', 'V'].includes(zone) ? 'high' : zone === 'X' ? 'low' : 'moderate'
-    return { source: 'live', zone, subtype: attrs.ZONE_SUBTY ?? 'n/a', sfha, risk, note: 'Live FEMA NFHL point intersection; verify with official panel before closing.' }
-  } catch (error) {
-    return { ...initialFlood, note: `FEMA live layer unavailable; fallback used. ${error instanceof Error ? error.message : ''}` }
-  } finally {
-    window.clearTimeout(timeout)
-  }
-}
-
-async function fetchUsdaSoil(lat: number, lon: number): Promise<SoilData> {
-  const point = `point(${lon} ${lat})`
-  const mukeyQuery = `SELECT mukey FROM SDA_Get_Mukey_from_intersection_with_WktWgs84('${point}')`
-  const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 8000)
-  try {
-    const mukeyResp = await fetch('https://sdmdataaccess.sc.egov.usda.gov/Tabular/post.rest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: mukeyQuery, format: 'JSON' }),
-      signal: controller.signal,
-    })
-    if (!mukeyResp.ok) throw new Error(`USDA mukey returned ${mukeyResp.status}`)
-    const mukeyData = await mukeyResp.json() as { Table?: string[][] }
-    const mukey = mukeyData.Table?.[0]?.[0]
-    if (!mukey) throw new Error('No USDA mukey for point')
-
-    const detailQuery = `SELECT TOP 1 mapunit.mukey, muname, drainagecl, farmlndcl FROM mapunit LEFT JOIN component ON component.mukey = mapunit.mukey WHERE mapunit.mukey = '${mukey}' ORDER BY comppct_r DESC`
-    const detailResp = await fetch('https://sdmdataaccess.sc.egov.usda.gov/Tabular/post.rest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: detailQuery, format: 'JSON' }),
-      signal: controller.signal,
-    })
-    if (!detailResp.ok) throw new Error(`USDA details returned ${detailResp.status}`)
-    const detailData = await detailResp.json() as { Table?: string[][] }
-    const row = detailData.Table?.[0]
-    return { source: 'live', mukey, mapunit: row?.[1] ?? 'USDA map unit found', drainage: row?.[2] ?? 'Drainage not returned', farmland: row?.[3] ?? 'Farmland class not returned', note: 'Live USDA Soil Data Access result; validate with Web Soil Survey for parcel-scale report.' }
-  } catch (error) {
-    return { ...initialSoil, note: `USDA live soil unavailable; fallback used. ${error instanceof Error ? error.message : ''}` }
-  } finally {
-    window.clearTimeout(timeout)
-  }
-}
-
-async function fetchCaldwellParcelBoundary(lat: number, lon: number): Promise<ParcelBoundary> {
-  const url = new URL('https://services.arcgis.com/rVxY74DxxIDrDbc0/arcgis/rest/services/Caldwell_CAD_Parcel_Map/FeatureServer/1/query')
-  url.searchParams.set('f', 'json')
-  url.searchParams.set('geometry', `${lon},${lat}`)
-  url.searchParams.set('geometryType', 'esriGeometryPoint')
-  url.searchParams.set('inSR', '4326')
-  url.searchParams.set('spatialRel', 'esriSpatialRelIntersects')
-  url.searchParams.set('outFields', 'OBJECTID,OLDPROPID,Prop_ID,Shape__Area,Shape__Length')
-  url.searchParams.set('returnGeometry', 'true')
-  url.searchParams.set('outSR', '4326')
-  const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 7500)
-  try {
-    const response = await fetch(url, { signal: controller.signal })
-    if (!response.ok) throw new Error(`Caldwell CAD returned ${response.status}`)
-    const data = await response.json() as { features?: Array<{ attributes?: Record<string, number | string>; geometry?: { rings?: number[][][] } }> }
-    const feature = data.features?.[0]
-    if (!feature?.geometry?.rings?.length) throw new Error('No parcel polygon at point')
-    const attrs = feature.attributes ?? {}
-    return {
-      source: 'live',
-      propId: String(attrs.Prop_ID ?? 'unknown'),
-      oldPropId: String(attrs.OLDPROPID ?? 'unknown'),
-      objectId: typeof attrs.OBJECTID === 'number' ? attrs.OBJECTID : null,
-      areaSqFt: typeof attrs.Shape__Area === 'number' ? attrs.Shape__Area : null,
-      perimeterFt: typeof attrs.Shape__Length === 'number' ? attrs.Shape__Length : null,
-      rings: feature.geometry.rings,
-      note: 'Live Caldwell CAD parcel polygon. Public layer exposes Prop_ID/OLDPROPID/boundary but not owner name; verify owner in CAD/property records.',
-    }
-  } catch (error) {
-    return { ...initialBoundary, note: `Caldwell CAD parcel boundary unavailable; fallback used. ${error instanceof Error ? error.message : ''}` }
-  } finally {
-    window.clearTimeout(timeout)
-  }
-}
-
-function boundaryToSvgPoints(boundary: ParcelBoundary) {
-  const ring = boundary.rings[0]
-  if (!ring?.length) return '210,110 470,70 595,205 510,348 260,372 145,235'
-  const xs = ring.map(([x]) => x)
-  const ys = ring.map(([, y]) => y)
-  const minX = Math.min(...xs); const maxX = Math.max(...xs)
-  const minY = Math.min(...ys); const maxY = Math.max(...ys)
-  const width = Math.max(maxX - minX, 0.000001)
-  const height = Math.max(maxY - minY, 0.000001)
-  return ring.map(([x, y]) => {
-    const sx = 150 + ((x - minX) / width) * 430
-    const sy = 78 + (1 - ((y - minY) / height)) * 285
-    return `${sx.toFixed(1)},${sy.toFixed(1)}`
-  }).join(' ')
-}
-
-function openStripeCheckout() {
-  const checkoutUrl = import.meta.env.VITE_STRIPE_CHECKOUT_URL as string | undefined
-  if (checkoutUrl) {
-    window.location.href = checkoutUrl
-    return true
-  }
-  return false
-}
-
-function downloadFile(filename: string, content: string, mimeType: string) {
-  const blob = new Blob([content], { type: mimeType })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  link.remove()
-  URL.revokeObjectURL(url)
+function severityWeight(severity: Severity) {
+  if (severity === 'red') return 15
+  if (severity === 'yellow') return 7
+  return -2
 }
 
 function App() {
-  const [selectedGoal, setSelectedGoal] = useState<GoalKey>('homestead')
-  const [activeLayer, setActiveLayer] = useState<LayerKey>('access')
-  const [checkoutOpen, setCheckoutOpen] = useState(false)
-  const [query, setQuery] = useState('https://www.acres.com/plat-map/map?parcel=R-18422-DEMO · 12.4 acres near Lockhart, TX · $89,000')
-  const [status, setStatus] = useState<Status>('idle')
-  const [stage, setStage] = useState(0)
-  const [liveParcel, setLiveParcel] = useState<LiveParcel>(fixtureParcel)
-  const [features, setFeatures] = useState<FeatureCount>(initialFeatureCounts)
-  const [flood, setFlood] = useState<FloodData>(initialFlood)
-  const [soil, setSoil] = useState<SoilData>(initialSoil)
-  const [parcelProvider, setParcelProvider] = useState<ParcelProvider>(parcelProviderFor(fixtureParcel))
-  const [boundary, setBoundary] = useState<ParcelBoundary>(initialBoundary)
-  const [liveNote, setLiveNote] = useState('Ready to geocode via OpenStreetMap/Nominatim. Falls back to the Lockhart demo fixture if a live service times out.')
+  const [slots, setSlots] = useState<CaptureSlot[]>(initialSlots)
+  const [equipmentType, setEquipmentType] = useState('tractor')
+  const [stripeOpen, setStripeOpen] = useState(false)
+  const [selectedFinding, setSelectedFinding] = useState<Finding>(findings[0])
 
-  const goal = goals.find((item) => item.key === selectedGoal) ?? goals[0]
-  const layer = layers.find((item) => item.key === activeLayer) ?? layers[0]
-  const isReady = status === 'ready'
+  const acceptedCount = slots.filter((slot) => slot.state === 'accepted').length
+  const reviewCount = slots.filter((slot) => slot.state === 'review').length
+  const missing = slots.filter((slot) => slot.state === 'missing')
+  const conditionScore = useMemo(() => {
+    const penalty = findings.reduce((sum, finding) => sum + severityWeight(finding.severity), 0) + missing.length * 5
+    return Math.max(0, Math.min(100, 94 - penalty + acceptedCount * 2))
+  }, [acceptedCount, missing.length])
 
-  const ledgerLines = useMemo(() => [
-    `[live] parcel input: ${query}`,
-    `[live] geocoder source: ${liveParcel.source === 'live' ? 'OpenStreetMap / Nominatim' : 'Lockhart fixture fallback'}`,
-    `[live] coordinates: ${liveParcel.lat.toFixed(5)}, ${liveParcel.lon.toFixed(5)}`,
-    `[live] OSM context: ${features.roads} roads · ${features.waterways} waterways · ${features.buildings} buildings · ${features.amenities} amenities`,
-    `[fema] ${flood.source} zone ${flood.zone} · SFHA ${flood.sfha} · risk ${flood.risk}`,
-    `[usda] ${soil.source} mukey ${soil.mukey} · ${soil.mapunit}`,
-    `[parcel] ${boundary.source} Prop_ID ${boundary.propId} · old ${boundary.oldPropId} · area ${boundary.areaSqFt ? Math.round(boundary.areaSqFt).toLocaleString() + ' sqft' : 'n/a'}`,
-    `[provider] ${parcelProvider.provider} · ${parcelProvider.status}`,
-    `[screen] active layer: ${layer.label}`,
-    checkoutOpen ? '[stripe] $19 test checkout staged' : '[stripe] paid report locked until user approval',
-  ], [boundary, checkoutOpen, features, flood, layer.label, liveParcel, parcelProvider, query, soil])
+  const report: FarmFaxReport = useMemo(() => ({
+    report_id: 'ffx-demo-5075e-1842h',
+    schema_version: 'farmfax.report.v0.1-open',
+    equipment_type: equipmentType,
+    serial_number: 'LV5075E7P0D18422',
+    hour_meter: 1842,
+    make_model_guess: catalogCandidates[0],
+    condition_score: conditionScore,
+    confidence: 78,
+    findings,
+    buyer_questions: [
+      'Can you provide service records for hydraulic hoses/cylinders in the last 24 months?',
+      'Has the right rear panel or loader arm ever been repainted, welded, or replaced?',
+      'Can you send a cold-start video and photo of the engine bay after 10 minutes of operation?',
+      'Does the serial/PIN plate match the bill of sale, lien/title paperwork, and dealer stock record?',
+    ],
+    missing_evidence: missing.map((slot) => slot.title),
+    open_record_guarantee: 'Core FarmFax records export as JSON/PDF. Paid hosting can end; the machine history still moves with the owner.',
+    sponsor_stack: sponsorStack.map((item) => item.name),
+  }), [conditionScore, equipmentType, missing])
 
-  const packet = useMemo(() => buildProofPacket({
-    goal: goal.prompt,
-    activeLayer: layer.label,
-    checkoutOpen,
-    ledgerLines,
-    scoreBoost: goal.boost,
-  }), [checkoutOpen, goal.boost, goal.prompt, layer.label, ledgerLines])
-
-  const markdown = useMemo(() => proofPacketToMarkdown(packet), [packet])
-
-  async function runAnalysis() {
-    if (status === 'loading') return
-    setStatus('loading')
-    setStage(0)
-    setLiveNote('Running live geocode + OSM context scan…')
-
-    const ticker = window.setInterval(() => {
-      setStage((current) => Math.min(analysisSteps.length, current + 1))
-    }, 380)
-
-    try {
-      const place = extractPlace(query)
-      const geocoded = await geocodePlace(place)
-      setLiveParcel(geocoded)
-      setParcelProvider(parcelProviderFor(geocoded))
-      const [counts, floodData, soilData, boundaryData] = await Promise.all([
-        fetchFeatureCounts(geocoded.lat, geocoded.lon),
-        fetchFemaFlood(geocoded.lat, geocoded.lon),
-        fetchUsdaSoil(geocoded.lat, geocoded.lon),
-        fetchCaldwellParcelBoundary(geocoded.lat, geocoded.lon),
-      ])
-      setFeatures(counts)
-      setFlood(floodData)
-      setSoil(soilData)
-      setBoundary(boundaryData)
-      setLiveNote(`Live geocode resolved: ${geocoded.displayName}`)
-      setStage(analysisSteps.length)
-      setStatus('ready')
-    } catch (error) {
-      setLiveParcel(fixtureParcel)
-      setParcelProvider(parcelProviderFor(fixtureParcel))
-      setFeatures(initialFeatureCounts)
-      setFlood(initialFlood)
-      setSoil(initialSoil)
-      setBoundary(initialBoundary)
-      setLiveNote(`Live service unavailable, using controlled demo fixture. ${error instanceof Error ? error.message : ''}`)
-      setStage(analysisSteps.length)
-      setStatus('ready')
-    } finally {
-      window.clearInterval(ticker)
+  function updateSlotImage(slotId: SlotId, event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = () => {
+      setSlots((current) => current.map((slot) => slot.id === slotId
+        ? { ...slot, image: String(reader.result), state: 'accepted' }
+        : slot))
     }
+    reader.readAsDataURL(file)
   }
 
-  const fitScore = packet.fit_score
-  const liveReport = { ...packet, liveParcel, features, flood, soil, boundary, parcelProvider }
-  const exportJson = () => downloadFile('ParcelProof_LiveDecisionPacket.json', JSON.stringify(liveReport, null, 2), 'application/json')
-  const exportMarkdown = () => downloadFile('ParcelProof_LiveDecisionPacket.md', `${markdown}\n\n## Live Data Layers\n- ${liveParcel.displayName}\n- Coordinates: ${liveParcel.lat}, ${liveParcel.lon}\n- OSM context: ${features.roads} roads, ${features.waterways} waterways, ${features.buildings} buildings, ${features.amenities} amenities\n- FEMA: zone ${flood.zone}, SFHA ${flood.sfha}, risk ${flood.risk}\n- USDA: ${soil.mapunit}, drainage ${soil.drainage}, farmland ${soil.farmland}\n- Parcel boundary: Prop_ID ${boundary.propId}, OLDPROPID ${boundary.oldPropId}, area ${boundary.areaSqFt ? Math.round(boundary.areaSqFt).toLocaleString() + ' sqft' : 'n/a'}\n- Parcel provider: ${parcelProvider.provider} (${parcelProvider.status})\n`, 'text/markdown')
-  const exportPdf = () => window.print()
-  const startCheckout = () => {
-    if (!openStripeCheckout()) setCheckoutOpen(true)
+  function exportReport() {
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `${report.report_id}.json`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
   }
 
   return (
     <main className="app-shell">
-      <section className="topbar">
-        <div>
-          <span className="live-dot" /> ParcelProof
-        </div>
+      <header className="topbar">
+        <div><span className="live-dot" /> FarmFax // open equipment record</div>
         <nav>
-          <a href="#analysis">Live screen</a>
-          <a href="#packet">Packet</a>
-          <a href="#sponsors">Sponsors</a>
+          <a href="#capture">Phone input</a>
+          <a href="#catalog">Serial catalog</a>
+          <a href="#report">Report</a>
         </nav>
-      </section>
+      </header>
 
-      <section className="hero-card">
+      <section className="hero-card farm-hero">
         <div className="hero-copy-block">
-          <p className="eyebrow">Carfax for land decisions</p>
-          <h1>Know what land can become before you buy.</h1>
-          <p className="lede">Paste a parcel, address, APN, or Acres-style map link. ParcelProof runs a live map lookup, screens land-use risk, and generates a buyer-ready decision packet.</p>
-          <div className="search-row">
-            <textarea value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Parcel input" />
-            <button onClick={runAnalysis}>{status === 'loading' ? 'Analyzing…' : isReady ? 'Re-run live screen' : 'Analyze live'}</button>
+          <p className="eyebrow">Carfax for farm equipment — without locked data</p>
+          <h1>Scan the machine before you buy the story.</h1>
+          <p className="lede">
+            FarmFax turns a phone walkthrough into an open, evidence-backed condition report for tractors, skid steers,
+            trailers, implements, and other working equipment. It cross-references serial/PIN plates, make/model clues,
+            visible defects, and maintenance evidence — then exports a portable record the owner controls.
+          </p>
+          <div className="hero-actions">
+            <button onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth' })}>Run guided inspection</button>
+            <button className="ghost" onClick={exportReport}>Export open JSON</button>
           </div>
-          <p className="live-note">{liveNote}</p>
+          <div className="principle-strip">
+            <span>Evidence-first</span>
+            <span>Open schema</span>
+            <span>Repair-friendly</span>
+            <span>No data hostage</span>
+          </div>
         </div>
-        <div className="summary-card">
-          <span>Fit score</span>
-          <strong>{fitScore}</strong>
-          <p>{packet.verdict.replace('_', ' ')} · {liveParcel.source === 'live' ? 'live geocode' : 'demo fixture'}</p>
+        <aside className="summary-card machine-card">
+          <span>visible condition</span>
+          <strong>{conditionScore}</strong>
+          <p>{catalogCandidates[0].make} {catalogCandidates[0].model} · {report.hour_meter.toLocaleString()} hrs · report confidence {report.confidence}%</p>
           <div className="mini-stats">
-            <b>{features.roads}</b><span>roads</span>
-            <b>{features.waterways}</b><span>water</span>
-            <b>{features.buildings}</b><span>buildings</span>
+            <div><b>{acceptedCount}</b><span>captures</span></div>
+            <div><b>{reviewCount}</b><span>review</span></div>
+            <div><b>{findings.length}</b><span>findings</span></div>
           </div>
-        </div>
+        </aside>
       </section>
 
-      <section className="goal-bar">
-        {goals.map((item) => (
-          <button key={item.key} className={item.key === selectedGoal ? 'active' : ''} onClick={() => setSelectedGoal(item.key)}>
-            <b>{item.label}</b>
-            <span>{item.prompt}</span>
-          </button>
+      <section className="sponsor-row sponsor-stack">
+        {sponsorStack.map((item) => (
+          <article className="panel" key={item.name}>
+            <span>{item.name}</span>
+            <p>{item.line}</p>
+          </article>
         ))}
       </section>
 
-      <section id="analysis" className="analysis-layout">
-        <div className="panel map-panel">
-          <div className="section-label">Live visualization</div>
-          <div className={`live-map layer-${activeLayer}`}>
-            <svg viewBox="0 0 700 430" role="img" aria-label="Live parcel visualization">
-              <defs>
-                <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse"><path d="M 32 0 L 0 0 0 32" fill="none" stroke="rgba(255,255,255,.08)" strokeWidth="1" /></pattern>
-                <linearGradient id="parcelGlow" x1="0" x2="1"><stop stopColor="#9cff7d" stopOpacity=".55"/><stop offset="1" stopColor="#6ef7c2" stopOpacity=".15"/></linearGradient>
-              </defs>
-              <rect width="700" height="430" fill="url(#grid)" />
-              <path d="M0 330 C140 280 220 360 350 300 S560 190 700 240 L700 430 L0 430Z" fill="rgba(61,119,255,.18)" />
-              <path d="M-20 330 L200 260 L520 220 L730 140" stroke="rgba(255,202,103,.72)" strokeWidth="18" />
-              <path d="M-20 330 L200 260 L520 220 L730 140" stroke="rgba(20,16,11,.92)" strokeWidth="11" />
-              <polygon points={boundaryToSvgPoints(boundary)} fill="url(#parcelGlow)" stroke="#9cff7d" strokeWidth="4" />
-              <circle cx="390" cy="188" r="10" fill="#9cff7d" /><text x="405" y="193">homesite</text>
-              <circle cx="275" cy="292" r="10" fill="#7db8ff" /><text x="292" y="297">well?</text>
-              <circle cx="190" cy="246" r="10" fill="#ffca67" /><text x="206" y="251">gate</text>
-              <text x="30" y="45" className="map-title">{liveParcel.displayName.split(',').slice(0, 3).join(', ')}</text>
-              <text x="30" y="74" className="map-sub">{liveParcel.lat.toFixed(4)}, {liveParcel.lon.toFixed(4)} · OSM live context</text>
-            </svg>
-          </div>
-          <div className="layer-tabs">
-            {layers.map((item) => (
-              <button key={item.key} className={item.key === activeLayer ? `active ${item.status}` : item.status} onClick={() => setActiveLayer(item.key)}>{item.label}</button>
+      <section className="analysis-layout farm-layout" id="capture">
+        <div className="panel capture-panel">
+          <div className="section-label">phone-guided inspection</div>
+          <h2>The phone is the input device.</h2>
+          <p className="muted">Guided capture is the moat. Better inputs beat hallucinated AI. Uploads below are browser-local in this demo.</p>
+          <div className="equipment-toggle" aria-label="equipment type">
+            {['tractor', 'skid steer', 'trailer', 'implement'].map((type) => (
+              <button key={type} className={equipmentType === type ? 'active' : 'ghost'} onClick={() => setEquipmentType(type)}>{type}</button>
             ))}
           </div>
-          <div className="live-layer-grid">
-            <article><span>FEMA NFHL</span><b>Zone {flood.zone}</b><small>{flood.risk} risk · SFHA {flood.sfha}</small></article>
-            <article><span>USDA NRCS</span><b>{soil.mapunit}</b><small>{soil.drainage} · {soil.farmland}</small></article>
-            <article><span>Parcel boundary</span><b>Prop {boundary.propId}</b><small>{boundary.source} · {boundary.areaSqFt ? Math.round(boundary.areaSqFt).toLocaleString() + ' sqft' : 'area pending'}</small></article>
+          <div className="capture-grid">
+            {slots.map((slot) => (
+              <article className={`capture-slot ${slot.state}`} key={slot.id}>
+                <div>
+                  <span>{stateLabel(slot.state)}</span>
+                  <h3>{slot.title}</h3>
+                  <p>{slot.prompt}</p>
+                  <small>{slot.why}</small>
+                </div>
+                <label>
+                  {slot.image ? <img src={slot.image} alt={`${slot.title} upload`} /> : <div className="phone-placeholder">tap to add photo</div>}
+                  <input accept="image/*" capture="environment" type="file" onChange={(event) => updateSlotImage(slot.id, event)} />
+                </label>
+              </article>
+            ))}
           </div>
         </div>
 
-        <div className="panel compact-panel">
-          <div className="section-label">AI due diligence</div>
-          <h2>{status === 'loading' ? 'Running live screen…' : isReady ? 'Decision packet ready' : 'Run the land screen'}</h2>
-          <div className="steps-list">
-            {analysisSteps.map((step, index) => {
-              const done = index < stage
-              const active = status === 'loading' && index === stage
-              return <article key={step.label} className={done ? 'done' : active ? 'active' : ''}><b>{step.agent}</b><span>{step.label}</span><small>{step.detail}</small></article>
-            })}
+        <aside className="panel vision-panel">
+          <div className="section-label">open cv + nemotron pass</div>
+          <h2>Evidence, not vibes.</h2>
+          <div className="overlay-card">
+            <div className="tractor-silhouette">
+              <span className="hotspot rust">rust</span>
+              <span className="hotspot leak">leak?</span>
+              <span className="hotspot paint">paint</span>
+              <span className="hotspot tire">tread</span>
+            </div>
           </div>
-        </div>
-
-        <div className="panel verdict-panel">
-          <div className="section-label">Current verdict</div>
-          <h2>{packet.verdict.replace('_', ' ')}</h2>
-          <p>Do not write an offer until legal access and septic feasibility are verified.</p>
-          <div className={`status-pill ${layer.status}`}>{statusLabel(layer.status)} · {layer.label}</div>
-          <p className="muted">{layer.summary}</p>
-          <button onClick={exportJson}>Export JSON</button>
-          <button className="ghost" onClick={exportMarkdown}>Export Markdown</button>
-          <button className="ghost" onClick={exportPdf}>Export PDF</button>
-          <a className="provider-link" href={parcelProvider.url} target="_blank" rel="noreferrer">Open parcel provider</a>
-        </div>
-      </section>
-
-      <section className="score-strip">
-        {baseScores.map((score) => (
-          <article key={score.label} className={score.status}>
-            <b>{score.score}</b>
-            <span>{score.label}</span>
-            <small>{score.nextAction}</small>
+          <div className="finding-list">
+            {findings.map((finding) => (
+              <button key={finding.category} className={`finding-button ${finding.severity} ${selectedFinding.category === finding.category ? 'active' : ''}`} onClick={() => setSelectedFinding(finding)}>
+                <b>{finding.category}</b>
+                <span>{finding.confidence}% · {finding.evidence}</span>
+              </button>
+            ))}
+          </div>
+          <article className={`selected-finding ${selectedFinding.severity}`}>
+            <span>{selectedFinding.severity} flag</span>
+            <h3>{selectedFinding.finding}</h3>
+            <p>{selectedFinding.nextStep}</p>
           </article>
-        ))}
+        </aside>
       </section>
 
-      <section id="packet" className="packet-layout">
-        <div className="panel packet-panel">
-          <div className="section-label">Land Decision Packet</div>
-          <h2>{liveParcel.county || 'Caldwell County'} land screen</h2>
-          <p>{goal.prompt}</p>
+      <section className="packet-layout" id="catalog">
+        <div className="panel catalog-panel">
+          <div className="section-label">serial code + visual catalog</div>
+          <h2>Cross-reference identity before trusting the listing.</h2>
+          <div className="identity-grid">
+            <article>
+              <span>OCR serial / PIN</span>
+              <b>{report.serial_number}</b>
+              <p>Plate crop confidence 86%. User confirmation required before report verification.</p>
+            </article>
+            <article>
+              <span>hour meter</span>
+              <b>{report.hour_meter.toLocaleString()} hrs</b>
+              <p>Dashboard OCR confidence 79%. Ask for service records around this hour mark.</p>
+            </article>
+            <article>
+              <span>external IDs</span>
+              <b>dealer stock · auction lot · owner log</b>
+              <p>Future adapters preserve OEM/dealer/auction references without locking the record inside one system.</p>
+            </article>
+          </div>
+          <div className="candidate-list">
+            {catalogCandidates.map((candidate) => (
+              <article key={`${candidate.make}-${candidate.model}`}>
+                <div><b>{candidate.make} {candidate.model}</b><span>{candidate.confidence}%</span></div>
+                <p>{candidate.family}</p>
+                <small>{candidate.basis}</small>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        <aside className="panel lock-panel">
+          <div className="section-label">anti vendor lock-in</div>
+          <h2>Own the machine. Own the history.</h2>
+          <p>
+            OEM portals, dealer CRMs, auction listings, and shop PDFs trap records in silos. FarmFax uses an open schema:
+            owners can export JSON/PDF, mechanics can add verified service events, and paid hosting never becomes data captivity.
+          </p>
+          <ul>
+            <li>Open report schema and scoring rubric</li>
+            <li>Portable maintenance + repair events</li>
+            <li>Self-hostable core record</li>
+            <li>Stripe monetizes workflow, not record access</li>
+          </ul>
+        </aside>
+      </section>
+
+      <section className="packet-layout" id="report">
+        <div className="panel report-panel">
+          <div className="section-label">consolidated FarmFax report</div>
+          <h2>Buyer packet generated.</h2>
+          <div className="report-score">
+            <strong>{report.condition_score}</strong>
+            <div>
+              <b>{report.make_model_guess.make} {report.make_model_guess.model}</b>
+              <p>Visible-condition score. Not a mechanical guarantee, title check, appraisal, or replacement for an inspector.</p>
+            </div>
+          </div>
           <div className="question-grid">
-            <div><b>Ask seller</b>{packet.seller_questions.slice(0, 3).map((q) => <p key={q}>• {q}</p>)}</div>
-            <div><b>Ask county</b>{packet.county_questions.slice(0, 3).map((q) => <p key={q}>• {q}</p>)}</div>
+            {report.buyer_questions.map((question) => (
+              <div key={question}><b>ask seller</b><p>{question}</p></div>
+            ))}
           </div>
           <div className="data-disclosures">
-            <p><b>FEMA:</b> {flood.note}</p>
-            <p><b>USDA:</b> {soil.note}</p>
-            <p><b>Parcel boundary:</b> {boundary.note}</p>
-            <p><b>Ownership:</b> Public Caldwell layer exposes parcel IDs/boundary, not owner name; use CAD/Regrid handoff for owner verification.</p>
-            <p><b>Provider:</b> {parcelProvider.message}</p>
+            <p><b>Missing evidence:</b> {report.missing_evidence.length ? report.missing_evidence.join(', ') : 'none'}</p>
+            <p><b>Open record:</b> {report.open_record_guarantee}</p>
+            <p><b>Guardrail:</b> FarmFax reports visible evidence and confidence. Unknowns stay unknown.</p>
+          </div>
+          <div className="hero-actions">
+            <button onClick={exportReport}>Download report JSON</button>
+            <button className="ghost" onClick={() => window.print()}>Print / save PDF</button>
           </div>
         </div>
-        <div className="panel commerce-panel">
+
+        <aside className="panel commerce-panel">
           <div className="section-label">Stripe rail</div>
-          <h2>$19</h2>
-          <p>Real Checkout handoff when VITE_STRIPE_CHECKOUT_URL is configured; otherwise local test modal for demo reliability.</p>
-          <button onClick={startCheckout}>Unlock report</button>
-          <button className="ghost" onClick={exportPdf}>Print / PDF</button>
-        </div>
+          <h2>$29</h2>
+          <p>Demo checkout for verified hosted report, seller share link, and dealer/shop branding. Export remains available without paying.</p>
+          <button onClick={() => setStripeOpen(true)}>Open Stripe checkout demo</button>
+        </aside>
       </section>
 
-      <section id="sponsors" className="sponsor-row">
-        {sponsorStack.map((sponsor) => (
-          <article key={sponsor.sponsor} className="panel">
-            <span>{sponsor.lane}</span>
-            <h3>{sponsor.sponsor}</h3>
-            <p>{sponsor.value}</p>
-          </article>
-        ))}
+      <section className="source-trail">
+        <b>audit trail</b>
+        <p>[phone] guided capture slots · accepted {acceptedCount}/7 · missing {missing.length}</p>
+        <p>[cv] rust/paint/leak/wear detectors are evidence-first and confidence-scored</p>
+        <p>[nemotron] structured multimodal reasoning over findings, OCR, missing evidence, and buyer questions</p>
+        <p>[hermes] orchestrates capture → detection → catalog → report → export/payment</p>
+        <p>[stripe] workflow payments only; record ownership and export rights stay with the machine owner</p>
       </section>
 
-      <section className="panel source-trail">
-        <div className="section-label">Source trail</div>
-        {ledgerLines.map((line) => <p key={line}>{line}</p>)}
-      </section>
-
-      {checkoutOpen && (
+      {stripeOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="stripe-modal">
-            <div className="modal-topline"><span>Stripe test checkout</span><button className="ghost" onClick={() => setCheckoutOpen(false)}>Close</button></div>
-            <div className="stripe-word">stripe</div>
-            <h2>Unlock Land Reality Check</h2>
-            <p>Demo checkout for the complete ParcelProof packet, source trail, and expert-review upsell.</p>
-            <div className="receipt"><span>Product</span><b>ParcelProof Report</b><span>Mode</span><b>Test</b><span>Total</span><b>$19.00</b></div>
+            <div className="modal-topline"><span>Stripe checkout simulation</span><button className="ghost" onClick={() => setStripeOpen(false)}>close</button></div>
+            <div className="stripe-word">Stripe</div>
+            <h2>Verified FarmFax report</h2>
+            <p>Pay for hosted verification, share link, and dealer/shop branding. The underlying equipment record still exports as open JSON/PDF.</p>
+            <div className="receipt">
+              <span>Report</span><b>{report.report_id}</b>
+              <span>Price</span><b>$29.00</b>
+              <span>Data rights</span><b>Owner-controlled export</b>
+              <span>Status</span><b>Demo only</b>
+            </div>
           </div>
         </div>
       )}

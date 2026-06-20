@@ -1,53 +1,63 @@
 {
-  "project": "Agentic Revenue Operator",
-  "branchName": "hackathon/agentic-revenue-operator",
-  "description": "Hermes hackathon demo: Revenue Forge proves governed agentic commerce with sponsor-native proof packets.",
-  "qualityChecks": ["npm run build"],
+  "project": "FarmFax",
+  "branchName": "main",
+  "description": "Open-source AI-assisted condition report for used farm equipment with phone capture, serial/model cross-reference, NVIDIA/Hermes/Stripe positioning, and anti-vendor-lock portable records.",
+  "qualityChecks": [
+    "npm run build",
+    "browser smoke verification"
+  ],
   "userStories": [
     {
       "id": "US-001",
-      "title": "Revenue Forge command center UI",
-      "description": "As a judge, I need to immediately understand that this is a governed revenue machine, not a chatbot.",
-      "acceptanceCriteria": ["Hero clearly states revenue forge concept", "Agent Circuit and Revenue Packet visible", "Spend Warrant and Rail Receipt visible"],
+      "title": "FarmFax strategic shell and sponsor positioning",
+      "description": "As a hackathon judge, I need to immediately understand FarmFax, why NVIDIA/Hermes/Stripe matter, and why this is not vendor-lock slop.",
+      "acceptanceCriteria": [
+        "Hero states AI pre-purchase inspection for farm equipment",
+        "NVIDIA/Nemotron, Hermes, and Stripe each have clear non-forced roles",
+        "Open-source anti-vendor-lock principle is visible above the fold or in primary flow"
+      ],
       "priority": 1,
       "passes": true,
-      "notes": "Revenue Forge UI implemented."
+      "notes": "Implemented and verified via npm run build + browser smoke test."
     },
     {
       "id": "US-002",
-      "title": "Interactive forged revenue workflow",
-      "description": "As an operator, I can step through the revenue workflow from objective to report.",
-      "acceptanceCriteria": ["At least 6 stages", "Each stage shows agent output", "Progress and living ledger update"],
+      "title": "Phone-guided inspection input",
+      "description": "As a buyer/seller, I need a guided mobile capture checklist that treats the phone as the trusted input device.",
+      "acceptanceCriteria": [
+        "UI includes required capture slots for walkaround, serial plate, hour meter, hydraulics, tires/tracks, paint/body, and engine bay",
+        "Each capture slot has accepted/needs-review/missing state",
+        "User can upload images into slots in browser"
+      ],
       "priority": 2,
       "passes": true,
-      "notes": "Six stages implemented with proof-like slips and ledger."
+      "notes": "Implemented and verified via npm run build + browser smoke test."
     },
     {
       "id": "US-003",
-      "title": "Budget and Stripe rail visualization",
-      "description": "As a judge, I can see how the agent spends safely and creates monetization.",
-      "acceptanceCriteria": ["Budget cap visible", "Approval gate visible", "Stripe test checkout/offer visible", "Projected ROI visible"],
+      "title": "Visual defect and identity catalog",
+      "description": "As a buyer, I need visible rust/paint/leak/wear detections, OCR-like serial/hour extraction, and make/model cross-reference candidates.",
+      "acceptanceCriteria": [
+        "App displays simulated/evidence-first detection overlays for rust, paint mismatch, leaks, and wear",
+        "App displays serial number, hour meter, and make/model candidates with confidence",
+        "Every finding includes confidence and evidence slot reference"
+      ],
       "priority": 3,
       "passes": true,
-      "notes": "Spend Warrant and Rail Receipt implemented."
+      "notes": "Implemented and verified via npm run build + browser smoke test."
     },
     {
       "id": "US-004",
-      "title": "Typed proof packet module",
-      "description": "As a builder, I need the Commercial Autonomy Proof packet to be a reusable typed artifact rather than inline component data.",
-      "acceptanceCriteria": ["Proof packet builder lives outside App.tsx", "Export JSON and Markdown still work", "Proof events include sponsor stack and policy/rail fields"],
+      "title": "Consolidated portable report and Stripe unlock",
+      "description": "As a user, I need a consolidated FarmFax report that can be exported/shared and monetized without locking the equipment record.",
+      "acceptanceCriteria": [
+        "Report includes condition score, red/yellow/green findings, buyer questions, missing evidence, and open record export language",
+        "Export button downloads JSON report",
+        "Stripe checkout modal explains paid verification/storage while preserving owner export rights"
+      ],
       "priority": 4,
       "passes": true,
-      "notes": "src/proofPacket.ts contains typed builder, sponsor stack, and Markdown serializer."
-    },
-    {
-      "id": "US-005",
-      "title": "Submission docs and demo script",
-      "description": "As a submitter, I need a demo script, README, and submission brief ready before video production.",
-      "acceptanceCriteria": ["DEMO_SCRIPT.md exists", "SUBMISSION.md exists", "README explains product, sponsor value, and run commands"],
-      "priority": 5,
-      "passes": true,
-      "notes": "DEMO_SCRIPT.md, SUBMISSION.md, and README.md are ready for submission asset production."
+      "notes": "Implemented and verified via npm run build + browser smoke test."
     }
   ]
 }

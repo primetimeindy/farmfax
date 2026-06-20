@@ -1,30 +1,6 @@
-# Ralph Progress — Agentic Revenue Operator
+2026-06-19 FarmFax Ralph loop initialized.
+- Product call: build AI-assisted visual condition report, not full authoritative Carfax history.
+- MVP must show phone capture, serial/model cross-reference, CV defect evidence, open portable report, NVIDIA/Hermes/Stripe roles.
+- Guardrail: no universal serial decoder, no mechanical guarantee, no vendor-locked data.
 
-## 2026-06-16 kickoff
-- Chosen Option A: Founder GTM / Agentic Revenue Operator.
-- Prototype scope: one-page Vite React demo, no credentials required, polished enough for hackathon video.
-- Quality gate: `npm run build`.
-
-## 2026-06-16 prototype pass
-- Built polished Vite/React single-page demo with mission-control UI.
-- Implemented six-stage GTM workflow: brief, research, assets, spend, Stripe rail, ledger.
-- Added budget guardrails, approval gate, Stripe-style test checkout modal, and expanding audit trail.
-- Verified with `npm run build` successfully.
-
-## 2026-06-16 moat + Revenue Forge design pass
-- Reframed moat as closed-loop revenue execution: Revenue Graph + Policy Engine + Audit Ledger.
-- Added MOAT.md and UX_DIRECTION_REVENUE_FORGE.md.
-- Rebuilt UI around Revenue Forge: Agent Circuit, Revenue Packet, Spend Warrant, Rail Receipt, Living Ledger, Verdict Dial.
-- Verified build and browser interactions; rail receipt modal opens after signed warrant.
-
-## 2026-06-16 sponsor proof ledger
-- Added Commercial Autonomy Proof Ledger: Nous/Hermes orchestration, Stripe commerce rail, NVIDIA runtime lanes.
-- Added exportable proof packet buttons for JSON and Markdown.
-- Added COMMERCIAL_AUTONOMY_PROOF.md to define event schema and sponsor value.
-- Verified `npm run build`, browser rendering, export button click, and console with zero JS errors.
-
-## 2026-06-16 Ralph loop: submission readiness
-- Added US-004 and US-005 to Ralph PRD and marked complete after implementation.
-- Refactored proof packet into src/proofPacket.ts with typed schema, sponsor stack, event IDs, replay metadata, and Markdown serializer.
-- Added DEMO_SCRIPT.md, SUBMISSION.md, and upgraded README.md.
-- Next phase: produce submission video/assets and optionally wire real Stripe test API if credentials are provided through env.
+2026-06-19T20:33:45.590388 Implemented FarmFax app pivot. Build passed. Browser smoke verified hero, capture, serial catalog, consolidated report, Stripe modal, zero JS console errors.
