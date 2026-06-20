@@ -87,12 +87,30 @@ type RiskCard = {
 type FarmFaxReport = {
   report_id: string
   schema_version: string
+  generated_at: string
+  scenario_id: ScenarioId
+  demo_mode: boolean
   equipment_type: string
   serial_number: string
   hour_meter: number
   make_model_guess: CatalogCandidate
   condition_score: number
   confidence: number
+  input_sources: {
+    photos: number
+    videos: number
+    sampled_video_frames: number
+    accepted_slots: number
+    missing_slots: number
+  }
+  demo_truth: {
+    browser_photo_checks: 'implemented'
+    browser_video_frame_sampling: 'implemented'
+    hermes_orchestration: 'planned'
+    nemotron_reasoning: 'planned'
+    stripe_checkout: 'simulated'
+    unsupported_claims: string[]
+  }
   findings: Finding[]
   visual_analysis: Array<{ slot: SlotId; source: 'photo' | 'video_frame'; rustPct: number; wetPct: number; paintVariance: number; confidence: number; summary: string; frameCount?: number; worstFrameTime?: number }>
   risk_summary: RiskCard[]
@@ -101,6 +119,9 @@ type FarmFaxReport = {
   open_record_commitment: string
   integration_stack: string[]
 }
+
+const PUBLIC_DEMO_URL = 'https://primetimeindy.github.io/farmfax-demo/'
+const assetUrl = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
 
 const catalogCandidates: CatalogCandidate[] = [
   {
@@ -475,6 +496,9 @@ function App() {
   const reviewCount = slots.filter((slot) => slot.state === 'review').length
   const analyzedSlots = slots.filter((slot) => slot.analysis)
   const missing = slots.filter((slot) => slot.state === 'missing')
+  const videoSourceCount = slots.filter((slot) => slot.mediaType === 'video').length
+  const photoSourceCount = analyzedSlots.filter((slot) => slot.mediaType !== 'video').length
+  const sampledFrameCount = slots.reduce((sum, slot) => sum + (slot.video?.frameCount ?? 0), 0)
   const riskSummary = useMemo(() => buildRiskSummary(slots, findings, analyzedSlots.length, reportSeed), [slots, findings, analyzedSlots.length, reportSeed])
   const dealPosture = missing.some((slot) => slot.id === 'serial' || slot.id === 'hours')
     ? 'Do not send money yet'
@@ -498,12 +522,36 @@ function App() {
   const report: FarmFaxReport = useMemo(() => ({
     report_id: reportSeed.reportId,
     schema_version: 'farmfax.report.v0.1-open',
+    generated_at: new Date().toISOString(),
+    scenario_id: scenarioState.selectedScenarioId,
+    demo_mode: true,
     equipment_type: reportSeed.equipmentType,
     serial_number: reportSeed.serialNumber,
     hour_meter: reportSeed.hourMeter ?? 0,
     make_model_guess: reportSeed.makeModelGuess,
     condition_score: conditionScore,
     confidence: reportSeed.confidence,
+    input_sources: {
+      photos: photoSourceCount,
+      videos: videoSourceCount,
+      sampled_video_frames: sampledFrameCount,
+      accepted_slots: acceptedCount,
+      missing_slots: missing.length,
+    },
+    demo_truth: {
+      browser_photo_checks: 'implemented',
+      browser_video_frame_sampling: 'implemented',
+      hermes_orchestration: 'planned',
+      nemotron_reasoning: 'planned',
+      stripe_checkout: 'simulated',
+      unsupported_claims: [
+        'mechanical certification',
+        'title/lien/theft status',
+        'safety certification',
+        'appraisal or repair estimate',
+        'full-video inspection',
+      ],
+    },
     findings,
     visual_analysis: analyzedSlots.map((slot) => ({
       slot: slot.id,
@@ -521,10 +569,15 @@ function App() {
     missing_evidence: missing.map((slot) => slot.title),
     open_record_commitment: reportSeed.openRecordCommitment,
     integration_stack: architectureStack.map((item) => item.name),
-  }), [analyzedSlots, conditionScore, findings, missing, reportSeed, riskSummary])
+  }), [acceptedCount, analyzedSlots, conditionScore, findings, missing, photoSourceCount, reportSeed, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, videoSourceCount])
 
   const openRecordPreview = useMemo(() => ({
     schema: report.schema_version,
+    generated_at: report.generated_at,
+    scenario_id: report.scenario_id,
+    demo_mode: report.demo_mode,
+    input_sources: report.input_sources,
+    demo_truth: report.demo_truth,
     equipment_identity: {
       type: report.equipment_type,
       serial_pin: report.serial_number,
@@ -545,7 +598,7 @@ function App() {
     {
       status: 'working demo',
       label: 'Photo + selected video-frame check',
-      detail: `${analyzedSlots.length}/7 slots checked · ${slots.filter((slot) => slot.mediaType === 'video').length} video source${slots.filter((slot) => slot.mediaType === 'video').length === 1 ? '' : 's'}`,
+      detail: `${analyzedSlots.length}/7 slots checked · ${videoSourceCount} video source${videoSourceCount === 1 ? '' : 's'}`,
     },
     {
       status: 'working demo',
@@ -567,7 +620,9 @@ function App() {
       label: 'Stripe hosted report',
       detail: 'Payment screen only; free JSON/PDF export stays with the owner.',
     },
-  ], [acceptedCount, analyzedSlots.length, missing.length, report.buyer_questions.length, report.risk_summary, reviewCount, slots])
+  ], [acceptedCount, analyzedSlots.length, missing.length, report.buyer_questions.length, report.risk_summary, reviewCount, videoSourceCount])
+
+  const shareUrl = PUBLIC_DEMO_URL
 
   function nextUploadRequest(slotId: SlotId) {
     uploadRequestRef.current[slotId] += 1
@@ -612,7 +667,7 @@ function App() {
     setIsSampleVideoLoading(true)
     const requestId = nextUploadRequest(slotId)
     try {
-      const response = await fetch('/farmfax-video-fixture.mp4')
+      const response = await fetch(assetUrl('/farmfax-video-fixture.mp4'))
       if (!response.ok) throw new Error('Sample video fixture could not be loaded.')
       const blob = await response.blob()
       const file = new File([blob], 'farmfax-video-fixture.mp4', { type: blob.type || 'video/mp4' })
@@ -633,6 +688,19 @@ function App() {
   async function runJudgeDemo() {
     loadScenario('risky-tractor')
     await runSampleVideo('hydraulics', { scrollToReport: true })
+  }
+
+  async function runCompleteSampleInspection() {
+    loadScenario('clean-tractor')
+    await runSampleVideo('hydraulics', { scrollToReport: true })
+  }
+
+  async function copyShareUrl() {
+    try {
+      await navigator.clipboard?.writeText(shareUrl)
+    } catch {
+      window.prompt('Copy FarmFax demo URL', shareUrl)
+    }
   }
 
   function updateSlotMedia(slotId: SlotId, event: ChangeEvent<HTMLInputElement>) {
@@ -791,6 +859,9 @@ function App() {
             <button className="ghost" onClick={() => document.getElementById('report')?.scrollIntoView({ behavior: 'smooth' })}>See buyer report</button>
             <button className="ghost judge-demo-button" data-qa="judge-demo-button" onClick={() => void runJudgeDemo()} disabled={isSampleVideoLoading}>
               {isSampleVideoLoading ? 'Running sample…' : 'Run judge demo'}
+            </button>
+            <button className="ghost" data-qa="sample-inspection-button" onClick={() => void runCompleteSampleInspection()} disabled={isSampleVideoLoading}>
+              Load complete sample
             </button>
           </div>
           <div className="scenario-kicker">Try a sample report:</div>
@@ -1039,7 +1110,7 @@ function App() {
                 <span>open record JSON preview</span>
                 <b>Portable by default</b>
               </div>
-              <pre>{JSON.stringify(openRecordPreview, null, 2)}</pre>
+              <pre data-qa="report-json-metadata">{JSON.stringify(openRecordPreview, null, 2)}</pre>
             </div>
             <div className="risk-factor-grid">
               {report.risk_summary.filter((risk) => risk.factors.length).slice(0, 4).map((risk) => (
@@ -1068,8 +1139,34 @@ function App() {
           <div className="section-label">save or share</div>
           <h2>$29</h2>
           <p>Optional hosted report link for a seller, mechanic, lender, or partner. Your PDF/JSON export stays available without paying.</p>
+          <div className="qr-share-block" data-qa="qr-share-block">
+            <img src={assetUrl('/farmfax-qr.svg')} alt="QR code for FarmFax demo" data-qa="qr-code" />
+            <div>
+              <b>View on phone</b>
+              <input data-qa="share-url" value={shareUrl} readOnly aria-label="FarmFax public demo URL" />
+              <button className="ghost" type="button" onClick={() => void copyShareUrl()}>Copy link</button>
+            </div>
+          </div>
           <button onClick={() => setStripeOpen(true)}>Save hosted report</button>
         </aside>
+      </section>
+
+      <section className="judge-proof-panel" data-qa="judge-proof-panel">
+        <div className="trace-heading">
+          <span>Judge proof</span>
+          <p>One screen showing what is working, what exports, and what stays honest.</p>
+        </div>
+        <div className="judge-proof-grid">
+          <article data-qa="judge-proof-item"><b>Live browser checks</b><p>Photo heuristics and selected video-frame sampling run in the demo.</p></article>
+          <article data-qa="judge-proof-item"><b>Open report</b><p>JSON and PDF export stay available before any paid hosted link.</p></article>
+          <article data-qa="judge-proof-item"><b>Hermes path</b><p>Capture → evidence check → report → export / hosted link is the planned workflow route.</p></article>
+          <article data-qa="judge-proof-item"><b>Truth labels</b><p>Nemotron is planned, Stripe checkout is simulated, and unsupported claims are listed in JSON.</p></article>
+        </div>
+        <div className="hero-actions">
+          <button type="button" onClick={() => void runJudgeDemo()}>Run judge demo</button>
+          <button className="ghost" type="button" onClick={() => void runCompleteSampleInspection()}>Load complete sample</button>
+          <button className="ghost" type="button" onClick={exportReport}>Download JSON report</button>
+        </div>
       </section>
 
       <section className="source-trail" data-qa="workflow-trace">
