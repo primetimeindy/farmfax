@@ -237,7 +237,7 @@ export const farmFaxScenarios = [
   {
     id: 'clean-tractor',
     label: 'Clean tractor',
-    description: 'Complete seller evidence with low visible defect signal and high buyer confidence.',
+    description: 'Mostly complete photos and no obvious major visual issue.',
     demoBadge: 'Scenario: clean tractor · complete evidence',
     slots: [
       scenarioSlot('walkaround', 'accepted', { label: 'Clean walkaround', tone: 'clean' }, cleanAnalysis),
@@ -290,7 +290,7 @@ export const farmFaxScenarios = [
   {
     id: 'risky-tractor',
     label: 'Risky tractor',
-    description: 'Complete enough to analyze, but defects and review states create repair and negotiation leverage.',
+    description: 'Photos show issues that should slow the deal down before deposit.',
     demoBadge: 'Scenario: risky tractor · red/yellow findings',
     slots: [
       scenarioSlot('walkaround', 'accepted', { label: 'Rust walkaround', tone: 'rust' }, riskyRustAnalysis),
@@ -352,7 +352,7 @@ export const farmFaxScenarios = [
   {
     id: 'incomplete-seller-listing',
     label: 'Incomplete seller listing',
-    description: 'Sparse marketplace listing with attractive photos but missing identity, hour, engine, and underside evidence.',
+    description: 'Attractive listing photos, but not enough proof to trust yet.',
     demoBadge: 'Scenario: incomplete listing · missing evidence gate',
     slots: [
       scenarioSlot('walkaround', 'accepted', { label: 'Listing hero photo', tone: 'clean' }, cleanAnalysis),

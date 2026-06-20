@@ -125,9 +125,9 @@ const architectureStack = [
 ]
 
 function stateLabel(state: CaptureState) {
-  if (state === 'accepted') return 'accepted'
-  if (state === 'review') return 'needs review'
-  return 'missing'
+  if (state === 'accepted') return 'photo received'
+  if (state === 'review') return 'retake recommended'
+  return 'still needed'
 }
 
 function severityWeight(severity: Severity) {
@@ -209,11 +209,11 @@ function buildRiskSummary(slots: CaptureSlot[], baseFindings: Finding[], analyze
   const leverageLevel = riskLevel(leverageScore)
 
   return [
-    { id: 'identity', label: 'Identity / fraud risk', score: identityScore, level: identityLevel, severity: riskSeverity(identityLevel), verdict: identityLevel === 'high' ? 'Identity evidence has serious gaps or conflicts.' : identityLevel === 'medium' ? 'Serial/model cues are plausible, but paperwork match is unverified.' : 'Identity evidence aligns in submitted capture.', evidence: 'serial plate · catalog match · paperwork not checked', buyerAction: 'Compare PIN plate to bill of sale, lien/title paperwork, dealer stock record, and service invoices.', factors: identityFactors },
-    { id: 'safety', label: 'Safety / weld / structural', score: safetyScore, level: safetyLevel, severity: riskSeverity(safetyLevel), verdict: safetyLevel === 'high' ? 'Inspect before purchase or operation.' : safetyLevel === 'medium' ? 'Potential safety/repair concerns need closer inspection.' : 'No obvious safety-critical issue in supplied evidence.', evidence: `${redFindings.length} red flag · engine ${engine?.state ?? 'unknown'} · hydraulics ${hydraulics?.state ?? 'unknown'}`, buyerAction: 'Inspect welds, pins, mounts, guards, hoses, loader arms, frame rails, and operator safety equipment.', factors: safetyFactors },
-    { id: 'evidence', label: 'Evidence completeness', score: evidenceScore, level: evidenceLevel, severity: riskSeverity(evidenceLevel), verdict: evidenceLevel === 'high' ? 'Major required evidence is missing.' : evidenceLevel === 'medium' ? 'Mostly complete, but important views still need review.' : 'Capture checklist is strong for a pre-purchase screen.', evidence: `${accepted.length}/7 accepted · ${missing.length} missing · ${analyzedCount}/7 CV analyzed`, buyerAction: 'Ask seller for missing or cleaner captures before relying on the report.', factors: evidenceFactors },
-    { id: 'hours', label: 'Hour-meter plausibility', score: hourScore, level: hourLevel, severity: riskSeverity(hourLevel), verdict: hourLevel === 'high' ? 'Hour evidence has serious conflicts or missing proof.' : hourLevel === 'medium' ? 'Displayed hours should be reconciled with records and visible wear.' : 'Hour evidence appears usable, pending normal record review.', evidence: `${hourLabel} OCR · service records not supplied`, buyerAction: 'Ask for service invoices, ECU/dealer diagnostics if available, and prior auction/dealer listings.', factors: hourFactors },
-    { id: 'leverage', label: 'Negotiation leverage', score: leverageScore, level: leverageLevel, severity: riskSeverity(leverageLevel), verdict: leverageLevel === 'high' ? 'Strong evidence-backed leverage for repair demand or contingency.' : leverageLevel === 'medium' ? 'Moderate leverage from visible issues and unanswered proof.' : 'Limited visible leverage; use report mainly for diligence.', evidence: `${redFindings.length} red · ${yellowFindings.length} yellow · ${missing.length} missing`, buyerAction: 'Use findings to request records, additional captures, inspection contingency, or seller concession — not as an appraisal.', factors: leverageFactors },
+    { id: 'identity', label: 'Serial / paperwork', score: identityScore, level: identityLevel, severity: riskSeverity(identityLevel), verdict: identityLevel === 'high' ? 'Machine identity cannot be trusted from current photos.' : identityLevel === 'medium' ? 'Serial/model cues are plausible, but paperwork still needs checking.' : 'Visible model cues match the listing.', evidence: 'serial plate · model cues · paperwork not checked', buyerAction: 'Compare PIN plate to bill of sale, lien/title paperwork, dealer stock record, and service invoices.', factors: identityFactors },
+    { id: 'safety', label: 'Costly repair / safety', score: safetyScore, level: safetyLevel, severity: riskSeverity(safetyLevel), verdict: safetyLevel === 'high' ? 'Do not skip inspection before buying or operating.' : safetyLevel === 'medium' ? 'Possible repair or safety concern needs closer inspection.' : 'No obvious safety-critical issue in supplied photos.', evidence: `${redFindings.length} red flag · engine ${engine?.state ?? 'unknown'} · hydraulics ${hydraulics?.state ?? 'unknown'}`, buyerAction: 'Inspect welds, pins, mounts, guards, hoses, loader arms, frame rails, and operator safety equipment.', factors: safetyFactors },
+    { id: 'evidence', label: 'Proof supplied', score: evidenceScore, level: evidenceLevel, severity: riskSeverity(evidenceLevel), verdict: evidenceLevel === 'high' ? 'Too little evidence to judge this machine.' : evidenceLevel === 'medium' ? 'Important proof is missing or needs a retake.' : 'Core views are captured.', evidence: `${accepted.length}/7 photos received · ${missing.length} still needed · ${analyzedCount}/7 checked`, buyerAction: 'Ask seller for missing or cleaner photos before relying on the report.', factors: evidenceFactors },
+    { id: 'hours', label: 'Hours check', score: hourScore, level: hourLevel, severity: riskSeverity(hourLevel), verdict: hourLevel === 'high' ? 'Hour evidence has serious gaps or missing proof.' : hourLevel === 'medium' ? 'Displayed hours should be checked against records and wear.' : 'Hour evidence appears usable, pending normal record review.', evidence: `${hourLabel} shown · service records not supplied`, buyerAction: 'Ask for service invoices, ECU/dealer diagnostics if available, and prior auction/dealer listings.', factors: hourFactors },
+    { id: 'leverage', label: 'Offer leverage', score: leverageScore, level: leverageLevel, severity: riskSeverity(leverageLevel), verdict: leverageLevel === 'high' ? 'Strong reason to require repair proof or a contingency.' : leverageLevel === 'medium' ? 'Moderate leverage from visible issues and unanswered proof.' : 'Limited visible leverage; use report mainly for diligence.', evidence: `${redFindings.length} red · ${yellowFindings.length} yellow · ${missing.length} missing`, buyerAction: 'Use findings to request records, additional photos, inspection contingency, or seller concession — not as an appraisal.', factors: leverageFactors },
   ]
 }
 
@@ -338,12 +338,19 @@ function App() {
   const missing = slots.filter((slot) => slot.state === 'missing')
   const riskSummary = useMemo(() => buildRiskSummary(slots, findings, analyzedSlots.length, reportSeed), [slots, findings, analyzedSlots.length, reportSeed])
   const dealPosture = missing.some((slot) => slot.id === 'serial' || slot.id === 'hours')
-    ? 'Do not deposit or travel until seller supplies missing evidence'
+    ? 'Do not send money yet'
     : riskSummary.some((risk) => risk.severity === 'red')
-      ? 'Proceed with inspection conditions'
+      ? 'Inspect before any deposit'
       : riskSummary.some((risk) => risk.severity === 'yellow')
-        ? 'Proceed after seller follow-up'
-        : 'Proceed with normal diligence'
+        ? 'Ask seller for proof first'
+        : 'Looks worth a call'
+  const nextMoveCopy = missing.some((slot) => slot.id === 'serial' || slot.id === 'hours')
+    ? 'Ask for the missing serial plate and hour meter photos before you drive out, wire money, or place a deposit.'
+    : riskSummary.some((risk) => risk.id === 'safety' && risk.severity === 'red')
+      ? 'Have the leak, weld, frame, and engine evidence inspected before any deposit. Use the questions below to slow the deal down.'
+      : riskSummary.some((risk) => risk.severity === 'yellow')
+        ? 'The packet is usable, but ask for the missing or cleaner photos before you rely on the listing.'
+        : 'Photos look complete enough for a seller call. Still match serial paperwork and service records before paying.'
   const conditionScore = useMemo(() => {
     const penalty = findings.reduce((sum, finding) => sum + severityWeight(finding.severity), 0) + missing.length * 5
     return Math.round(Math.max(0, Math.min(100, reportSeed.conditionScore - penalty * 0.15 + acceptedCount)))
@@ -501,24 +508,28 @@ function App() {
   return (
     <main className="app-shell">
       <header className="topbar">
-        <div><span className="live-dot" /> FarmFax // open equipment record</div>
+        <div><span className="live-dot" /> FarmFax // used equipment check</div>
         <nav>
-          <a href="#capture">Phone input</a>
-          <a href="#catalog">Serial catalog</a>
-          <a href="#report">Report</a>
+          <a href="#capture">Photos needed</a>
+          <a href="#catalog">Paperwork check</a>
+          <a href="#report">Buyer report</a>
         </nav>
       </header>
 
       <section className="hero-card farm-hero">
         <div className="hero-copy-block">
-          <p className="eyebrow">Carfax for farm equipment — without locked data</p>
-          <div className="demo-badge">{activeScenario.demoBadge} · upload/capture photos to override</div>
-          <h1>Scan the machine before you buy the story.</h1>
+          <p className="eyebrow">Pre-buy equipment check</p>
+          <div className="demo-badge">{activeScenario.demoBadge} · try your own photos</div>
+          <h1>Check the machine before you buy.</h1>
           <p className="lede">
-            FarmFax turns a phone walkthrough into an open, evidence-backed condition report for tractors, skid steers,
-            trailers, implements, and other working equipment. It cross-references serial/PIN plates, make/model clues,
-            visible defects, and maintenance evidence — then exports a portable record the owner controls.
+            Take a guided phone walkthrough. FarmFax points out visible problems, missing proof, serial/PIN and hour-meter concerns,
+            then gives you plain seller questions before you send money or drive out.
           </p>
+          <div className="hero-actions primary-actions">
+            <button onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth' })}>Start photo checklist</button>
+            <button className="ghost" onClick={() => document.getElementById('report')?.scrollIntoView({ behavior: 'smooth' })}>See buyer report</button>
+          </div>
+          <div className="scenario-kicker">Try a sample report:</div>
           <div className="scenario-switcher" aria-label="sample scenario selector">
             {farmFaxScenarios.map((scenario) => (
               <button
@@ -531,21 +542,17 @@ function App() {
               </button>
             ))}
           </div>
-          <div className="hero-actions">
-            <button onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth' })}>Run guided inspection</button>
-            <button className="ghost" onClick={exportReport}>Export open JSON</button>
-          </div>
           <div className="principle-strip">
-            <span>Evidence-first</span>
-            <span>Open schema</span>
-            <span>Repair-friendly</span>
-            <span>No data hostage</span>
+            <span>Photos first</span>
+            <span>Plain questions</span>
+            <span>No guessing</span>
+            <span>Owner keeps report</span>
           </div>
         </div>
         <aside className="summary-card machine-card">
-          <span>visible condition</span>
+          <span>recommended next move</span>
           <strong>{conditionScore}</strong>
-          <p>{report.make_model_guess.make} {report.make_model_guess.model} · {reportSeed.hourMeter == null ? 'hours unknown' : `${report.hour_meter.toLocaleString()} hrs`} · report confidence {report.confidence}%</p>
+          <p><b>{dealPosture}</b><br />{nextMoveCopy}</p>
           <div className="mini-stats">
             <div><b>{acceptedCount}</b><span>captures</span></div>
             <div><b>{reviewCount}</b><span>review</span></div>
@@ -555,7 +562,7 @@ function App() {
       </section>
 
       <section className="architecture-row architecture-stack" aria-label="demo architecture stack">
-        <div className="stack-heading panel"><span>Demo architecture stack</span><p>Planned integration roles for hackathon positioning; not a claim of endorsement or production certification.</p></div>
+        <div className="stack-heading panel"><span>How the demo works</span><p>Buyer-first flow first. Technical stack is here for judges, but the farmer view stays simple.</p></div>
         {architectureStack.map((item) => (
           <article className="panel" key={item.name}>
             <span>{item.name}</span>
@@ -566,9 +573,9 @@ function App() {
 
       <section className="analysis-layout farm-layout" id="capture">
         <div className="panel capture-panel">
-          <div className="section-label">phone-guided inspection</div>
-          <h2>The phone is the input device.</h2>
-          <p className="muted">Guided capture is the moat. Better inputs beat hallucinated AI. Uploads below are browser-local in this demo.</p>
+          <div className="section-label">photo checklist</div>
+          <h2>Take these 7 photos.</h2>
+          <p className="muted">Use the rear camera. If a seller skips a required photo, FarmFax marks the risk instead of guessing.</p>
           <div className="equipment-toggle" aria-label="equipment type">
             {['tractor', 'skid steer', 'trailer', 'implement'].map((type) => (
               <button key={type} className={equipmentType === type ? 'active' : 'ghost'} disabled={type !== 'tractor'} onClick={() => type === 'tractor' && setEquipmentType(type)}>{type}{type !== 'tractor' ? ' soon' : ''}</button>
@@ -584,10 +591,10 @@ function App() {
                   <small>{slot.why}</small>
                 </div>
                 <div className="slot-media-actions">
-                  <button className="camera-button" type="button" onClick={() => openCamera(slot)}>Open camera</button>
+                  <button className="camera-button" type="button" onClick={() => openCamera(slot)}>Take photo</button>
                   <label>
                     <div className="capture-preview">
-                      {slot.image ? <img src={slot.image} alt={`${slot.title} capture`} /> : <div className="phone-placeholder">upload fallback</div>}
+                      {slot.image ? <img src={slot.image} alt={`${slot.title} capture`} /> : <div className="phone-placeholder">Tap to upload</div>}
                       {slot.analysis && (
                         <div className="heuristic-mask" aria-label="browser-side rust paint leak heuristic overlay">
                           {slot.analysis.cells.map((cell, index) => (
@@ -618,8 +625,8 @@ function App() {
         </div>
 
         <aside className="panel vision-panel">
-          <div className="section-label">browser CV + planned Nemotron layer</div>
-          <h2>Evidence, not vibes.</h2>
+          <div className="section-label">what FarmFax noticed</div>
+          <h2>Visible clues from the photos.</h2>
           <div className="overlay-card">
             <div className="tractor-silhouette">
               <span className="hotspot rust">rust</span>
@@ -632,7 +639,7 @@ function App() {
             {findings.map((finding) => (
               <button key={finding.category} className={`finding-button ${finding.severity} ${selectedFinding.category === finding.category ? 'active' : ''}`} onClick={() => setSelectedFinding(finding)}>
                 <b>{finding.category}</b>
-                <span>{finding.confidence}% · {finding.evidence}</span>
+                <span>{finding.severity === 'red' ? 'Do not skip this' : finding.severity === 'yellow' ? 'Check this' : 'Looks okay'} · {finding.evidence}</span>
               </button>
             ))}
           </div>
@@ -646,18 +653,18 @@ function App() {
 
       <section className="packet-layout" id="catalog">
         <div className="panel catalog-panel">
-          <div className="section-label">serial code + visual catalog</div>
-          <h2>Cross-reference identity before trusting the listing.</h2>
+          <div className="section-label">paperwork check</div>
+          <h2>Does the machine match the paperwork?</h2>
           <div className="identity-grid">
             <article>
-              <span>OCR serial / PIN</span>
+              <span>serial / PIN shown</span>
               <b>{report.serial_number}</b>
-              <p>Plate crop confidence 86%. User confirmation required before report publication.</p>
+              <p>Compare this to the bill of sale, lien/title paperwork, and service records before sending money.</p>
             </article>
             <article>
               <span>hour meter</span>
               <b>{reportSeed.hourMeter == null ? 'Unknown' : `${report.hour_meter.toLocaleString()} hrs`}</b>
-              <p>Dashboard OCR confidence 79%. Ask for service records around this hour mark.</p>
+              <p>Ask for service records near this hour reading and compare wear in person.</p>
             </article>
             <article>
               <span>external IDs</span>
@@ -677,31 +684,36 @@ function App() {
         </div>
 
         <aside className="panel lock-panel">
-          <div className="section-label">anti vendor lock-in</div>
-          <h2>Own the machine. Own the history.</h2>
+          <div className="section-label">report ownership</div>
+          <h2>Save the report. Take it anywhere.</h2>
           <p>
-            OEM portals, dealer CRMs, auction listings, and shop PDFs trap records in silos. FarmFax uses an open schema:
-            owners can export JSON/PDF, mechanics can add documented service events, and paid hosting never becomes data captivity.
+            FarmFax keeps the buyer packet portable. You can save PDF/JSON for your mechanic, lender, partner, seller follow-up, or future resale.
+            Paid hosting can help sharing, but it does not trap the machine history.
           </p>
           <ul>
-            <li>Open report schema and scoring rubric</li>
-            <li>Portable maintenance + repair events</li>
-            <li>Self-hostable core record</li>
-            <li>Stripe monetizes workflow, not record access</li>
+            <li>Save PDF for the deal folder</li>
+            <li>Export data for records or resale</li>
+            <li>Share questions with seller or mechanic</li>
+            <li>Hosted links are optional</li>
           </ul>
         </aside>
       </section>
 
       <section className="packet-layout" id="report">
         <div className="panel report-panel">
-          <div className="section-label">consolidated FarmFax report</div>
-          <h2>Buyer risk report generated.</h2>
+          <div className="section-label">buyer report</div>
+          <h2>What to check before buying.</h2>
           <div className="report-score">
             <strong>{report.condition_score}</strong>
             <div>
               <b>{report.make_model_guess.make} {report.make_model_guess.model}</b>
-              <p>Visible-condition score from submitted evidence. Not a mechanical guarantee, title check, appraisal, or substitute for a qualified inspection.</p>
+              <p>Photo-screening score only. FarmFax helps you decide what to ask next; it is not a mechanical inspection, title check, appraisal, or guarantee.</p>
             </div>
+          </div>
+          <div className="deal-posture priority-action">
+            <span>recommended next step</span>
+            <h3>{dealPosture}</h3>
+            <p>{nextMoveCopy}</p>
           </div>
           <div className="risk-strip">
             {report.risk_summary.map((risk) => (
@@ -713,56 +725,54 @@ function App() {
               </article>
             ))}
           </div>
-          <div className="risk-disclosure">Scores are demo screening heuristics from submitted/sample evidence — not diagnostic, mechanical, legal, title, theft, or appraisal conclusions.</div>
-          <div className="deal-posture">
-            <span>deal posture</span>
-            <h3>{dealPosture}</h3>
-            <p>{report.risk_summary.find((risk) => risk.id === 'leverage')?.buyerAction}</p>
-          </div>
+          <div className="risk-disclosure">FarmFax only reviews submitted photos and information. It is not a mechanical inspection, title search, theft check, lien check, appraisal, warranty, or guarantee.</div>
           <div className="question-grid">
             {report.buyer_questions.map((question) => (
-              <div key={question}><b>buyer leverage question</b><p>{question}</p></div>
+              <div key={question}><b>ask seller before deposit</b><p>{question}</p></div>
             ))}
           </div>
           <div className="data-disclosures">
-            <p><b>Missing evidence:</b> {report.missing_evidence.length ? report.missing_evidence.join(', ') : 'none'}</p>
-            <p><b>Open record:</b> {report.open_record_commitment}</p>
-            <p><b>Guardrail:</b> FarmFax reports visible evidence, confidence, and missing proof. Unknowns stay unknown.</p>
+            <p><b>Proof still needed:</b> {report.missing_evidence.length ? report.missing_evidence.join(', ') : 'none'}</p>
+            <p><b>Your copy:</b> {report.open_record_commitment}</p>
+            <p><b>Plain rule:</b> FarmFax reports visible evidence and missing proof. Unknowns stay unknown.</p>
           </div>
-          <div className="open-record-preview">
-            <div>
-              <span>open record JSON preview</span>
-              <b>Portable by default</b>
+          <details className="advanced-details">
+            <summary>Show technical details</summary>
+            <div className="open-record-preview">
+              <div>
+                <span>open record JSON preview</span>
+                <b>Portable by default</b>
+              </div>
+              <pre>{JSON.stringify(openRecordPreview, null, 2)}</pre>
             </div>
-            <pre>{JSON.stringify(openRecordPreview, null, 2)}</pre>
-          </div>
-          <div className="risk-factor-grid">
-            {report.risk_summary.filter((risk) => risk.factors.length).slice(0, 4).map((risk) => (
-              <article key={`${risk.id}-factors`}>
-                <b>{risk.label} factors</b>
-                {risk.factors.slice(0, 3).map((factor) => (
-                  <p key={`${risk.id}-${factor.label}`}>+{factor.points} · {factor.label}: {factor.explanation}</p>
-                ))}
-              </article>
-            ))}
-          </div>
-          <div className="analysis-ledger">
-            <b>Evidence ledger</b>
-            {report.visual_analysis.length ? report.visual_analysis.map((item) => (
-              <p key={item.slot}>[{item.slot}] {item.summary} · confidence {item.confidence}%</p>
-            )) : <p>No live slot image analyzed yet. Capture/upload a photo to run the local heuristic pass.</p>}
-          </div>
+            <div className="risk-factor-grid">
+              {report.risk_summary.filter((risk) => risk.factors.length).slice(0, 4).map((risk) => (
+                <article key={`${risk.id}-factors`}>
+                  <b>{risk.label} factors</b>
+                  {risk.factors.slice(0, 3).map((factor) => (
+                    <p key={`${risk.id}-${factor.label}`}>+{factor.points} · {factor.label}: {factor.explanation}</p>
+                  ))}
+                </article>
+              ))}
+            </div>
+            <div className="analysis-ledger">
+              <b>Evidence ledger</b>
+              {report.visual_analysis.length ? report.visual_analysis.map((item) => (
+                <p key={item.slot}>[{item.slot}] {item.summary} · confidence {item.confidence}%</p>
+              )) : <p>No live slot image analyzed yet. Capture/upload a photo to run the local heuristic pass.</p>}
+            </div>
+          </details>
           <div className="hero-actions">
-            <button onClick={exportReport}>Download report JSON</button>
+            <button onClick={exportReport}>Download full report</button>
             <button className="ghost" onClick={() => window.print()}>Print / save PDF</button>
           </div>
         </div>
 
         <aside className="panel commerce-panel">
-          <div className="section-label">Stripe rail</div>
+          <div className="section-label">save or share</div>
           <h2>$29</h2>
-          <p>Demo checkout for hosted report, seller share link, and dealer/shop branding. Export remains available without paying.</p>
-          <button onClick={() => setStripeOpen(true)}>Open Stripe checkout demo</button>
+          <p>Optional hosted report link for a seller, mechanic, lender, or partner. Your PDF/JSON export stays available without paying.</p>
+          <button onClick={() => setStripeOpen(true)}>Save hosted report</button>
         </aside>
       </section>
 
@@ -805,10 +815,10 @@ function App() {
       {stripeOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">
           <div className="stripe-modal">
-            <div className="modal-topline"><span>Stripe checkout simulation</span><button className="ghost" onClick={() => setStripeOpen(false)}>close</button></div>
-            <div className="stripe-word">Stripe</div>
-            <h2>Hosted FarmFax report</h2>
-            <p>Pay for hosted report link, seller share page, and dealer/shop branding. The underlying equipment record still exports as open JSON/PDF.</p>
+            <div className="modal-topline"><span>Hosted report demo</span><button className="ghost" onClick={() => setStripeOpen(false)}>close</button></div>
+            <div className="stripe-word">FarmFax</div>
+            <h2>Save your FarmFax report</h2>
+            <p>Free export stays yours. The paid option creates a clean hosted link for seller follow-up, mechanic review, lender sharing, or partner approval. It does not certify the machine.</p>
             <div className="receipt">
               <span>Report</span><b>{report.report_id}</b>
               <span>Price</span><b>$29.00</b>

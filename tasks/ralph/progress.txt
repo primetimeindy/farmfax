@@ -14,3 +14,5 @@
 2026-06-19T21:30:52-05:00 Agent-reviewed and hardened risk layer: added demo/sample labeling, disabled unimplemented equipment modes, changed sponsor language to architecture stack, removed verified/guarantee monetization copy, added score heuristic disclosure, fixed stale async CV analysis, fixed camera cleanup race/contrast. Build and browser smoke passed.
 
 2026-06-20T02:56:39Z Scenario engine sprint complete: challenger agents forced deterministic demo paths and overclaim guardrails. Implemented clean/risky/incomplete seller listing scenarios, open record preview, submission docs, camera/Stripe smoke checks, and missing-evidence no-deposit posture. Build/browser verified before commit.
+
+2026-06-20T03:31:26Z Farmer-first UX pass: challenger review pushed default UI away from technical pitch-deck language toward plain buyer actions. Simplified hero, nav, photo checklist, risk labels, recommendation box, seller questions, save/share copy, mobile tap targets, and tucked JSON/risk math/evidence ledger behind technical disclosure. Build + desktop/browser + CDP mobile checks passed.
