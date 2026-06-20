@@ -1174,6 +1174,10 @@ function App() {
               <button className="ghost" type="button" onClick={() => void copyShareUrl()}>Copy link</button>
             </div>
           </div>
+          <div className="phone-install-card" data-qa="phone-install-card">
+            <b>Install as phone app</b>
+            <p>iPhone: open in Safari → Share → Add to Home Screen. Android: open in Chrome → Install app / Add to Home screen.</p>
+          </div>
           <button onClick={() => setStripeOpen(true)}>Save hosted report</button>
         </aside>
       </section>

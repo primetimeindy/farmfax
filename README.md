@@ -6,11 +6,20 @@ FarmFax turns a guided phone walkthrough into an evidence-backed buyer risk repo
 
 ## Live demo
 
-- App: https://primetimeindy.github.io/farmfax-demo/
+- Public app: https://primetimeindy.github.io/farmfax-demo/
 - Source: https://github.com/primetimeindy/farmfax
-- Best demo path: click **Load complete sample** or **Run judge demo**.
+- CI: GitHub Actions runs `npm run verify:demo` on push/PR.
 
-## Winning thesis
+## Install on phone
+
+FarmFax now ships as a phone-installable PWA.
+
+- iPhone: open the public app in Safari → Share → Add to Home Screen.
+- Android: open the public app in Chrome → Install app / Add to Home screen.
+
+The installed app launches standalone, uses FarmFax icons, and keeps the core demo shell cached through the service worker.
+
+## What it does
 
 > Carfax tells you what paperwork says happened. FarmFax shows you what the machine is telling you right now — with evidence, confidence, missing proof, buyer leverage, and an open record the owner controls.
 

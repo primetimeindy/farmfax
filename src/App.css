@@ -228,6 +228,9 @@ h3 { margin:0 0 8px; }
 .qr-share-block b { display:block; color:var(--ink); margin-bottom:7px; }
 .qr-share-block input { width:100%; min-width:0; border:1px solid rgba(255,255,255,.14); border-radius:10px; color:#d7e4d1; background:rgba(0,0,0,.28); padding:9px; font:800 .72rem/1.2 ui-monospace, monospace; }
 .qr-share-block .ghost { margin-top:8px; color:var(--ink); border-color:rgba(255,255,255,.18); background:rgba(255,255,255,.07); }
+.phone-install-card { margin: 12px 0 14px; border:1px solid rgba(156,255,125,.22); border-radius:12px; padding:12px; background:rgba(156,255,125,.055); }
+.phone-install-card b { display:block; color:var(--green); margin-bottom:6px; }
+.phone-install-card p { margin:0; color:#d7e4d1; font-size:.88rem; line-height:1.38; }
 .judge-proof-panel { margin-top:14px; border:1px solid rgba(183,247,122,.24); border-radius:24px; padding:17px; background:linear-gradient(145deg, rgba(16,24,20,.92), rgba(3,8,5,.94)); box-shadow:var(--shadow); }
 .judge-proof-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
 .judge-proof-grid article { border:1px solid rgba(255,255,255,.10); border-radius:16px; padding:12px; background:rgba(0,0,0,.24); }
