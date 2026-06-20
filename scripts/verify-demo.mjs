@@ -10,6 +10,14 @@ const requiredFiles = [
   'public/sw.js',
   'public/icons/farmfax-icon-192.png',
   'public/icons/farmfax-icon-512.png',
+  'public/sample-photos/walkaround.jpg',
+  'public/sample-photos/serial-plate.jpg',
+  'public/sample-photos/hour-meter.jpg',
+  'public/sample-photos/hydraulics.jpg',
+  'public/sample-photos/tires.jpg',
+  'public/sample-photos/paint-body.jpg',
+  'public/sample-photos/engine-bay.jpg',
+  'public/sample-photos/ATTRIBUTION.md',
   'src/App.tsx',
 ]
 const requiredSourceLabels = [
@@ -22,6 +30,7 @@ const requiredSourceLabels = [
   'Judge proof',
   'data-qa="qr-share-block"',
   'data-qa="phone-install-card"',
+  'sample-photos/',
   'input_sources',
   'demo_truth',
 ]
@@ -39,9 +48,12 @@ for (const file of requiredFiles) {
   console.log(`ok file ${file} (${size} bytes)`)
 }
 
-const appSource = await readFile(new URL('src/App.tsx', root), 'utf8')
+const appSource = [
+  await readFile(new URL('src/App.tsx', root), 'utf8'),
+  await readFile(new URL('src/farmfax/scenarios.ts', root), 'utf8'),
+].join('\n')
 for (const label of requiredSourceLabels) {
-  if (!appSource.includes(label)) throw new Error(`missing required demo label/hook in src/App.tsx: ${label}`)
+  if (!appSource.includes(label)) throw new Error(`missing required demo label/hook in source: ${label}`)
   console.log(`ok label ${label}`)
 }
 

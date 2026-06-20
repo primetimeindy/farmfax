@@ -97,6 +97,7 @@ dist/
 - `src/App.tsx` — main FarmFax app.
 - `src/farmfax/scenarios.ts` — deterministic demo scenarios and capture-state reducer.
 - `public/farmfax-video-fixture.mp4` — deterministic short sample video for the video-frame demo.
+- `public/sample-photos/` — authentic-looking Wikimedia Commons sample photos for the default report scenarios, with attribution notes.
 - `public/farmfax-qr.svg` — QR to the public demo.
 - `scripts/verify-demo.mjs` — checks demo-critical files, source labels, metadata, and build output.
 - `.github/workflows/verify-demo.yml` — CI workflow that runs `npm run verify:demo`.

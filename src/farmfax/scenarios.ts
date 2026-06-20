@@ -91,6 +91,7 @@ export type ScenarioId = 'clean-tractor' | 'risky-tractor' | 'incomplete-seller-
 
 export type ScenarioSlotSeed = Omit<CaptureSlot, 'image'> & {
   imageSeed?: PlaceholderImageSeed
+  imageUrl?: string
 }
 
 export type PlaceholderImageSeed = {
@@ -141,9 +142,11 @@ const slotCopy = (slot: ScenarioSlotSeed): CaptureSlot => ({
   prompt: slot.prompt,
   why: slot.why,
   state: slot.state,
-  image: slot.imageSeed ? svgDataUrl(slot.imageSeed) : undefined,
+  image: slot.imageUrl ?? (slot.imageSeed ? svgDataUrl(slot.imageSeed) : undefined),
   analysis: slot.analysis,
 })
+
+const samplePhotoUrl = (name: string) => `${import.meta.env.BASE_URL}sample-photos/${name}`
 
 const svgDataUrl = ({ label, tone, accent }: PlaceholderImageSeed) => {
   const palette: Record<PlaceholderImageSeed['tone'], { bg: string; fg: string; mark: string }> = {
@@ -216,7 +219,8 @@ const scenarioSlot = (
   state: CaptureState,
   imageSeed: PlaceholderImageSeed | undefined,
   analysis?: ImageAnalysis,
-): ScenarioSlotSeed => ({ ...commonPrompts[id], id, state, imageSeed, analysis })
+  imageUrl?: string,
+): ScenarioSlotSeed => ({ ...commonPrompts[id], id, state, imageSeed, imageUrl, analysis })
 
 const cleanAnalysis: ImageAnalysis = {
   rustPct: 0.8,
@@ -259,13 +263,13 @@ export const farmFaxScenarios = [
     description: 'Mostly complete photos and no obvious major visual issue.',
     demoBadge: 'Scenario: clean tractor · complete evidence',
     slots: [
-      scenarioSlot('walkaround', 'accepted', { label: 'Clean walkaround', tone: 'clean' }, cleanAnalysis),
-      scenarioSlot('serial', 'accepted', { label: 'Readable PIN plate', tone: 'documents' }, cleanAnalysis),
-      scenarioSlot('hours', 'accepted', { label: '1,126h dashboard', tone: 'documents' }, cleanAnalysis),
-      scenarioSlot('hydraulics', 'accepted', { label: 'Dry hydraulics', tone: 'clean' }, cleanAnalysis),
-      scenarioSlot('tires', 'accepted', { label: 'Even tire wear', tone: 'clean' }, cleanAnalysis),
-      scenarioSlot('paint', 'accepted', { label: 'Consistent paint', tone: 'clean' }, cleanAnalysis),
-      scenarioSlot('engine', 'accepted', { label: 'Clean engine bay', tone: 'clean' }, cleanAnalysis),
+      scenarioSlot('walkaround', 'accepted', { label: 'Clean walkaround', tone: 'clean' }, cleanAnalysis, samplePhotoUrl('walkaround.jpg')),
+      scenarioSlot('serial', 'accepted', { label: 'Readable PIN plate', tone: 'documents' }, cleanAnalysis, samplePhotoUrl('serial-plate.jpg')),
+      scenarioSlot('hours', 'accepted', { label: '1,126h dashboard', tone: 'documents' }, cleanAnalysis, samplePhotoUrl('hour-meter.jpg')),
+      scenarioSlot('hydraulics', 'accepted', { label: 'Dry hydraulics', tone: 'clean' }, cleanAnalysis, samplePhotoUrl('hydraulics.jpg')),
+      scenarioSlot('tires', 'accepted', { label: 'Even tire wear', tone: 'clean' }, cleanAnalysis, samplePhotoUrl('tires.jpg')),
+      scenarioSlot('paint', 'accepted', { label: 'Consistent paint', tone: 'clean' }, cleanAnalysis, samplePhotoUrl('paint-body.jpg')),
+      scenarioSlot('engine', 'accepted', { label: 'Clean engine bay', tone: 'clean' }, cleanAnalysis, samplePhotoUrl('engine-bay.jpg')),
     ],
     findings: [
       {
@@ -312,12 +316,12 @@ export const farmFaxScenarios = [
     description: 'Photos show issues that should slow the deal down before deposit.',
     demoBadge: 'Scenario: risky tractor · red/yellow findings',
     slots: [
-      scenarioSlot('walkaround', 'accepted', { label: 'Rust walkaround', tone: 'rust' }, riskyRustAnalysis),
-      scenarioSlot('serial', 'accepted', { label: 'Readable PIN plate', tone: 'documents' }, cleanAnalysis),
-      scenarioSlot('hours', 'accepted', { label: '1,842h dashboard', tone: 'documents' }, cleanAnalysis),
-      scenarioSlot('hydraulics', 'review', { label: 'Wet cylinder area', tone: 'wet' }, riskyWetAnalysis),
-      scenarioSlot('tires', 'accepted', { label: 'Serviceable tires', tone: 'clean' }, cleanAnalysis),
-      scenarioSlot('paint', 'review', { label: 'Paint mismatch', tone: 'rust', accent: '#315f31' }, riskyRustAnalysis),
+      scenarioSlot('walkaround', 'accepted', { label: 'Rust walkaround', tone: 'rust' }, riskyRustAnalysis, samplePhotoUrl('paint-body.jpg')),
+      scenarioSlot('serial', 'accepted', { label: 'Readable PIN plate', tone: 'documents' }, cleanAnalysis, samplePhotoUrl('serial-plate.jpg')),
+      scenarioSlot('hours', 'accepted', { label: '1,842h dashboard', tone: 'documents' }, cleanAnalysis, samplePhotoUrl('hour-meter.jpg')),
+      scenarioSlot('hydraulics', 'review', { label: 'Wet cylinder area', tone: 'wet' }, riskyWetAnalysis, samplePhotoUrl('hydraulics.jpg')),
+      scenarioSlot('tires', 'accepted', { label: 'Serviceable tires', tone: 'clean' }, cleanAnalysis, samplePhotoUrl('tires.jpg')),
+      scenarioSlot('paint', 'review', { label: 'Paint mismatch', tone: 'rust', accent: '#315f31' }, riskyRustAnalysis, samplePhotoUrl('walkaround.jpg')),
       scenarioSlot('engine', 'missing', undefined),
     ],
     findings: [
@@ -374,12 +378,12 @@ export const farmFaxScenarios = [
     description: 'Attractive listing photos, but not enough proof to trust yet.',
     demoBadge: 'Scenario: incomplete listing · missing evidence gate',
     slots: [
-      scenarioSlot('walkaround', 'accepted', { label: 'Listing hero photo', tone: 'clean' }, cleanAnalysis),
+      scenarioSlot('walkaround', 'accepted', { label: 'Listing hero photo', tone: 'clean' }, cleanAnalysis, samplePhotoUrl('walkaround.jpg')),
       scenarioSlot('serial', 'missing', undefined),
       scenarioSlot('hours', 'missing', undefined),
       scenarioSlot('hydraulics', 'missing', undefined),
-      scenarioSlot('tires', 'review', { label: 'Partial tire crop', tone: 'clean' }, cleanAnalysis),
-      scenarioSlot('paint', 'accepted', { label: 'Polished paint photo', tone: 'clean' }, cleanAnalysis),
+      scenarioSlot('tires', 'review', { label: 'Partial tire crop', tone: 'clean' }, cleanAnalysis, samplePhotoUrl('tires.jpg')),
+      scenarioSlot('paint', 'accepted', { label: 'Polished paint photo', tone: 'clean' }, cleanAnalysis, samplePhotoUrl('paint-body.jpg')),
       scenarioSlot('engine', 'missing', undefined),
     ],
     findings: [
