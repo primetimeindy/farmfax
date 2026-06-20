@@ -91,10 +91,12 @@ h3 { margin:0 0 8px; }
 .capture-slot.missing span { color: var(--red); }
 .capture-slot p { margin: 0 0 8px; }
 .capture-slot small { color: var(--muted); line-height: 1.35; }
-.capture-slot label { display:block; border:1px dashed rgba(255,255,255,.18); border-radius: 16px; min-height: 140px; overflow:hidden; background:rgba(255,255,255,.04); cursor:pointer; }
+.capture-slot label { display:block; border:1px dashed rgba(255,255,255,.18); border-radius: 16px; min-height: 108px; overflow:hidden; background:rgba(255,255,255,.04); cursor:pointer; }
 .capture-slot input { display:none; }
-.capture-slot img { width:100%; height:100%; min-height: 140px; object-fit:cover; display:block; }
-.phone-placeholder { height:100%; min-height:140px; display:grid; place-items:center; padding:12px; color:var(--muted); text-align:center; font-weight:900; }
+.slot-media-actions { display:grid; gap:8px; align-content:start; }
+.camera-button { width:100%; padding:9px 10px; font-size:.78rem; }
+.capture-slot img { width:100%; height:100%; min-height: 108px; object-fit:cover; display:block; }
+.phone-placeholder { height:100%; min-height:108px; display:grid; place-items:center; padding:12px; color:var(--muted); text-align:center; font-weight:900; }
 .overlay-card { border:1px solid rgba(255,255,255,.10); border-radius:20px; background:linear-gradient(135deg, rgba(40,55,45,.9), rgba(0,0,0,.35)); padding:12px; }
 .tractor-silhouette { position:relative; height:250px; border-radius:18px; overflow:hidden; background:
   radial-gradient(circle at 32% 72%, #111 0 18px, transparent 19px),
@@ -143,7 +145,20 @@ h3 { margin:0 0 8px; }
 .source-trail { margin-top:14px; border:1px solid var(--line); border-radius:24px; padding:17px; background:#020503; color:var(--mint); font:800 .82rem/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
 .source-trail p { margin: 8px 0 0; }
 .modal-backdrop { position:fixed; inset:0; z-index:30; display:grid; place-items:center; padding:22px; background:rgba(0,0,0,.74); backdrop-filter:blur(12px); }
-.stripe-modal { width:min(560px, calc(100vw - 36px)); color:#101426; border-radius:28px; padding:26px; background:linear-gradient(160deg, #fff, #eef0ff 55%, #dce2ff); box-shadow:0 35px 130px rgba(0,0,0,.65); }
+.stripe-modal, .camera-modal { width:min(560px, calc(100vw - 36px)); color:#101426; border-radius:28px; padding:26px; background:linear-gradient(160deg, #fff, #eef0ff 55%, #dce2ff); box-shadow:0 35px 130px rgba(0,0,0,.65); }
+.camera-modal { width:min(760px, calc(100vw - 28px)); color:var(--ink); background:linear-gradient(160deg, #17201b, #0a0f0c 58%, #141b26); border:1px solid rgba(110,247,194,.24); }
+.camera-modal h2 { color:var(--ink); }
+.camera-modal p, .camera-modal small { color:#c4d4c6; line-height:1.45; }
+.camera-frame { position:relative; margin:14px 0; min-height:320px; border-radius:22px; overflow:hidden; border:1px solid rgba(255,255,255,.12); background:#010302; display:grid; place-items:center; }
+.camera-frame video { width:100%; height:100%; min-height:320px; object-fit:cover; display:block; }
+.camera-status, .camera-error { position:absolute; inset:auto 16px 16px; border-radius:16px; padding:12px; font-weight:900; text-align:center; }
+.camera-status { color:#06100c; background:rgba(156,255,125,.92); }
+.camera-error { color:#260000; background:rgba(255,202,103,.95); }
+.capture-canvas { display:none; }
+.camera-actions { display:flex; flex-wrap:wrap; gap:10px; align-items:center; }
+.camera-actions button:disabled { opacity:.45; cursor:not-allowed; }
+.upload-button { display:inline-flex; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,.18); border-radius:14px; padding:12px 15px; min-height:45px; color:var(--ink); background:rgba(255,255,255,.06); font-weight:950; cursor:pointer; }
+.upload-button input { display:none; }
 .modal-topline { display:flex; justify-content:space-between; align-items:center; color:var(--stripe); font:1000 .75rem/1 ui-monospace, SFMono-Regular, Menlo, monospace; text-transform:uppercase; letter-spacing:.12em; }
 .modal-topline button { color:#101426; border-color:rgba(99,91,255,.2); }
 .stripe-word { margin-top:20px; color:var(--stripe); font-size:2.4rem; font-weight:1000; letter-spacing:-.08em; }

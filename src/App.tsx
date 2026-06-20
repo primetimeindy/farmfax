@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import './App.css'
 
@@ -191,6 +191,12 @@ function App() {
   const [equipmentType, setEquipmentType] = useState('tractor')
   const [stripeOpen, setStripeOpen] = useState(false)
   const [selectedFinding, setSelectedFinding] = useState<Finding>(findings[0])
+  const [cameraSlot, setCameraSlot] = useState<CaptureSlot | null>(null)
+  const [cameraError, setCameraError] = useState('')
+  const [isCameraStarting, setIsCameraStarting] = useState(false)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const canvasRef = useRef<HTMLCanvasElement | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
 
   const acceptedCount = slots.filter((slot) => slot.state === 'accepted').length
   const reviewCount = slots.filter((slot) => slot.state === 'review').length
@@ -221,17 +227,80 @@ function App() {
     sponsor_stack: sponsorStack.map((item) => item.name),
   }), [conditionScore, equipmentType, missing])
 
+  function saveSlotImage(slotId: SlotId, image: string) {
+    setSlots((current) => current.map((slot) => slot.id === slotId
+      ? { ...slot, image, state: 'accepted' }
+      : slot))
+  }
+
   function updateSlotImage(slotId: SlotId, event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file) return
     const reader = new FileReader()
-    reader.onload = () => {
-      setSlots((current) => current.map((slot) => slot.id === slotId
-        ? { ...slot, image: String(reader.result), state: 'accepted' }
-        : slot))
-    }
+    reader.onload = () => saveSlotImage(slotId, String(reader.result))
     reader.readAsDataURL(file)
+    event.target.value = ''
   }
+
+  function stopCamera() {
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    if (videoRef.current) videoRef.current.srcObject = null
+  }
+
+  async function openCamera(slot: CaptureSlot) {
+    setCameraSlot(slot)
+    setCameraError('')
+    setIsCameraStarting(true)
+    stopCamera()
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Camera API unavailable in this browser. Use the upload fallback.')
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1600 },
+          height: { ideal: 1200 },
+        },
+      })
+      streamRef.current = stream
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream
+        await videoRef.current.play()
+      } else {
+        throw new Error('Camera preview failed to mount. Use upload fallback.')
+      }
+    } catch (error) {
+      setCameraError(error instanceof Error ? error.message : 'Unable to start camera. Use upload fallback.')
+    } finally {
+      setIsCameraStarting(false)
+    }
+  }
+
+  function closeCamera() {
+    stopCamera()
+    setCameraSlot(null)
+    setCameraError('')
+    setIsCameraStarting(false)
+  }
+
+  function captureFrame() {
+    if (!cameraSlot || !videoRef.current || !canvasRef.current) return
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    canvas.width = video.videoWidth || 1280
+    canvas.height = video.videoHeight || 720
+    const context = canvas.getContext('2d')
+    if (!context) return
+    context.drawImage(video, 0, 0, canvas.width, canvas.height)
+    saveSlotImage(cameraSlot.id, canvas.toDataURL('image/jpeg', 0.9))
+    closeCamera()
+  }
+
+  useEffect(() => () => stopCamera(), [])
 
   function exportReport() {
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
@@ -316,10 +385,13 @@ function App() {
                   <p>{slot.prompt}</p>
                   <small>{slot.why}</small>
                 </div>
-                <label>
-                  {slot.image ? <img src={slot.image} alt={`${slot.title} upload`} /> : <div className="phone-placeholder">tap to add photo</div>}
-                  <input accept="image/*" capture="environment" type="file" onChange={(event) => updateSlotImage(slot.id, event)} />
-                </label>
+                <div className="slot-media-actions">
+                  <button className="camera-button" type="button" onClick={() => openCamera(slot)}>Open camera</button>
+                  <label>
+                    {slot.image ? <img src={slot.image} alt={`${slot.title} capture`} /> : <div className="phone-placeholder">upload fallback</div>}
+                    <input accept="image/*" capture="environment" type="file" onChange={(event) => updateSlotImage(slot.id, event)} />
+                  </label>
+                </div>
               </article>
             ))}
           </div>
@@ -443,6 +515,33 @@ function App() {
         <p>[hermes] orchestrates capture → detection → catalog → report → export/payment</p>
         <p>[stripe] workflow payments only; record ownership and export rights stay with the machine owner</p>
       </section>
+
+      {cameraSlot && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="FarmFax phone camera capture">
+          <div className="camera-modal">
+            <div className="modal-topline"><span>Phone camera capture</span><button className="ghost" onClick={closeCamera}>close</button></div>
+            <h2>{cameraSlot.title}</h2>
+            <p>{cameraSlot.prompt}</p>
+            <div className="camera-frame">
+              <video ref={videoRef} playsInline muted autoPlay />
+              {isCameraStarting && <div className="camera-status">Starting rear camera…</div>}
+              {cameraError && <div className="camera-error">{cameraError}</div>}
+            </div>
+            <canvas ref={canvasRef} className="capture-canvas" aria-hidden="true" />
+            <div className="camera-actions">
+              <button onClick={captureFrame} disabled={!!cameraError || isCameraStarting}>Capture evidence photo</button>
+              <label className="upload-button">
+                Upload fallback
+                <input accept="image/*" capture="environment" type="file" onChange={(event) => {
+                  updateSlotImage(cameraSlot.id, event)
+                  closeCamera()
+                }} />
+              </label>
+            </div>
+            <small>Evidence is stored in-browser for the demo. Production signs capture metadata before routing to Hermes/Nemotron.</small>
+          </div>
+        </div>
+      )}
 
       {stripeOpen && (
         <div className="modal-backdrop" role="dialog" aria-modal="true">

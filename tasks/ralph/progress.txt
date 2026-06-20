@@ -4,3 +4,5 @@
 - Guardrail: no universal serial decoder, no mechanical guarantee, no vendor-locked data.
 
 2026-06-19T20:33:45.590388 Implemented FarmFax app pivot. Build passed. Browser smoke verified hero, capture, serial catalog, consolidated report, Stripe modal, zero JS console errors.
+
+2026-06-19T20:55:01-05:00 Added real phone capture: getUserMedia rear-camera modal per evidence slot, canvas still capture, permission-denied handling, and upload fallback. Verified build and browser modal.
