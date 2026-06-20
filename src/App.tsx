@@ -44,6 +44,27 @@ type CatalogCandidate = {
   basis: string
 }
 
+type RiskLevel = 'low' | 'medium' | 'high'
+
+type RiskFactor = {
+  label: string
+  points: number
+  evidence: string
+  explanation: string
+}
+
+type RiskCard = {
+  id: 'identity' | 'safety' | 'evidence' | 'hours' | 'leverage'
+  label: string
+  score: number
+  level: RiskLevel
+  severity: Severity
+  verdict: string
+  evidence: string
+  buyerAction: string
+  factors: RiskFactor[]
+}
+
 type FarmFaxReport = {
   report_id: string
   schema_version: string
@@ -55,10 +76,11 @@ type FarmFaxReport = {
   confidence: number
   findings: Finding[]
   visual_analysis: Array<{ slot: SlotId; rustPct: number; wetPct: number; paintVariance: number; confidence: number; summary: string }>
+  risk_summary: RiskCard[]
   buyer_questions: string[]
   missing_evidence: string[]
-  open_record_guarantee: string
-  sponsor_stack: string[]
+  open_record_commitment: string
+  integration_stack: string[]
 }
 
 const initialSlots: CaptureSlot[] = [
@@ -172,7 +194,7 @@ const catalogCandidates: CatalogCandidate[] = [
   },
 ]
 
-const sponsorStack = [
+const architectureStack = [
   {
     name: 'NVIDIA / Nemotron',
     line: 'Multimodal reasoning over captured evidence: defect crops, OCR fields, checklist completeness, and buyer questions.',
@@ -183,7 +205,7 @@ const sponsorStack = [
   },
   {
     name: 'Stripe',
-    line: 'Paid verification, hosted report links, dealer/shop subscriptions — without holding equipment records hostage.',
+    line: 'Paid hosted report links, review workflow, dealer/shop branding — without holding equipment records hostage.',
   },
 ]
 
@@ -197,6 +219,86 @@ function severityWeight(severity: Severity) {
   if (severity === 'red') return 15
   if (severity === 'yellow') return 7
   return -2
+}
+
+function clampScore(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)))
+}
+
+function riskLevel(score: number): RiskLevel {
+  if (score >= 70) return 'high'
+  if (score >= 35) return 'medium'
+  return 'low'
+}
+
+function riskSeverity(level: RiskLevel): Severity {
+  if (level === 'high') return 'red'
+  if (level === 'medium') return 'yellow'
+  return 'green'
+}
+
+function buildRiskSummary(slots: CaptureSlot[], baseFindings: Finding[], analyzedCount: number): RiskCard[] {
+  const missing = slots.filter((slot) => slot.state === 'missing')
+  const needsReview = slots.filter((slot) => slot.state === 'review')
+  const accepted = slots.filter((slot) => slot.state === 'accepted')
+  const serial = slots.find((slot) => slot.id === 'serial')
+  const hours = slots.find((slot) => slot.id === 'hours')
+  const engine = slots.find((slot) => slot.id === 'engine')
+  const hydraulics = slots.find((slot) => slot.id === 'hydraulics')
+  const redFindings = baseFindings.filter((finding) => finding.severity === 'red')
+  const yellowFindings = baseFindings.filter((finding) => finding.severity === 'yellow')
+  const highRust = slots.some((slot) => (slot.analysis?.rustPct ?? 0) > 8)
+  const highWet = slots.some((slot) => (slot.analysis?.wetPct ?? 0) > 8)
+  const paintShift = slots.some((slot) => (slot.analysis?.paintVariance ?? 0) > 35)
+
+  const evidenceFactors: RiskFactor[] = [
+    ...missing.map((slot) => ({ label: `${slot.title} missing`, points: slot.id === 'engine' || slot.id === 'serial' || slot.id === 'hours' ? 18 : 10, evidence: slot.id, explanation: 'Required view is absent, so FarmFax increases uncertainty instead of guessing.' })),
+    ...needsReview.map((slot) => ({ label: `${slot.title} needs review`, points: slot.id === 'hydraulics' || slot.id === 'paint' ? 9 : 5, evidence: slot.id, explanation: 'Evidence exists but needs a cleaner capture before treating it as fully trusted.' })),
+  ]
+  if (analyzedCount < accepted.length) evidenceFactors.push({ label: 'Some accepted slots lack CV pass', points: 8, evidence: 'browser_cv', explanation: 'Accepted evidence should ideally include local rust/wet/paint analysis.' })
+  const evidenceScore = clampScore(evidenceFactors.reduce((sum, factor) => sum + factor.points, 0))
+  const evidenceLevel = riskLevel(evidenceScore)
+
+  const identityFactors: RiskFactor[] = []
+  if (serial?.state === 'missing') identityFactors.push({ label: 'Serial/PIN plate missing', points: 35, evidence: 'serial', explanation: 'Machine identity cannot be anchored without readable plate evidence.' })
+  if (serial?.state === 'review') identityFactors.push({ label: 'Serial/PIN plate needs cleaner capture', points: 18, evidence: 'serial', explanation: 'Glare, blur, crop, or paint around the plate can reduce confidence.' })
+  identityFactors.push({ label: 'Paperwork match not verified', points: 14, evidence: 'bill_of_sale', explanation: 'Serial/PIN still needs bill of sale, lien/title, dealer, or service-record confirmation.' })
+  if (catalogCandidates[0].confidence < 85) identityFactors.push({ label: 'Catalog match not definitive', points: 8, evidence: 'catalog', explanation: `Top make/model match is ${catalogCandidates[0].confidence}%, useful but not a certification.` })
+  const identityScore = clampScore(identityFactors.reduce((sum, factor) => sum + factor.points, 0))
+  const identityLevel = riskLevel(identityScore)
+
+  const hourFactors: RiskFactor[] = []
+  if (hours?.state === 'missing') hourFactors.push({ label: 'Hour meter missing', points: 35, evidence: 'hours', explanation: 'Displayed hours cannot be anchored without dashboard evidence.' })
+  if (hours?.state === 'review') hourFactors.push({ label: 'Hour meter needs confirmation', points: 16, evidence: 'hours', explanation: 'Hour OCR/capture confidence is not high enough for reliance.' })
+  hourFactors.push({ label: 'No service records near 1,842h shown', points: 12, evidence: 'service_records', explanation: 'Maintenance records should reconcile displayed hours and wear.' })
+  if ((highRust || highWet || paintShift) && hours?.state !== 'missing') hourFactors.push({ label: 'Visible wear should be reconciled with hours', points: 12, evidence: 'cv_findings', explanation: 'Rust/wet/paint signals do not prove hour rollback, but they justify record review.' })
+  const hourScore = clampScore(hourFactors.reduce((sum, factor) => sum + factor.points, 0))
+  const hourLevel = riskLevel(hourScore)
+
+  const safetyFactors: RiskFactor[] = []
+  if (hydraulics?.state === 'review' || highWet) safetyFactors.push({ label: 'Hydraulic leak evidence needs inspection', points: 28, evidence: 'hydraulics', explanation: 'Hydraulic leaks can create repair, fire, environmental, and operator safety risk.' })
+  if (engine?.state === 'missing') safetyFactors.push({ label: 'Engine bay / cold-start missing', points: 18, evidence: 'engine', explanation: 'Belts, hoses, battery corrosion, smoke, and startup behavior remain unknown.' })
+  if (highRust) safetyFactors.push({ label: 'Rust-tone signal near structural views', points: 14, evidence: 'browser_cv', explanation: 'Rust near mounts, steps, arms, or frame points should be inspected for metal loss.' })
+  redFindings.forEach((finding) => safetyFactors.push({ label: `Red finding: ${finding.category}`, points: 10, evidence: finding.evidence, explanation: finding.finding }))
+  const safetyScore = clampScore(safetyFactors.reduce((sum, factor) => sum + factor.points, 0))
+  const safetyLevel = riskLevel(safetyScore)
+
+  const leverageFactors: RiskFactor[] = [
+    ...redFindings.map((finding) => ({ label: `Repair ask: ${finding.category}`, points: 14, evidence: finding.evidence, explanation: finding.finding })),
+    ...yellowFindings.map((finding) => ({ label: `Verify: ${finding.category}`, points: 6, evidence: finding.evidence, explanation: finding.finding })),
+  ]
+  if (evidenceScore >= 35) leverageFactors.push({ label: 'Evidence gaps support contingency', points: 10, evidence: 'missing_evidence', explanation: 'Buyer can ask seller for missing captures before deposit or travel.' })
+  if (hourScore >= 35) leverageFactors.push({ label: 'Hours need records', points: 8, evidence: 'hours', explanation: 'Service records or ECU/dealer readout should reconcile displayed hours.' })
+  const leverageScore = clampScore(leverageFactors.reduce((sum, factor) => sum + factor.points, 0))
+  const leverageLevel = riskLevel(leverageScore)
+
+  return [
+    { id: 'identity', label: 'Identity / fraud risk', score: identityScore, level: identityLevel, severity: riskSeverity(identityLevel), verdict: identityLevel === 'high' ? 'Identity evidence has serious gaps or conflicts.' : identityLevel === 'medium' ? 'Serial/model cues are plausible, but paperwork match is unverified.' : 'Identity evidence aligns in submitted capture.', evidence: 'serial plate · catalog match · paperwork not checked', buyerAction: 'Compare PIN plate to bill of sale, lien/title paperwork, dealer stock record, and service invoices.', factors: identityFactors },
+    { id: 'safety', label: 'Safety / weld / structural', score: safetyScore, level: safetyLevel, severity: riskSeverity(safetyLevel), verdict: safetyLevel === 'high' ? 'Inspect before purchase or operation.' : safetyLevel === 'medium' ? 'Potential safety/repair concerns need closer inspection.' : 'No obvious safety-critical issue in supplied evidence.', evidence: `${redFindings.length} red flag · engine ${engine?.state ?? 'unknown'} · hydraulics ${hydraulics?.state ?? 'unknown'}`, buyerAction: 'Inspect welds, pins, mounts, guards, hoses, loader arms, frame rails, and operator safety equipment.', factors: safetyFactors },
+    { id: 'evidence', label: 'Evidence completeness', score: evidenceScore, level: evidenceLevel, severity: riskSeverity(evidenceLevel), verdict: evidenceLevel === 'high' ? 'Major required evidence is missing.' : evidenceLevel === 'medium' ? 'Mostly complete, but important views still need review.' : 'Capture checklist is strong for a pre-purchase screen.', evidence: `${accepted.length}/7 accepted · ${missing.length} missing · ${analyzedCount}/7 CV analyzed`, buyerAction: 'Ask seller for missing or cleaner captures before relying on the report.', factors: evidenceFactors },
+    { id: 'hours', label: 'Hour-meter plausibility', score: hourScore, level: hourLevel, severity: riskSeverity(hourLevel), verdict: hourLevel === 'high' ? 'Hour evidence has serious conflicts or missing proof.' : hourLevel === 'medium' ? 'Displayed hours should be reconciled with records and visible wear.' : 'Hour evidence appears usable, pending normal record review.', evidence: '1,842h OCR · service records not supplied', buyerAction: 'Ask for service invoices, ECU/dealer diagnostics if available, and prior auction/dealer listings.', factors: hourFactors },
+    { id: 'leverage', label: 'Negotiation leverage', score: leverageScore, level: leverageLevel, severity: riskSeverity(leverageLevel), verdict: leverageLevel === 'high' ? 'Strong evidence-backed leverage for repair demand or contingency.' : leverageLevel === 'medium' ? 'Moderate leverage from visible issues and unanswered proof.' : 'Limited visible leverage; use report mainly for diligence.', evidence: `${redFindings.length} red · ${yellowFindings.length} yellow · ${missing.length} missing`, buyerAction: 'Use findings to request records, additional captures, inspection contingency, or seller concession — not as an appraisal.', factors: leverageFactors },
+  ]
 }
 
 function rgbToHsv(r: number, g: number, b: number) {
@@ -308,11 +410,14 @@ function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const cameraRequestRef = useRef(0)
 
   const acceptedCount = slots.filter((slot) => slot.state === 'accepted').length
   const reviewCount = slots.filter((slot) => slot.state === 'review').length
   const analyzedSlots = slots.filter((slot) => slot.analysis)
   const missing = slots.filter((slot) => slot.state === 'missing')
+  const riskSummary = useMemo(() => buildRiskSummary(slots, findings, analyzedSlots.length), [slots, analyzedSlots.length])
+  const dealPosture = riskSummary.some((risk) => risk.severity === 'red') ? 'Proceed with inspection conditions' : riskSummary.some((risk) => risk.severity === 'yellow') ? 'Proceed after seller follow-up' : 'Proceed with normal diligence'
   const conditionScore = useMemo(() => {
     const penalty = findings.reduce((sum, finding) => sum + severityWeight(finding.severity), 0) + missing.length * 5
     return Math.max(0, Math.min(100, 94 - penalty + acceptedCount * 2))
@@ -336,6 +441,7 @@ function App() {
       confidence: slot.analysis!.confidence,
       summary: slot.analysis!.summary,
     })),
+    risk_summary: riskSummary,
     buyer_questions: [
       'Can you provide service records for hydraulic hoses/cylinders in the last 24 months?',
       'Has the right rear panel or loader arm ever been repainted, welded, or replaced?',
@@ -343,16 +449,16 @@ function App() {
       'Does the serial/PIN plate match the bill of sale, lien/title paperwork, and dealer stock record?',
     ],
     missing_evidence: missing.map((slot) => slot.title),
-    open_record_guarantee: 'Core FarmFax records export as JSON/PDF. Paid hosting can end; the machine history still moves with the owner.',
-    sponsor_stack: sponsorStack.map((item) => item.name),
-  }), [analyzedSlots, conditionScore, equipmentType, missing])
+    open_record_commitment: 'Core FarmFax records export as JSON/PDF. Paid hosting can end; the machine history still moves with the owner.',
+    integration_stack: architectureStack.map((item) => item.name),
+  }), [analyzedSlots, conditionScore, equipmentType, missing, riskSummary])
 
   async function saveSlotImage(slotId: SlotId, image: string) {
     setSlots((current) => current.map((slot) => slot.id === slotId
       ? { ...slot, image, state: 'accepted', analysis: undefined }
       : slot))
     const analysis = await analyzeImageHeuristics(image)
-    setSlots((current) => current.map((slot) => slot.id === slotId
+    setSlots((current) => current.map((slot) => slot.id === slotId && slot.image === image
       ? { ...slot, analysis }
       : slot))
   }
@@ -367,21 +473,27 @@ function App() {
   }
 
   function stopCamera() {
+    cameraRequestRef.current += 1
     streamRef.current?.getTracks().forEach((track) => track.stop())
     streamRef.current = null
     if (videoRef.current) videoRef.current.srcObject = null
   }
 
   async function openCamera(slot: CaptureSlot) {
+    const requestId = cameraRequestRef.current + 1
+    cameraRequestRef.current = requestId
     setCameraSlot(slot)
     setCameraError('')
     setIsCameraStarting(true)
-    stopCamera()
+    streamRef.current?.getTracks().forEach((track) => track.stop())
+    streamRef.current = null
+    if (videoRef.current) videoRef.current.srcObject = null
+    let acquiredStream: MediaStream | null = null
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
         throw new Error('Camera API unavailable in this browser. Use the upload fallback.')
       }
-      const stream = await navigator.mediaDevices.getUserMedia({
+      acquiredStream = await navigator.mediaDevices.getUserMedia({
         audio: false,
         video: {
           facingMode: { ideal: 'environment' },
@@ -389,18 +501,26 @@ function App() {
           height: { ideal: 1200 },
         },
       })
-      streamRef.current = stream
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream
-        await videoRef.current.play()
-      } else {
-        throw new Error('Camera preview failed to mount. Use upload fallback.')
+      if (cameraRequestRef.current !== requestId) {
+        acquiredStream.getTracks().forEach((track) => track.stop())
+        return
       }
+      streamRef.current = acquiredStream
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()))
+      if (cameraRequestRef.current !== requestId || !videoRef.current) {
+        acquiredStream.getTracks().forEach((track) => track.stop())
+        streamRef.current = null
+        return
+      }
+      videoRef.current.srcObject = acquiredStream
+      await videoRef.current.play()
     } catch (error) {
-      setCameraError(error instanceof Error ? error.message : 'Unable to start camera. Use upload fallback.')
+      acquiredStream?.getTracks().forEach((track) => track.stop())
+      if (cameraRequestRef.current === requestId) {
+        setCameraError(error instanceof Error ? error.message : 'Unable to start camera. Use upload fallback.')
+      }
     } finally {
-      setIsCameraStarting(false)
+      if (cameraRequestRef.current === requestId) setIsCameraStarting(false)
     }
   }
 
@@ -424,7 +544,13 @@ function App() {
     closeCamera()
   }
 
-  useEffect(() => () => stopCamera(), [])
+  useEffect(() => {
+    return () => {
+      streamRef.current?.getTracks().forEach((track) => track.stop())
+      streamRef.current = null
+      if (videoRef.current) videoRef.current.srcObject = null
+    }
+  }, [])
 
   function exportReport() {
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
@@ -452,6 +578,7 @@ function App() {
       <section className="hero-card farm-hero">
         <div className="hero-copy-block">
           <p className="eyebrow">Carfax for farm equipment — without locked data</p>
+          <div className="demo-badge">Demo sample report · upload/capture photos to replace sample evidence</div>
           <h1>Scan the machine before you buy the story.</h1>
           <p className="lede">
             FarmFax turns a phone walkthrough into an open, evidence-backed condition report for tractors, skid steers,
@@ -481,8 +608,9 @@ function App() {
         </aside>
       </section>
 
-      <section className="sponsor-row sponsor-stack">
-        {sponsorStack.map((item) => (
+      <section className="architecture-row architecture-stack" aria-label="demo architecture stack">
+        <div className="stack-heading panel"><span>Demo architecture stack</span><p>Planned integration roles for hackathon positioning; not a claim of endorsement or production certification.</p></div>
+        {architectureStack.map((item) => (
           <article className="panel" key={item.name}>
             <span>{item.name}</span>
             <p>{item.line}</p>
@@ -497,7 +625,7 @@ function App() {
           <p className="muted">Guided capture is the moat. Better inputs beat hallucinated AI. Uploads below are browser-local in this demo.</p>
           <div className="equipment-toggle" aria-label="equipment type">
             {['tractor', 'skid steer', 'trailer', 'implement'].map((type) => (
-              <button key={type} className={equipmentType === type ? 'active' : 'ghost'} onClick={() => setEquipmentType(type)}>{type}</button>
+              <button key={type} className={equipmentType === type ? 'active' : 'ghost'} disabled={type !== 'tractor'} onClick={() => type === 'tractor' && setEquipmentType(type)}>{type}{type !== 'tractor' ? ' soon' : ''}</button>
             ))}
           </div>
           <div className="capture-grid">
@@ -578,7 +706,7 @@ function App() {
             <article>
               <span>OCR serial / PIN</span>
               <b>{report.serial_number}</b>
-              <p>Plate crop confidence 86%. User confirmation required before report verification.</p>
+              <p>Plate crop confidence 86%. User confirmation required before report publication.</p>
             </article>
             <article>
               <span>hour meter</span>
@@ -607,7 +735,7 @@ function App() {
           <h2>Own the machine. Own the history.</h2>
           <p>
             OEM portals, dealer CRMs, auction listings, and shop PDFs trap records in silos. FarmFax uses an open schema:
-            owners can export JSON/PDF, mechanics can add verified service events, and paid hosting never becomes data captivity.
+            owners can export JSON/PDF, mechanics can add documented service events, and paid hosting never becomes data captivity.
           </p>
           <ul>
             <li>Open report schema and scoring rubric</li>
@@ -626,8 +754,24 @@ function App() {
             <strong>{report.condition_score}</strong>
             <div>
               <b>{report.make_model_guess.make} {report.make_model_guess.model}</b>
-              <p>Visible-condition score. Not a mechanical guarantee, title check, appraisal, or replacement for an inspector.</p>
+              <p>Visible-condition score from submitted evidence. Not a mechanical guarantee, title check, appraisal, or substitute for a qualified inspection.</p>
             </div>
+          </div>
+          <div className="risk-strip">
+            {report.risk_summary.map((risk) => (
+              <article className={`risk-card ${risk.severity}`} key={risk.id}>
+                <span>{risk.severity} · {risk.score}/100</span>
+                <h3>{risk.label}</h3>
+                <p>{risk.verdict}</p>
+                <small>{risk.evidence}</small>
+              </article>
+            ))}
+          </div>
+          <div className="risk-disclosure">Scores are demo screening heuristics from submitted/sample evidence — not diagnostic, mechanical, legal, title, theft, or appraisal conclusions.</div>
+          <div className="deal-posture">
+            <span>deal posture</span>
+            <h3>{dealPosture}</h3>
+            <p>{report.risk_summary.find((risk) => risk.id === 'leverage')?.buyerAction}</p>
           </div>
           <div className="question-grid">
             {report.buyer_questions.map((question) => (
@@ -636,8 +780,18 @@ function App() {
           </div>
           <div className="data-disclosures">
             <p><b>Missing evidence:</b> {report.missing_evidence.length ? report.missing_evidence.join(', ') : 'none'}</p>
-            <p><b>Open record:</b> {report.open_record_guarantee}</p>
-            <p><b>Guardrail:</b> FarmFax reports visible evidence and confidence. Unknowns stay unknown.</p>
+            <p><b>Open record:</b> {report.open_record_commitment}</p>
+            <p><b>Guardrail:</b> FarmFax reports visible evidence, confidence, and missing proof. Unknowns stay unknown.</p>
+          </div>
+          <div className="risk-factor-grid">
+            {report.risk_summary.filter((risk) => risk.factors.length).slice(0, 4).map((risk) => (
+              <article key={`${risk.id}-factors`}>
+                <b>{risk.label} factors</b>
+                {risk.factors.slice(0, 3).map((factor) => (
+                  <p key={`${risk.id}-${factor.label}`}>+{factor.points} · {factor.label}: {factor.explanation}</p>
+                ))}
+              </article>
+            ))}
           </div>
           <div className="analysis-ledger">
             <b>Browser CV ledger</b>
@@ -654,7 +808,7 @@ function App() {
         <aside className="panel commerce-panel">
           <div className="section-label">Stripe rail</div>
           <h2>$29</h2>
-          <p>Demo checkout for verified hosted report, seller share link, and dealer/shop branding. Export remains available without paying.</p>
+          <p>Demo checkout for hosted report, seller share link, and dealer/shop branding. Export remains available without paying.</p>
           <button onClick={() => setStripeOpen(true)}>Open Stripe checkout demo</button>
         </aside>
       </section>
@@ -700,8 +854,8 @@ function App() {
           <div className="stripe-modal">
             <div className="modal-topline"><span>Stripe checkout simulation</span><button className="ghost" onClick={() => setStripeOpen(false)}>close</button></div>
             <div className="stripe-word">Stripe</div>
-            <h2>Verified FarmFax report</h2>
-            <p>Pay for hosted verification, share link, and dealer/shop branding. The underlying equipment record still exports as open JSON/PDF.</p>
+            <h2>Hosted FarmFax report</h2>
+            <p>Pay for hosted report link, seller share page, and dealer/shop branding. The underlying equipment record still exports as open JSON/PDF.</p>
             <div className="receipt">
               <span>Report</span><b>{report.report_id}</b>
               <span>Price</span><b>$29.00</b>

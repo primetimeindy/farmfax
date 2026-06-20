@@ -8,3 +8,7 @@
 2026-06-19T20:55:01-05:00 Added real phone capture: getUserMedia rear-camera modal per evidence slot, canvas still capture, permission-denied handling, and upload fallback. Verified build and browser modal.
 
 2026-06-19T21:00:27-05:00 Added browser CV heuristics: uploaded/captured images run HSV-based rust-tone, dark/wet, and paint-variance analysis; slot thumbnails render heatmap cells and report JSON includes visual_analysis. Browser smoke used synthetic rusty image: 86% CV, 14.4% rust, 8.5% wet, 24 overlay masks.
+
+2026-06-19T21:21:13-05:00 Added FarmFax buyer-risk layer after agent critique: identity/fraud evidence, safety/weld/structural, evidence completeness, hour-meter plausibility, negotiation leverage, deal posture, factor explanations, JSON export risk_summary. Verified build and browser synthetic CV risk escalation: safety red 70/100, deal posture inspection conditions, 24 masks, zero JS errors.
+
+2026-06-19T21:30:52-05:00 Agent-reviewed and hardened risk layer: added demo/sample labeling, disabled unimplemented equipment modes, changed sponsor language to architecture stack, removed verified/guarantee monetization copy, added score heuristic disclosure, fixed stale async CV analysis, fixed camera cleanup race/contrast. Build and browser smoke passed.
