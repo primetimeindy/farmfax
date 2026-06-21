@@ -78,10 +78,10 @@ for (const snippet of ['rel="manifest"', 'apple-mobile-web-app-capable', 'apple-
 console.log('ok index.html includes iOS/PWA install metadata')
 
 const sw = await readFile(new URL('public/sw.js', root), 'utf8')
-for (const snippet of ['install', 'activate', 'fetch']) {
+for (const snippet of ['farmfax-phone-app-v3', 'install', 'activate', 'fetch', "request.mode === 'navigate'"]) {
   if (!sw.includes(snippet)) throw new Error(`service worker missing ${snippet} handler`)
 }
-console.log('ok service worker has install/activate/fetch handlers')
+console.log('ok service worker has versioned network-first navigation caching')
 
 const dist = await readFile(new URL('dist/index.html', root), 'utf8')
 if (!dist.includes('/assets/')) throw new Error('dist/index.html does not reference Vite assets')
