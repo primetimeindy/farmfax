@@ -1,6 +1,6 @@
-# FarmFax sample photo attribution
+# FarmFax sample media attribution
 
-These are demo sample photos used to make the FarmFax hackathon flow look like a real equipment inspection. They are sourced from Wikimedia Commons thumbnail URLs and should be treated as illustrative sample evidence, not photos of the same machine/report. User-uploaded photos replace these in the real workflow.
+These are demo sample photos/video used to make the FarmFax hackathon flow look like a real equipment inspection. They are sourced from Wikimedia Commons media URLs and should be treated as illustrative sample evidence, not photos/video of the same machine/report. User-uploaded photos or videos replace these in the real workflow.
 
 - `walkaround.jpg` — John Deere 6155M tractor — Wikimedia Commons. Source thumbnail: https://upload.wikimedia.org/wikipedia/commons/thumb/4/4d/John_Deere_6155M_tractor_MD1.jpg/1280px-John_Deere_6155M_tractor_MD1.jpg
 - `serial-plate.jpg` — Brush Tractor serial number plate — Wikimedia Commons. Source thumbnail: https://upload.wikimedia.org/wikipedia/commons/thumb/f/f6/Brush_Tractor_16304_Serial_Number_Plate.jpg/960px-Brush_Tractor_16304_Serial_Number_Plate.jpg
@@ -9,3 +9,4 @@ These are demo sample photos used to make the FarmFax hackathon flow look like a
 - `tires.jpg` — Tractor tyre tracks / tire evidence — Wikimedia Commons. Source thumbnail: https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/Tractor_tyre_tracks%2C_Ponte_de_Sor%2C_Portugal_%28approx._GPS_location%29_julesvernex2.jpg/960px-Tractor_tyre_tracks%2C_Ponte_de_Sor%2C_Portugal_%28approx._GPS_location%29_julesvernex2.jpg
 - `paint-body.jpg` — Drab but not derelict tractor/equipment — Wikimedia Commons. Source thumbnail: https://upload.wikimedia.org/wikipedia/commons/thumb/9/9d/Drab_but_not_derelict_-_geograph.org.uk_-_1771558.jpg/960px-Drab_but_not_derelict_-_geograph.org.uk_-_1771558.jpg
 - `engine-bay.jpg` — Tow tractor engine maintenance — Wikimedia Commons. Source thumbnail: https://upload.wikimedia.org/wikipedia/commons/thumb/4/44/US_Navy_101018-N-5853P-243_Aviation_support_equipment_technicians_perform_maintenance_on_a_tow_tractor_engine_used_to_maneuver_aircraft_in_the_hang.jpg/960px-US_Navy_101018-N-5853P-243_Aviation_support_equipment_technicians_perform_maintenance_on_a_tow_tractor_engine_used_to_maneuver_aircraft_in_the_hang.jpg
+- `farmfax-video-fixture.mp4` — 6-second transcoded excerpt from `Traktor John Deere 6130R mit Miststreuer.webm` — Wikimedia Commons. Source: https://upload.wikimedia.org/wikipedia/commons/7/77/Traktor_John_Deere_6130R_mit_Miststreuer.webm
