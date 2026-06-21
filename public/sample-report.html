@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>FarmFax Sample Report — John Deere 5075E</title>
+  <style>
+    :root { color-scheme: light; --ink:#111827; --muted:#5b6472; --line:#d9e2dc; --green:#0d5f3a; --mint:#e9f8ef; --red:#b42318; --amber:#b7791f; --blue:#164e8b; --panel:#ffffff; --wash:#f5f8f5; }
+    * { box-sizing:border-box; }
+    body { margin:0; background:#eef3ef; color:var(--ink); font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; line-height:1.45; }
+    .page { max-width:1120px; margin:0 auto; padding:24px; }
+    header { background:linear-gradient(135deg,#06351f,#0d5f3a); color:white; border-radius:22px; padding:26px; box-shadow:0 18px 48px rgba(13,95,58,.22); }
+    .topline { display:flex; justify-content:space-between; gap:16px; align-items:flex-start; border-bottom:1px solid rgba(255,255,255,.22); padding-bottom:18px; margin-bottom:18px; }
+    .brand { font-size:34px; font-weight:950; letter-spacing:-.04em; }
+    .brand span { color:#9cff7d; }
+    .report-id { text-align:right; color:#dbeee1; font:700 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; text-transform:uppercase; letter-spacing:.08em; }
+    h1 { margin:0; font-size:42px; line-height:.98; letter-spacing:-.04em; max-width:760px; }
+    .subhead { max-width:840px; margin:14px 0 0; color:#dcece0; font-size:17px; }
+    .hero-grid { display:grid; grid-template-columns:1.3fr .7fr; gap:16px; margin-top:18px; }
+    .hero-card { background:rgba(255,255,255,.10); border:1px solid rgba(255,255,255,.18); border-radius:18px; padding:16px; }
+    .hero-card span, .label { display:block; color:#bde7c5; font:850 11px/1.2 ui-monospace, monospace; text-transform:uppercase; letter-spacing:.10em; margin-bottom:6px; }
+    .hero-card b { font-size:22px; }
+    .score { display:grid; grid-template-columns:86px 1fr; gap:12px; align-items:center; }
+    .score-circle { width:86px; height:86px; border-radius:50%; display:grid; place-items:center; background:#ffe8bc; color:#5f3100; font-weight:950; font-size:28px; border:5px solid #f59e0b; }
+    main { display:grid; gap:18px; margin-top:18px; }
+    section { background:var(--panel); border:1px solid var(--line); border-radius:22px; padding:20px; box-shadow:0 10px 28px rgba(15,23,42,.06); }
+    h2 { margin:0 0 12px; font-size:24px; letter-spacing:-.02em; }
+    h3 { margin:0 0 6px; font-size:18px; }
+    p { margin:0 0 10px; }
+    .summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+    .metric { border:1px solid var(--line); border-radius:16px; padding:14px; background:var(--wash); }
+    .metric b { font-size:20px; display:block; }
+    .status { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:999px; font:850 12px/1 ui-monospace, monospace; text-transform:uppercase; }
+    .status.red { background:#fee4e2; color:var(--red); }
+    .status.yellow { background:#fff4d6; color:#8a5200; }
+    .status.green { background:#dcfce7; color:#166534; }
+    .risk-grid { display:grid; grid-template-columns:repeat(5,1fr); gap:10px; }
+    .risk { border:1px solid var(--line); border-radius:16px; padding:13px; min-height:132px; }
+    .risk strong { display:block; margin:8px 0 6px; }
+    .risk p { font-size:13px; color:var(--muted); }
+    .evidence-card { display:grid; grid-template-columns:290px 1fr; gap:18px; padding:16px 0; border-top:1px solid var(--line); }
+    .evidence-card:first-of-type { border-top:0; padding-top:0; }
+    figure { margin:0; }
+    .media-frame { position:relative; min-height:190px; border-radius:18px; overflow:hidden; background:#0b120d; border:1px solid #cbd7ce; }
+    .media-frame img, .media-frame video { display:block; width:100%; height:210px; object-fit:cover; }
+    .tag { position:absolute; border-radius:999px; padding:7px 9px; font:950 11px/1 ui-monospace, monospace; text-transform:uppercase; box-shadow:0 10px 26px rgba(0,0,0,.28); }
+    .tag.rust { left:16%; top:45%; background:#fb923c; color:#351400; }
+    .tag.paint { left:58%; top:30%; background:#facc15; color:#2d1c00; }
+    .tag.leak { left:55%; top:52%; background:#f87171; color:#3a0000; }
+    .tag.id { left:12%; top:14%; background:#93c5fd; color:#041a33; }
+    .box { position:absolute; border:3px solid currentColor; border-radius:10px; width:94px; height:58px; opacity:.70; }
+    .box.rust { left:12%; top:35%; color:#fb923c; }
+    .box.paint { left:53%; top:22%; color:#facc15; }
+    .box.leak { left:52%; top:42%; color:#f87171; }
+    .box.id { left:10%; top:34%; color:#93c5fd; }
+    figcaption { margin-top:8px; color:var(--muted); font-size:12px; }
+    .reasoning { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:10px; }
+    .reasoning div { background:#f8faf8; border:1px solid var(--line); border-radius:14px; padding:12px; }
+    .reasoning b { display:block; color:var(--green); margin-bottom:4px; }
+    .source-line { color:var(--muted); font-size:13px; }
+    .questions { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+    .questions article { background:#fff9ed; border:1px solid #f3d69a; border-radius:16px; padding:14px; }
+    .ledger { width:100%; border-collapse:collapse; overflow:hidden; border-radius:14px; }
+    th, td { text-align:left; border-bottom:1px solid var(--line); padding:10px; vertical-align:top; }
+    th { background:#f0f6f1; color:#23422d; font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+    td { font-size:14px; }
+    .limitations { background:#111827; color:#f9fafb; }
+    .limitations h2 { color:white; }
+    .limitations ul { margin:8px 0 0; padding-left:20px; color:#d1d5db; }
+    .footer-actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .button { display:inline-block; border-radius:999px; padding:10px 14px; background:var(--green); color:white; font-weight:850; text-decoration:none; }
+    .button.secondary { background:#e5efe8; color:#143922; }
+    @media (max-width:850px) { .hero-grid,.summary-grid,.risk-grid,.evidence-card,.reasoning,.questions { grid-template-columns:1fr; } h1{font-size:34px;} .topline{display:block}.report-id{text-align:left;margin-top:10px;} }
+    @media print { body{background:white}.page{padding:0} section, header{box-shadow:none; break-inside:avoid}.footer-actions{display:none} }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="topline">
+        <div class="brand">Farm<span>Fax</span></div>
+        <div class="report-id">Sample report<br/>ffx-demo-risky-tractor-1842h<br/>schema: farmfax.report.v0.1-open</div>
+      </div>
+      <h1>Used Equipment Condition Report</h1>
+      <p class="subhead">A buyer-owned, evidence-backed report for a John Deere 5075E-style utility tractor. This sample demonstrates how photos, short video clips, and reasoning combine into a report before deposit.</p>
+      <div class="hero-grid">
+        <div class="hero-card">
+          <span>Recommended next move</span>
+          <b>Inspect before any deposit</b>
+          <p>Hydraulic wet signal, paint mismatch, moderate corrosion, and missing engine-bay proof should slow the deal down.</p>
+        </div>
+        <div class="hero-card score">
+          <div class="score-circle">63</div>
+          <div><span>Condition score</span><b>Medium/high buyer risk</b><p>Confidence 78%; based only on submitted media.</p></div>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <h2>Report snapshot</h2>
+        <div class="summary-grid">
+          <div class="metric"><span class="label">Machine guess</span><b>John Deere 5075E</b><p>82% confidence from plate pattern, body color, loader geometry, and decal family.</p></div>
+          <div class="metric"><span class="label">Serial / PIN</span><b>LV5075E7P0D18422</b><p>Readable in submitted plate photo; still must match bill of sale and lien/title paperwork.</p></div>
+          <div class="metric"><span class="label">Hour meter</span><b>1,842 hrs</b><p>Readable dashboard image; service records requested to support usage claim.</p></div>
+          <div class="metric"><span class="label">Evidence sources</span><b>6 photos + 1 video</b><p>Engine bay/cold-start proof is still missing.</p></div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Risk categories</h2>
+        <div class="risk-grid">
+          <article class="risk"><span class="status yellow">Paperwork</span><strong>Needs match</strong><p>Serial is readable but not verified against bill of sale, service records, lien/title, or dealer records.</p></article>
+          <article class="risk"><span class="status red">Repair</span><strong>Hydraulic concern</strong><p>Wet/dark streak near lift cylinder could indicate seepage, fresh grease, or recent service residue.</p></article>
+          <article class="risk"><span class="status yellow">Proof</span><strong>One required view missing</strong><p>No engine bay / cold-start evidence. Missing proof increases uncertainty.</p></article>
+          <article class="risk"><span class="status yellow">Hours</span><strong>Records requested</strong><p>1,842h reading should be matched to service history and visible wear.</p></article>
+          <article class="risk"><span class="status red">Leverage</span><strong>Slow the deal</strong><p>Ask for repair records, closeups, and a cold-start video before travel or deposit.</p></article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Evidence-linked findings</h2>
+        <article class="evidence-card">
+          <figure>
+            <div class="media-frame">
+              <img src="./sample-photos/hydraulics.jpg" alt="Hydraulic cylinder evidence" />
+              <span class="tag leak">leak?</span><span class="box leak"></span>
+            </div>
+            <figcaption>Source: hydraulic-lines photo · local browser wet-signal check · 88% photo confidence</figcaption>
+          </figure>
+          <div>
+            <span class="status red">Finding 1</span>
+            <h3>Hydraulic leak evidence</h3>
+            <p>Dark wet streak pattern appears near the right lift cylinder. FarmFax does not certify the cause; it flags the area as buyer-relevant evidence.</p>
+            <div class="reasoning">
+              <div><b>Reasoning</b><p>Wet/dark signal is elevated at 14.8%, concentrated near hydraulic hardware. That pattern is more concerning than diffuse dirt because the location maps to a costly repair area.</p></div>
+              <div><b>Buyer action</b><p>Ask whether cylinder seals or hoses were replaced. Request a loader-cycle video and inspect again after warm-up.</p></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="evidence-card">
+          <figure>
+            <div class="media-frame">
+              <img src="./sample-photos/paint-body.jpg" alt="Walkaround paint and corrosion evidence" />
+              <span class="tag rust">rust</span><span class="box rust"></span>
+              <span class="tag paint">paint</span><span class="box paint"></span>
+            </div>
+            <figcaption>Source: walkaround/body photo · rust-tone + paint variance check · 84% photo confidence</figcaption>
+          </figure>
+          <div>
+            <span class="status yellow">Finding 2</span>
+            <h3>Moderate corrosion + paint mismatch</h3>
+            <p>FarmFax sees moderate rust-tone clustering and elevated paint variance. This does not prove collision or structural repair; it creates a focused follow-up.</p>
+            <div class="reasoning">
+              <div><b>Reasoning</b><p>12.4% rust-tone pixels and paint variance of 46/100 are above the clean scenario baseline. The finding is tied to body/loader areas that affect resale and repair negotiation.</p></div>
+              <div><b>Buyer action</b><p>Request closeups after pressure wash. Ask about repaint, storm damage, welds, replaced panels, and loader-arm repair history.</p></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="evidence-card">
+          <figure>
+            <div class="media-frame">
+              <img src="./sample-photos/serial-plate.jpg" alt="Serial plate evidence" />
+              <span class="tag id">PIN</span><span class="box id"></span>
+            </div>
+            <figcaption>Source: serial/PIN plate photo · identity evidence · readable but not externally verified</figcaption>
+          </figure>
+          <div>
+            <span class="status yellow">Finding 3</span>
+            <h3>Machine identity is anchored, not certified</h3>
+            <p>The submitted serial/PIN plate is readable enough to anchor the report, but FarmFax has not checked lien, theft, title, service, or dealer records.</p>
+            <div class="reasoning">
+              <div><b>Reasoning</b><p>The plate pattern aligns with the make/model guess, but paperwork truth requires external records. FarmFax keeps this separate to avoid overclaiming.</p></div>
+              <div><b>Buyer action</b><p>Match the PIN to bill of sale, lien/title paperwork, dealer service records, and any auction lot metadata before payment.</p></div>
+            </div>
+          </div>
+        </article>
+
+        <article class="evidence-card">
+          <figure>
+            <div class="media-frame">
+              <video src="./farmfax-video-fixture.mp4" controls muted playsinline preload="metadata"></video>
+              <span class="tag leak">video</span>
+            </div>
+            <figcaption>Source: short video clip · 4 sampled frames · selected-frame inspection only</figcaption>
+          </figure>
+          <div>
+            <span class="status yellow">Finding 4</span>
+            <h3>Video adds context, not certainty</h3>
+            <p>The short clip helps inspect motion/context, but FarmFax samples selected frames. It does not claim full-video inspection or audio diagnosis.</p>
+            <div class="reasoning">
+              <div><b>Reasoning</b><p>Video frames are useful when hydraulics, smoke, motion, or engine behavior matter. The report records frame count and worst-frame time rather than pretending every moment was checked.</p></div>
+              <div><b>Buyer action</b><p>Ask for a cold-start video, loader cycle, steering lock-to-lock, PTO engagement if relevant, and engine bay after 10 minutes of operation.</p></div>
+            </div>
+          </div>
+        </article>
+      </section>
+
+      <section>
+        <h2>Seller questions generated from the evidence</h2>
+        <div class="questions">
+          <article><h3>Hydraulics</h3><p>Can you provide service records for hydraulic hoses/cylinders in the last 24 months?</p></article>
+          <article><h3>Paint / body</h3><p>Has the right rear panel or loader arm ever been repainted, welded, or replaced?</p></article>
+          <article><h3>Cold start</h3><p>Can you send a cold-start video and a photo of the engine bay after 10 minutes of operation?</p></article>
+        </div>
+      </section>
+
+      <section>
+        <h2>Evidence ledger</h2>
+        <table class="ledger">
+          <thead><tr><th>View</th><th>Status</th><th>Signals</th><th>Reason this matters</th></tr></thead>
+          <tbody>
+            <tr><td>360° walkaround</td><td><span class="status yellow">review</span></td><td>Rust 12.4%, paint variance 46/100</td><td>May affect resale, structural questions, and negotiation leverage.</td></tr>
+            <tr><td>Serial / PIN plate</td><td><span class="status green">received</span></td><td>Readable plate</td><td>Anchors report but still needs paperwork match.</td></tr>
+            <tr><td>Hour meter</td><td><span class="status green">received</span></td><td>1,842h dashboard</td><td>Needs service-record match and wear plausibility check.</td></tr>
+            <tr><td>Hydraulic lines</td><td><span class="status red">review</span></td><td>Wet signal 14.8%</td><td>Potential costly repair; inspect before deposit.</td></tr>
+            <tr><td>Tires / tracks</td><td><span class="status green">received</span></td><td>Low wet/rust signal</td><td>Visible consumables look serviceable in submitted media.</td></tr>
+            <tr><td>Engine bay / cold start</td><td><span class="status red">missing</span></td><td>No evidence</td><td>FarmFax increases uncertainty instead of guessing.</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="limitations">
+        <h2>What this report will not claim</h2>
+        <p>FarmFax is a screening aid. It is not a certified mechanic inspection, title/lien/theft search, appraisal, safety certification, warranty, repair estimate, or full-video inspection.</p>
+        <ul>
+          <li>Unknowns stay unknown.</li>
+          <li>Missing views increase risk.</li>
+          <li>Every finding should be verified by seller records, a mechanic, dealer records, or in-person inspection before payment.</li>
+        </ul>
+      </section>
+
+      <section>
+        <h2>Open record</h2>
+        <p>This report is designed to export as JSON/PDF so the buyer can keep it, share it with a mechanic, attach it to a deal folder, or carry it into resale. Paid hosting can make sharing easier, but it should not own the underlying equipment record.</p>
+        <div class="footer-actions">
+          <a class="button" href="./">Open live demo</a>
+          <a class="button secondary" href="./farmfax-video-fixture.mp4">View sample video asset</a>
+          <a class="button secondary" href="./sample-photos/ATTRIBUTION.md">Media attribution</a>
+        </div>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

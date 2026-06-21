@@ -18,6 +18,7 @@ const requiredFiles = [
   'public/sample-photos/paint-body.jpg',
   'public/sample-photos/engine-bay.jpg',
   'public/sample-photos/ATTRIBUTION.md',
+  'public/sample-report.html',
   'src/App.tsx',
 ]
 const requiredSourceLabels = [
@@ -92,5 +93,11 @@ console.log('ok service worker has versioned network-first navigation caching')
 const dist = await readFile(new URL('dist/index.html', root), 'utf8')
 if (!dist.includes('/assets/')) throw new Error('dist/index.html does not reference Vite assets')
 console.log('ok dist index references built assets')
+
+const sampleReport = await readFile(new URL('public/sample-report.html', root), 'utf8')
+for (const snippet of ['FarmFax Sample Report', 'Evidence-linked findings', 'Hydraulic leak evidence', 'farmfax-video-fixture.mp4', 'What this report will not claim']) {
+  if (!sampleReport.includes(snippet)) throw new Error(`sample report missing ${snippet}`)
+}
+console.log('ok standalone sample report has evidence-linked photo/video reasoning')
 
 console.log('FarmFax demo verification passed')
