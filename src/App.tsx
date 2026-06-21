@@ -1193,6 +1193,20 @@ function App() {
           <article data-qa="judge-proof-item"><b>Hermes orchestration seam</b><p>Capture → evidence check → report → export / hosted link is the planned route.</p></article>
           <article data-qa="judge-proof-item"><b>Honest sponsor labels</b><p>Nemotron reasoning is planned, Stripe checkout is simulated, and unsupported claims are listed in JSON.</p></article>
         </div>
+        <div className="defense-panel" data-qa="defense-panel">
+          <article>
+            <span>What FarmFax can verify today</span>
+            <p>Submitted photo slots, short-video frame samples, visible rust/wet/paint cues, missing evidence, buyer questions, JSON/PDF export, and phone-installable demo flow.</p>
+          </article>
+          <article>
+            <span>What FarmFax will not claim</span>
+            <p>No mechanic certification, title/lien/theft result, appraisal, repair estimate, warranty, safety certification, or full-video inspection.</p>
+          </article>
+          <article>
+            <span>Sample media disclosure</span>
+            <p>Bundled photos and video are authentic-looking demo media from Wikimedia sources. Real reports use the buyer or seller’s own phone evidence.</p>
+          </article>
+        </div>
         <div className="hero-actions">
           <button type="button" onClick={() => void runJudgeDemo()}>Run judge demo</button>
           <button className="ghost" type="button" onClick={() => void runCompleteSampleInspection()}>Load complete sample</button>
