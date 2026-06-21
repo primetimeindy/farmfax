@@ -178,6 +178,10 @@ function severityWeight(severity: Severity) {
   return -2
 }
 
+function cellLabel(kind: AnalysisCell['kind']) {
+  return kind === 'wet' ? 'leak?' : kind
+}
+
 function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)))
 }
@@ -499,6 +503,18 @@ function App() {
   const videoSourceCount = slots.filter((slot) => slot.mediaType === 'video').length
   const photoSourceCount = analyzedSlots.filter((slot) => slot.mediaType !== 'video').length
   const sampledFrameCount = slots.reduce((sum, slot) => sum + (slot.video?.frameCount ?? 0), 0)
+  const analysisSlot = useMemo(() => (
+    slots.find((slot) => slot.id === selectedFinding.evidence && slot.image && slot.analysis)
+    ?? slots.find((slot) => slot.image && slot.analysis && slot.state === 'review')
+    ?? slots.find((slot) => slot.image && slot.analysis)
+  ), [slots, selectedFinding.evidence])
+  const overlayCells = analysisSlot?.analysis?.cells.length
+    ? analysisSlot.analysis.cells.slice(0, 5)
+    : [
+        { x: 2, y: 3, kind: 'rust' as const },
+        { x: 5, y: 2, kind: 'paint' as const },
+        { x: 6, y: 4, kind: 'wet' as const },
+      ]
   const riskSummary = useMemo(() => buildRiskSummary(slots, findings, analyzedSlots.length, reportSeed), [slots, findings, analyzedSlots.length, reportSeed])
   const dealPosture = missing.some((slot) => slot.id === 'serial' || slot.id === 'hours')
     ? 'Do not send money yet'
@@ -1012,12 +1028,25 @@ function App() {
         <aside className="panel vision-panel">
           <div className="section-label">visible condition signals</div>
           <h2>What the submitted media suggests.</h2>
-          <div className="overlay-card">
-            <div className="tractor-silhouette">
-              <span className="hotspot rust">rust</span>
-              <span className="hotspot leak">leak?</span>
-              <span className="hotspot paint">paint</span>
-              <span className="hotspot tire">tread</span>
+          <div className="overlay-card" data-qa="real-photo-analysis">
+            <div className="photo-analysis-frame">
+              {analysisSlot?.image && (
+                <img data-qa="analysis-overlay-photo" src={analysisSlot.image} alt={`${analysisSlot.title} evidence with FarmFax analysis overlay`} />
+              )}
+              <div className="analysis-scrim" aria-hidden="true" />
+              {overlayCells.map((cell, index) => (
+                <span
+                  key={`${cell.kind}-${cell.x}-${cell.y}-${index}`}
+                  className={`analysis-box ${cell.kind}`}
+                  style={{ left: `${8 + cell.x * 11}%`, top: `${10 + cell.y * 10}%` }}
+                >
+                  {cellLabel(cell.kind)}
+                </span>
+              ))}
+              <div className="analysis-photo-caption">
+                <b>{analysisSlot?.title ?? 'Submitted media'}</b>
+                <span>{analysisSlot?.video ? `${analysisSlot.video.frameCount} sampled video frames` : 'real sample photo'} · {analysisSlot?.analysis?.confidence ?? 84}% confidence</span>
+              </div>
             </div>
           </div>
           <div className="finding-list">

@@ -32,6 +32,8 @@ const requiredSourceLabels = [
   'What FarmFax will not claim',
   'Sample media disclosure',
   'data-qa="defense-panel"',
+  'data-qa="real-photo-analysis"',
+  'data-qa="analysis-overlay-photo"',
   'data-qa="qr-share-block"',
   'data-qa="phone-install-card"',
   'sample-photos/',
