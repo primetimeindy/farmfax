@@ -1653,6 +1653,41 @@ function App() {
         </aside>
       </section>
 
+      <section className="judge-conversion-panel" data-qa="judge-conversion-panel">
+        <div className="trace-heading">
+          <span>30-second judge loop</span>
+          <p>Run the proof path, challenge the overclaim, then inspect the live API contract.</p>
+        </div>
+        <div className="judge-script-grid">
+          <article>
+            <span>00–10 sec</span>
+            <b>Click “Run judge demo”</b>
+            <p>Watch FarmFax load a risky tractor, score visible evidence, and surface what should slow the buyer down before deposit.</p>
+          </article>
+          <article>
+            <span>10–20 sec</span>
+            <b>Open the buyer report</b>
+            <p>Notice the seller questions, missing-proof list, JSON/PDF export, and the rule that unknowns stay unknown.</p>
+          </article>
+          <article>
+            <span>20–30 sec</span>
+            <b>Inspect the API contract</b>
+            <p>Use the Render-backed docs/OpenAPI links to see capture sessions, report persistence, handoffs, and the truth-layer guard.</p>
+          </article>
+        </div>
+        <div className="submission-link-grid" data-qa="submission-links">
+          <a href="https://primetimeindy.github.io/farmfax-demo/?v=renderapi-readonly#report" target="_blank" rel="noreferrer">Live demo</a>
+          <a href={`${FARMFAX_API_URL}/docs`} target="_blank" rel="noreferrer">API docs</a>
+          <a href={`${FARMFAX_API_URL}/api/openapi.json`} target="_blank" rel="noreferrer">OpenAPI JSON</a>
+          <a href="https://github.com/primetimeindy/farmfax" target="_blank" rel="noreferrer">GitHub repo</a>
+        </div>
+        <div className="truth-layer-callout" data-qa="truth-layer-callout">
+          <b>Truth-layer challenge</b>
+          <p>FarmFax does not certify equipment. It creates buyer-owned evidence packets and flags missing proof before deposit.</p>
+          <small>Loop: capture evidence → challenge overclaims → export/share the record → hand off to seller or mechanic.</small>
+        </div>
+      </section>
+
       <section className="judge-proof-panel" data-qa="judge-proof-panel">
         <div className="trace-heading">
           <span>Judge proof</span>
