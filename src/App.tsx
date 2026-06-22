@@ -152,6 +152,8 @@ type FarmFaxReport = {
     'nemotron_reasoning_layer: planned': boolean
     challenge: string
   }
+  mechanic_handoff_summary: string[]
+  before_deposit_checklist: Array<{ label: string; status: 'done' | 'needs-proof' | 'review'; action: string }>
   risk_summary: RiskCard[]
   buyer_questions: string[]
   missing_evidence: string[]
@@ -653,6 +655,8 @@ function App() {
     engine: 0,
   })
   const [mediaErrors, setMediaErrors] = useState<Partial<Record<SlotId, string>>>({})
+  const [jsonPreviewOpen, setJsonPreviewOpen] = useState(false)
+  const [copyStatus, setCopyStatus] = useState('')
 
   const acceptedCount = slots.filter((slot) => slot.state === 'accepted').length
   const reviewCount = slots.filter((slot) => slot.state === 'review').length
@@ -729,6 +733,19 @@ function App() {
       : riskSummary.some((risk) => risk.severity === 'yellow')
         ? 'The packet is usable, but ask for the missing or cleaner photos before you rely on the listing.'
         : 'Photos look complete enough for a seller call. Still match serial paperwork and service records before paying.'
+  const mechanicHandoffSummary = useMemo(() => [
+    `${reportSeed.makeModelGuess.make} ${reportSeed.makeModelGuess.model} · ${reportSeed.hourMeter == null ? 'hour meter unknown' : `${reportSeed.hourMeter.toLocaleString()} hrs`} · serial/PIN ${reportSeed.serialNumber}`,
+    `Top buyer concern: ${highestRiskFinding.category} — ${highestRiskFinding.finding}`,
+    moduleRiskSummary[0] ? `Detector follow-up: ${moduleRiskSummary[0].action}` : 'Detector follow-up: no module risk above green in supplied media.',
+    `Missing proof: ${missing.length ? missing.map((slot) => slot.title).join(', ') : 'none in required checklist'}`,
+    'Trust challenge: export is useful only if a buyer can hand it to the seller or mechanic.',
+  ], [highestRiskFinding.category, highestRiskFinding.finding, missing, moduleRiskSummary, reportSeed.hourMeter, reportSeed.makeModelGuess.make, reportSeed.makeModelGuess.model, reportSeed.serialNumber])
+  const beforeDepositChecklist = useMemo(() => [
+    { label: 'Match serial/PIN to paperwork', status: missing.some((slot) => slot.id === 'serial') ? 'needs-proof' as const : 'done' as const, action: missing.some((slot) => slot.id === 'serial') ? 'Get a straight-on serial plate photo before deposit.' : 'Compare serial/PIN against bill of sale and lien/title records.' },
+    { label: 'Verify hour meter against wear', status: missing.some((slot) => slot.id === 'hours') ? 'needs-proof' as const : 'review' as const, action: missing.some((slot) => slot.id === 'hours') ? 'Get hour meter photo before scheduling pickup.' : 'Ask mechanic to compare hour reading with pedals, tires/tracks, pins, and seat wear.' },
+    { label: 'Resolve detector module flags', status: moduleRiskSummary.length ? 'review' as const : 'done' as const, action: moduleRiskSummary[0]?.action ?? 'No detector module requires extra proof before the seller call.' },
+    { label: 'Send seller questions', status: detectorQuestions.length ? 'review' as const : 'done' as const, action: detectorQuestions.length ? 'Copy generated questions and require answers/photos before sending money.' : 'Use baseline seller questions before inspection.' },
+  ], [detectorQuestions.length, missing, moduleRiskSummary])
   const conditionScore = useMemo(() => {
     const penalty = findings.reduce((sum, finding) => sum + severityWeight(finding.severity), 0) + missing.length * 5
     return Math.round(Math.max(0, Math.min(100, reportSeed.conditionScore - penalty * 0.15 + acceptedCount)))
@@ -791,12 +808,14 @@ function App() {
       'nemotron_reasoning_layer: planned': true,
       challenge: 'Detector module outputs are exported as buyer decision support, not as mechanical certification.',
     },
+    mechanic_handoff_summary: mechanicHandoffSummary,
+    before_deposit_checklist: beforeDepositChecklist,
     risk_summary: riskSummary,
     buyer_questions: [...reportSeed.buyerQuestions, ...detectorQuestions],
     missing_evidence: missing.map((slot) => slot.title),
     open_record_commitment: reportSeed.openRecordCommitment,
     integration_stack: architectureStack.map((item) => item.name),
-  }), [acceptedCount, analyzedSlots, conditionScore, detectorModuleExports, detectorQuestions, findings, missing, moduleRiskSummary, photoSourceCount, reportSeed, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, videoSourceCount])
+  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, conditionScore, detectorModuleExports, detectorQuestions, findings, mechanicHandoffSummary, missing, moduleRiskSummary, photoSourceCount, reportSeed, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, videoSourceCount])
 
   const openRecordPreview = useMemo(() => ({
     schema: report.schema_version,
@@ -816,6 +835,8 @@ function App() {
     module_risk_summary: report.module_risk_summary,
     seller_questions_from_detectors: report.seller_questions_from_detectors,
     proof_intelligence: report.proof_intelligence,
+    mechanic_handoff_summary: report.mechanic_handoff_summary,
+    before_deposit_checklist: report.before_deposit_checklist,
     risk_summary: report.risk_summary.map((risk) => ({ id: risk.id, score: risk.score, level: risk.level, action: risk.buyerAction })),
     portability: 'Core record exports as JSON/PDF; paid hosting does not own the equipment history.',
   }), [report, reportSeed.hourMeter, slots])
@@ -1063,6 +1084,17 @@ function App() {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
+  }
+
+  async function copySellerQuestions() {
+    const text = report.buyer_questions.map((question, index) => `${index + 1}. ${question}`).join('\n')
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopyStatus('seller questions copied')
+    } catch {
+      setCopyStatus('copy blocked — select questions from JSON preview')
+    }
+    window.setTimeout(() => setCopyStatus(''), 2400)
   }
 
   return (
@@ -1436,6 +1468,34 @@ function App() {
             <small>trained_cv_models: planned · nemotron_reasoning_layer: planned</small>
           </article>
         </div>
+      </section>
+
+      <section className="report-trust-loop" data-qa="report-trust-loop">
+        <div>
+          <span className="section-label">Report trust loop</span>
+          <h2>Make the export usable by the next human.</h2>
+          <p>Trust challenge: export is useful only if a buyer can hand it to the seller or mechanic. So the report now has a JSON preview, copy seller questions, mechanic_handoff_summary, and before_deposit_checklist.</p>
+          <div className="trust-actions">
+            <button type="button" onClick={() => setJsonPreviewOpen((open) => !open)}>{jsonPreviewOpen ? 'Close JSON preview' : 'Open JSON preview'}</button>
+            <button className="ghost" type="button" onClick={() => void copySellerQuestions()}>copy seller questions</button>
+            {copyStatus && <small>{copyStatus}</small>}
+          </div>
+        </div>
+        <div className="trust-grid">
+          <article>
+            <span>mechanic_handoff_summary</span>
+            {report.mechanic_handoff_summary.map((item) => <small key={item}>{item}</small>)}
+          </article>
+          <article>
+            <span>before_deposit_checklist</span>
+            {report.before_deposit_checklist.map((item) => (
+              <small key={item.label}><b>{item.status}</b> · {item.label}: {item.action}</small>
+            ))}
+          </article>
+        </div>
+        {jsonPreviewOpen && (
+          <pre className="json-preview-drawer" data-qa="json-preview-drawer">{JSON.stringify(openRecordPreview, null, 2)}</pre>
+        )}
       </section>
 
       <section className="packet-layout" id="catalog">
