@@ -9,5 +9,7 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: HOST
+        value: 0.0.0.0
       - key: FARMFAX_ALLOWED_ORIGIN
         value: https://primetimeindy.github.io
