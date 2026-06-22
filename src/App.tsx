@@ -4,6 +4,8 @@ import { createScenarioState, farmFaxScenarios, scenarioReducer } from './farmfa
 import type { ScenarioId, ScenarioReportSeed } from './farmfax/scenarios'
 import './App.css'
 
+const FARMFAX_API_URL = import.meta.env.VITE_FARMFAX_API_URL || 'http://127.0.0.1:8787'
+
 type CaptureState = 'accepted' | 'review' | 'missing'
 type Severity = 'green' | 'yellow' | 'red'
 type SlotId = 'walkaround' | 'serial' | 'hours' | 'hydraulics' | 'tires' | 'paint' | 'engine'
@@ -1639,6 +1641,13 @@ function App() {
           <div className="phone-install-card" data-qa="phone-install-card">
             <b>Install as phone app</b>
             <p>iPhone: open in Safari → Share → Add to Home Screen. Android: open in Chrome → Install app / Add to Home screen.</p>
+          </div>
+          <div className="live-api-contract" data-qa="live-api-contract">
+            <span>Live API contract</span>
+            <b>OpenAPI 3.1 backend seam</b>
+            <p>Judges can inspect the backend docs, report/session API, and truth-layer guard. Configure the deployed host with VITE_FARMFAX_API_URL.</p>
+            <a href={`${FARMFAX_API_URL}/docs`} target="_blank" rel="noreferrer">API docs</a>
+            <a href={`${FARMFAX_API_URL}/api/openapi.json`} target="_blank" rel="noreferrer">OpenAPI JSON</a>
           </div>
           <button onClick={() => setStripeOpen(true)}>Save hosted report</button>
         </aside>

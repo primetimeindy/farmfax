@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: farmfax-api
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm run backend:dev
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FARMFAX_ALLOWED_ORIGIN
+        value: https://primetimeindy.github.io

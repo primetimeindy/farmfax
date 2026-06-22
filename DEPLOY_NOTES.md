@@ -138,7 +138,39 @@ Implemented backend endpoints:
 - `POST /api/reports` — validates and persists a report to local JSON storage.
 - `GET /api/reports/:id` — retrieves a stored hosted-report payload and summary.
 
-The backend preserves the frontend report shape and is ready to become the hosted-report/API seam. Future production backend work can add:
+The backend preserves the frontend report shape and is ready to become the hosted-report/API seam.
+
+## Public backend deploy path
+
+The repo includes deployment manifests for the three fastest Node API hosts:
+
+- `render.yaml` — Render Blueprint web service.
+- `railway.json` — Railway Nixpacks service.
+- `Dockerfile` + `fly.toml` — Fly.io container deployment.
+
+All use the same process:
+
+```bash
+npm run backend:dev
+```
+
+Required public checks after deployment:
+
+```bash
+curl https://<api-host>/health
+curl https://<api-host>/api/openapi.json
+open https://<api-host>/docs
+```
+
+Then build the static demo with the public API URL so judges see the live contract card:
+
+```bash
+VITE_FARMFAX_API_URL=https://<api-host> npm run build
+```
+
+The frontend falls back to `http://127.0.0.1:8787` for local judge review when `VITE_FARMFAX_API_URL` is not set.
+
+Future production backend work can add:
 
 - OCR for serial/PIN plate and hour meter.
 - NVIDIA-accelerated CV for rust, leaks, paint mismatch, wear, weld repairs, missing guards, and deformation.

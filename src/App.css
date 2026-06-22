@@ -334,6 +334,11 @@ h3 { margin:0 0 8px; }
 .phone-install-card { margin: 12px 0 14px; border:1px solid rgba(156,255,125,.22); border-radius:12px; padding:12px; background:rgba(156,255,125,.055); }
 .phone-install-card b { display:block; color:var(--green); margin-bottom:6px; }
 .phone-install-card p { margin:0; color:#d7e4d1; font-size:.88rem; line-height:1.38; }
+.live-api-contract { display:grid; gap:8px; margin: 12px 0 14px; border:1px solid rgba(125,245,255,.24); border-radius:14px; padding:13px; background:linear-gradient(180deg, rgba(125,245,255,.08), rgba(255,255,255,.035)); }
+.live-api-contract span { color:#a7f7ff; text-transform:uppercase; letter-spacing:.12em; font-weight:900; font-size:.72rem; }
+.live-api-contract b { color:var(--ink); }
+.live-api-contract p { margin:0; color:#d7e4d1; font-size:.86rem; line-height:1.4; }
+.live-api-contract a { color:#bffcff; font-weight:900; text-decoration:none; border:1px solid rgba(125,245,255,.2); border-radius:999px; padding:7px 10px; width:max-content; background:rgba(0,0,0,.18); }
 .judge-proof-panel { margin-top:14px; border:1px solid rgba(183,247,122,.24); border-radius:24px; padding:17px; background:linear-gradient(145deg, rgba(16,24,20,.92), rgba(3,8,5,.94)); box-shadow:var(--shadow); }
 .judge-proof-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
 .judge-proof-grid article { border:1px solid rgba(255,255,255,.10); border-radius:16px; padding:12px; background:rgba(0,0,0,.24); }
