@@ -105,6 +105,12 @@ type RiskCard = {
   factors: RiskFactor[]
 }
 
+type DetectorModuleExport = DetectorModuleResult & {
+  slot: SlotId
+  slotTitle: string
+  risk: 'green' | 'yellow' | 'red'
+}
+
 type FarmFaxReport = {
   report_id: string
   schema_version: string
@@ -127,13 +133,25 @@ type FarmFaxReport = {
   demo_truth: {
     browser_photo_checks: 'implemented'
     browser_video_frame_sampling: 'implemented'
+    browser_detector_modules: 'implemented'
+    trained_cv_models: 'planned'
     hermes_orchestration: 'planned'
+    nemotron_reasoning_layer: 'planned'
     nemotron_reasoning: 'planned'
     stripe_checkout: 'simulated'
     unsupported_claims: string[]
   }
   findings: Finding[]
   visual_analysis: Array<{ slot: SlotId; source: 'photo' | 'video_frame'; rustPct: number; wetPct: number; paintVariance: number; confidence: number; summary: string; frameCount?: number; worstFrameTime?: number }>
+  detector_modules: DetectorModuleExport[]
+  module_risk_summary: Array<{ module: string; score: number; risk: 'green' | 'yellow' | 'red'; action: string }>
+  seller_questions_from_detectors: string[]
+  proof_intelligence: {
+    'browser_detector_modules: implemented': boolean
+    'trained_cv_models: planned': boolean
+    'nemotron_reasoning_layer: planned': boolean
+    challenge: string
+  }
   risk_summary: RiskCard[]
   buyer_questions: string[]
   missing_evidence: string[]
@@ -248,6 +266,31 @@ function modulesForAnalysis(analysis: ImageAnalysis): DetectorModuleResult[] {
     { name: 'Color-cluster repaint module', score: colorClusterScore, output: `${analysis.paintVariance}/100 hue variance`, challenge: 'Detects color discontinuity; lighting/shadows can still create false positives.' },
     { name: 'Safety checklist module', score: safetyChecklistScore, output: `${safetyChecklistScore}% visible guard/cover coverage proxy`, challenge: 'Equipment-specific component templates are required before certification.' },
   ]
+}
+
+function detectorRisk(module: DetectorModuleResult): DetectorModuleExport['risk'] {
+  if (module.name.includes('Wet-mask') && module.score >= 18) return 'red'
+  if (module.name.includes('Color-cluster') && module.score >= 35) return 'yellow'
+  if (module.name.includes('OCR') && module.score < 72) return 'red'
+  if (module.name.includes('Safety') && module.score < 64) return 'yellow'
+  if (module.name.includes('Edge') && module.score < 32) return 'yellow'
+  return 'green'
+}
+
+function detectorAction(module: DetectorModuleResult, risk: DetectorModuleExport['risk']) {
+  if (module.name.includes('OCR')) return risk === 'green' ? 'Serial/hour proof is exportable; still ask seller to confirm plate text.' : 'Ask seller for a closer serial/hour-meter photo before trusting identity or hours.'
+  if (module.name.includes('Wet-mask')) return risk === 'green' ? 'No strong wet-mask signal in supplied media.' : 'Ask seller for a wiped-clean hose/cylinder close-up and cold-start hydraulic cycle video.'
+  if (module.name.includes('Color-cluster')) return risk === 'green' ? 'No major color-cluster anomaly in supplied view.' : 'Ask whether panels were repainted or repaired, with receipts if available.'
+  if (module.name.includes('Safety')) return risk === 'green' ? 'Visible guard/cover proof is acceptable for buyer review.' : 'Ask for engine-bay/guard photos before deposit.'
+  return risk === 'green' ? 'Texture evidence is acceptable for buyer review.' : 'Ask for close tire/track tread photos at ground level.'
+}
+
+function questionFromDetector(item: DetectorModuleExport) {
+  if (item.name.includes('OCR')) return `Can you send one straight-on close-up of the serial/PIN plate and hour meter? FarmFax OCR readiness is ${item.score}%.`
+  if (item.name.includes('Wet-mask')) return `The hydraulic wet-mask module found ${item.output}. Can you send a wiped-clean cylinder/hoses video after cycling hydraulics?`
+  if (item.name.includes('Color-cluster')) return `FarmFax found ${item.output} on paint/body color clusters. Has any panel been repainted, welded, or repaired?`
+  if (item.name.includes('Safety')) return `Can you send engine-bay guard/cover photos? FarmFax safety coverage proxy is ${item.score}%.`
+  return `Can you send a closer tire/track tread photo? FarmFax texture score is ${item.score}%.`
 }
 
 function clampScore(value: number) {
@@ -645,20 +688,32 @@ function App() {
     const status = zoneSlots.some((slot) => slot.state === 'missing') ? 'missing' : zoneSlots.some((slot) => slot.state === 'review') ? 'review' : 'received'
     return { ...zone, status, count: zoneSlots.filter((slot) => slot.state !== 'missing').length, total: zoneSlots.length }
   })), [slots])
-  const sellerQuestionPreview = reportSeed.buyerQuestions.slice(0, 3)
+  const baseSellerQuestionPreview = reportSeed.buyerQuestions.slice(0, 3)
   const missingProofPreview = missing.slice(0, 3)
   const guideCopy = cameraGuideForSlot(cameraSlot)
   const specificDetectorSignals = useMemo(() => slots
     .flatMap((slot) => detectorSignalsForSlot(slot).map((signal) => ({ ...signal, slot })))
     .sort((a, b) => detectorPriority(b.status) - detectorPriority(a.status))
     .slice(0, 7), [slots])
-  const detectorModuleRollup = useMemo(() => slots
+  const detectorModuleExports = useMemo<DetectorModuleExport[]>(() => slots
     .flatMap((slot) => {
       const analysis = slot.analysis as ImageAnalysis | undefined
       if (!analysis) return []
-      return modulesForAnalysis(analysis).map((module: DetectorModuleResult) => ({ ...module, slotTitle: slot.title }))
-    })
-    .slice(0, 10), [slots])
+      return modulesForAnalysis(analysis).map((module) => {
+        const risk = detectorRisk(module)
+        return { ...module, slot: slot.id, slotTitle: slot.title, risk }
+      })
+    }), [slots])
+  const detectorModuleRollup = useMemo(() => detectorModuleExports.slice(0, 10), [detectorModuleExports])
+  const moduleRiskSummary = useMemo(() => detectorModuleExports
+    .filter((module) => module.risk !== 'green')
+    .slice(0, 6)
+    .map((module) => ({ module: module.name, score: module.score, risk: module.risk, action: detectorAction(module, module.risk) })), [detectorModuleExports])
+  const detectorQuestions = useMemo(() => detectorModuleExports
+    .filter((module) => module.risk !== 'green')
+    .slice(0, 5)
+    .map(questionFromDetector), [detectorModuleExports])
+  const sellerQuestionPreview = [...baseSellerQuestionPreview, ...detectorQuestions].slice(0, 3)
   const riskSummary = useMemo(() => buildRiskSummary(slots, findings, analyzedSlots.length, reportSeed), [slots, findings, analyzedSlots.length, reportSeed])
   const dealPosture = missing.some((slot) => slot.id === 'serial' || slot.id === 'hours')
     ? 'Do not send money yet'
@@ -701,7 +756,10 @@ function App() {
     demo_truth: {
       browser_photo_checks: 'implemented',
       browser_video_frame_sampling: 'implemented',
+      browser_detector_modules: 'implemented',
+      trained_cv_models: 'planned',
       hermes_orchestration: 'planned',
+      nemotron_reasoning_layer: 'planned',
       nemotron_reasoning: 'planned',
       stripe_checkout: 'simulated',
       unsupported_claims: [
@@ -724,12 +782,21 @@ function App() {
       frameCount: slot.video?.frameCount,
       worstFrameTime: slot.video?.posterTime,
     })),
+    detector_modules: detectorModuleExports,
+    module_risk_summary: moduleRiskSummary,
+    seller_questions_from_detectors: detectorQuestions,
+    proof_intelligence: {
+      'browser_detector_modules: implemented': true,
+      'trained_cv_models: planned': true,
+      'nemotron_reasoning_layer: planned': true,
+      challenge: 'Detector module outputs are exported as buyer decision support, not as mechanical certification.',
+    },
     risk_summary: riskSummary,
-    buyer_questions: reportSeed.buyerQuestions,
+    buyer_questions: [...reportSeed.buyerQuestions, ...detectorQuestions],
     missing_evidence: missing.map((slot) => slot.title),
     open_record_commitment: reportSeed.openRecordCommitment,
     integration_stack: architectureStack.map((item) => item.name),
-  }), [acceptedCount, analyzedSlots, conditionScore, findings, missing, photoSourceCount, reportSeed, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, videoSourceCount])
+  }), [acceptedCount, analyzedSlots, conditionScore, detectorModuleExports, detectorQuestions, findings, missing, moduleRiskSummary, photoSourceCount, reportSeed, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, videoSourceCount])
 
   const openRecordPreview = useMemo(() => ({
     schema: report.schema_version,
@@ -745,6 +812,10 @@ function App() {
       hour_meter: reportSeed.hourMeter ?? 'unknown',
     },
     evidence: report.visual_analysis.length ? report.visual_analysis.map((item) => ({ slot: item.slot, summary: item.summary, confidence: item.confidence })) : slots.map((slot) => ({ slot: slot.id, state: slot.state, has_image: Boolean(slot.image) })),
+    detector_modules: report.detector_modules.map((module) => ({ slot: module.slot, module: module.name, score: module.score, risk: module.risk, output: module.output })),
+    module_risk_summary: report.module_risk_summary,
+    seller_questions_from_detectors: report.seller_questions_from_detectors,
+    proof_intelligence: report.proof_intelligence,
     risk_summary: report.risk_summary.map((risk) => ({ id: risk.id, score: risk.score, level: risk.level, action: risk.buyerAction })),
     portability: 'Core record exports as JSON/PDF; paid hosting does not own the equipment history.',
   }), [report, reportSeed.hourMeter, slots])
@@ -1340,6 +1411,31 @@ function App() {
           </div>
           <button type="button" onClick={exportReport}>Download JSON report</button>
         </article>
+      </section>
+
+      <section className="report-intelligence-panel" data-qa="report-intelligence-panel">
+        <div>
+          <span className="section-label">Detector module intelligence in export</span>
+          <h2>Proof export now carries the detector reasoning.</h2>
+          <p>The JSON report includes detector_modules, module_risk_summary, seller_questions_from_detectors, and proof_intelligence. Challenge: browser modules are implemented now; trained CV models and the Nemotron reasoning layer remain planned.</p>
+        </div>
+        <div className="intel-grid">
+          <article>
+            <span>module_risk_summary</span>
+            <b>{moduleRiskSummary.length || 0} buyer flags</b>
+            <small>{moduleRiskSummary[0]?.action ?? 'No detector module requires immediate seller follow-up.'}</small>
+          </article>
+          <article>
+            <span>seller_questions_from_detectors</span>
+            <b>{detectorQuestions.length} generated asks</b>
+            <small>{detectorQuestions[0] ?? 'Detector output did not generate extra seller questions.'}</small>
+          </article>
+          <article>
+            <span>proof_intelligence</span>
+            <b>browser_detector_modules: implemented</b>
+            <small>trained_cv_models: planned · nemotron_reasoning_layer: planned</small>
+          </article>
+        </div>
       </section>
 
       <section className="packet-layout" id="catalog">
