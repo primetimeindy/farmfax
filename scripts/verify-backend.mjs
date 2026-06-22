@@ -55,6 +55,13 @@ async function requestJson(url, options = {}) {
   return body
 }
 
+async function requestText(url, options = {}) {
+  const response = await fetch(url, options)
+  const text = await response.text()
+  if (!response.ok) throw new Error(`${url} returned ${response.status}: ${text.slice(0, 200)}`)
+  return text
+}
+
 const child = spawn(process.execPath, [backendPath], {
   cwd: repoRoot,
   env: { ...process.env, FARMFAX_BACKEND_PORT: String(port), FARMFAX_DATA_DIR: dataDir },
@@ -80,6 +87,35 @@ try {
   }
   if (!healthy) throw new Error(`Backend did not become healthy. stdout=${stdout} stderr=${stderr}`)
 
+  const openapi = await requestJson(`${base}/api/openapi.json`)
+  if (openapi.openapi !== '3.1.0') throw new Error('OpenAPI version missing')
+  for (const route of ['/api/sessions', '/api/sessions/{session_id}/media', '/api/sessions/{session_id}/handoff', '/api/reports/{report_id}/share']) {
+    if (!openapi.paths?.[route]) throw new Error(`OpenAPI missing ${route}`)
+  }
+
+  const docs = await requestText(`${base}/docs`)
+  for (const needle of ['FarmFax API', 'POST /api/sessions', 'POST /api/reports', 'decision-support only']) {
+    if (!docs.includes(needle)) throw new Error(`Docs missing ${needle}`)
+  }
+
+  const session = await requestJson(`${base}/api/sessions`, {
+    method: 'POST',
+    body: JSON.stringify({ equipment_type: 'tractor', buyer_id: 'judge-demo', source: 'backend-verifier' }),
+  })
+  if (!session.session_id || session.status !== 'capture_started') throw new Error('Session create failed')
+
+  const media = await requestJson(`${base}/api/sessions/${session.session_id}/media`, {
+    method: 'POST',
+    body: JSON.stringify({ slot: 'serial-plate', media_type: 'photo', filename: 'serial.jpg', sha256: 'abc123', detector_outputs: [{ name: 'OCR readiness module', score: 82, risk: 'yellow' }] }),
+  })
+  if (media.media_count !== 1 || media.session.status !== 'capture_in_progress') throw new Error('Media attach failed')
+
+  const handoff = await requestJson(`${base}/api/sessions/${session.session_id}/handoff`, {
+    method: 'POST',
+    body: JSON.stringify({ recipient_type: 'mechanic', notes: ['Verify serial plate', 'Check hydraulic wetness'], report_id: sampleReport.report_id }),
+  })
+  if (!handoff.handoff_id || handoff.handoff.recipient_type !== 'mechanic') throw new Error('Handoff create failed')
+
   const analysis = await requestJson(`${base}/api/analyze`, {
     method: 'POST',
     body: JSON.stringify({ report: sampleReport }),
@@ -98,6 +134,17 @@ try {
   if (fetched.report.report_id !== sampleReport.report_id) throw new Error('Fetched report id mismatch')
   if (fetched.summary.counts.detector_modules !== 1) throw new Error('Fetched summary detector count mismatch')
 
+  const share = await requestJson(`${base}/api/reports/${sampleReport.report_id}/share`, {
+    method: 'POST',
+    body: JSON.stringify({ visibility: 'mechanic', expires_in_hours: 72 }),
+  })
+  if (!share.share_url || !share.share_url.includes(sampleReport.report_id)) throw new Error('Share URL missing report id')
+  if (share.share.visibility !== 'mechanic') throw new Error('Share visibility mismatch')
+
+  const fetchedSession = await requestJson(`${base}/api/sessions/${session.session_id}`)
+  if (fetchedSession.session.media.length !== 1) throw new Error('Fetched session media missing')
+  if (fetchedSession.session.handoffs.length !== 1) throw new Error('Fetched session handoff missing')
+
   const invalidResponse = await fetch(`${base}/api/reports`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
@@ -107,8 +154,14 @@ try {
 
   console.log('FarmFax backend verification passed')
   console.log(`ok health ${base}/health`)
+  console.log(`ok openapi ${base}/api/openapi.json`)
+  console.log(`ok docs ${base}/docs`)
+  console.log(`ok session ${session.session_id}`)
+  console.log(`ok media attach count=${media.media_count}`)
+  console.log(`ok handoff ${handoff.handoff_id}`)
   console.log(`ok analyze counts red=${analysis.analysis.counts.red_findings}`)
   console.log(`ok save ${saved.url}`)
+  console.log(`ok share ${share.share_url}`)
   console.log(`ok fetch ${fetched.report.report_id}`)
   console.log('ok invalid report rejected with 422')
 } finally {
