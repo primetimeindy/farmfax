@@ -503,6 +503,10 @@ function App() {
   const videoSourceCount = slots.filter((slot) => slot.mediaType === 'video').length
   const photoSourceCount = analyzedSlots.filter((slot) => slot.mediaType !== 'video').length
   const sampledFrameCount = slots.reduce((sum, slot) => sum + (slot.video?.frameCount ?? 0), 0)
+  const scanReadiness = Math.round(((acceptedCount + reviewCount * 0.55) / slots.length) * 100)
+  const highestRiskFinding = findings.find((finding) => finding.severity === 'red') ?? findings.find((finding) => finding.severity === 'yellow') ?? findings[0]
+  const scanMode = missing.length ? 'Evidence missing' : reviewCount ? 'Human review needed' : 'Ready for buyer report'
+  const scanFocus = highestRiskFinding ? slotTitle(slots, highestRiskFinding.evidence) : 'Walkaround'
   const analysisSlot = useMemo(() => (
     slots.find((slot) => slot.id === selectedFinding.evidence && slot.image && slot.analysis)
     ?? slots.find((slot) => slot.image && slot.analysis && slot.state === 'review')
@@ -963,6 +967,49 @@ function App() {
             {['tractor', 'skid steer', 'trailer', 'implement'].map((type) => (
               <button key={type} className={equipmentType === type ? 'active' : 'ghost'} disabled={type !== 'tractor'} onClick={() => type === 'tractor' && setEquipmentType(type)}>{type}{type !== 'tractor' ? ' soon' : ''}</button>
             ))}
+          </div>
+          <div className="scan-cockpit" data-qa="scan-cockpit">
+            <div className="scan-viewport">
+              {analysisSlot?.image && <img src={analysisSlot.image} alt="Live FarmFax scan evidence" />}
+              <div className="scan-gridlines" aria-hidden="true" />
+              <div className="scan-beam" aria-hidden="true" />
+              {overlayCells.map((cell, index) => (
+                <span
+                  className={`scan-tag ${cell.kind}`}
+                  key={`scan-${cell.kind}-${cell.x}-${cell.y}-${index}`}
+                  style={{ left: `${10 + cell.x * 10.5}%`, top: `${12 + cell.y * 9.5}%` }}
+                >
+                  {cellLabel(cell.kind)}
+                </span>
+              ))}
+              <div className="scan-hud-top"><span>LIVE MEDIA PASS</span><b>{scanMode}</b></div>
+              <div className="scan-hud-bottom"><span>focus</span><b>{scanFocus}</b></div>
+            </div>
+            <div className="scan-console">
+              <div>
+                <span className="section-label">Evidence quality</span>
+                <h3>{scanReadiness}% scan readiness</h3>
+                <div className="readiness-bar" data-qa="scan-readiness-meter" aria-label={`Scan readiness ${scanReadiness}%`}>
+                  <i style={{ width: `${scanReadiness}%` }} />
+                </div>
+              </div>
+              <div className="scan-stats">
+                <article><span>photos</span><b>{photoSourceCount}</b></article>
+                <article><span>videos</span><b>{videoSourceCount}</b></article>
+                <article><span>frames</span><b>{sampledFrameCount}</b></article>
+                <article><span>review</span><b>{reviewCount}</b></article>
+              </div>
+              <div className="defect-radar">
+                <span className="section-label">Defect radar</span>
+                {findings.map((finding) => (
+                  <button key={`radar-${finding.category}`} type="button" className={`radar-pill ${finding.severity}`} onClick={() => setSelectedFinding(finding)}>
+                    <b>{finding.category}</b>
+                    <small>{finding.confidence}% · {slotTitle(slots, finding.evidence)}</small>
+                  </button>
+                ))}
+              </div>
+              <p className="scan-disclaimer">High-tech does not mean magic: FarmFax flags visible evidence and missing proof. It does not certify hidden defects.</p>
+            </div>
           </div>
           <div className="capture-grid">
             {slots.map((slot) => (
