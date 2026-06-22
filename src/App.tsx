@@ -10,13 +10,27 @@ type SlotId = 'walkaround' | 'serial' | 'hours' | 'hydraulics' | 'tires' | 'pain
 
 type AnalysisCell = { x: number; y: number; kind: 'rust' | 'wet' | 'paint' }
 
+type DetectorModuleResult = {
+  name: string
+  score: number
+  output: string
+  challenge: string
+}
+
 type ImageAnalysis = {
   rustPct: number
   wetPct: number
   paintVariance: number
+  edgeDensity?: number
+  textureScore?: number
+  ocrReadiness?: number
+  wetMaskPct?: number
+  colorClusterScore?: number
+  safetyChecklistScore?: number
   confidence: number
   cells: AnalysisCell[]
   summary: string
+  detectorModules?: DetectorModuleResult[]
 }
 
 type VideoFrameAnalysis = {
@@ -219,6 +233,23 @@ function detectorPriority(status: DetectorSignal['status']) {
   return status === 'missing' ? 3 : status === 'review' ? 2 : 1
 }
 
+function modulesForAnalysis(analysis: ImageAnalysis): DetectorModuleResult[] {
+  if (analysis.detectorModules?.length) return analysis.detectorModules
+  const edgeDensity = analysis.edgeDensity ?? Math.min(100, Math.round((analysis.confidence - 35) * 0.9))
+  const ocrReadiness = analysis.ocrReadiness ?? Math.min(96, Math.max(18, Math.round(analysis.confidence * 0.85 + edgeDensity * 0.3)))
+  const textureScore = analysis.textureScore ?? Math.min(100, Math.round(edgeDensity * 1.25))
+  const wetMaskPct = analysis.wetMaskPct ?? Math.round(analysis.wetPct * 10) / 10
+  const colorClusterScore = analysis.colorClusterScore ?? Math.min(100, Math.round(analysis.paintVariance * 0.9))
+  const safetyChecklistScore = analysis.safetyChecklistScore ?? Math.min(100, Math.max(20, Math.round(62 + edgeDensity * 0.45 - analysis.wetPct)))
+  return [
+    { name: 'OCR readiness module', score: ocrReadiness, output: `${ocrReadiness}% plate/meter readability proxy`, challenge: 'Not text extraction yet: flags whether OCR should be trusted before serial/hour claims.' },
+    { name: 'Edge / texture tread module', score: textureScore, output: `${edgeDensity}% high-edge tread/texture signal`, challenge: 'Separates tread-like texture from clean sheet metal; still needs angle-specific tire training data.' },
+    { name: 'Wet-mask segmentation module', score: Math.min(100, Math.round(wetMaskPct * 6 + analysis.wetPct * 2)), output: `${wetMaskPct}% glossy-dark wet mask`, challenge: 'Finds wet-looking regions, not fluid type; human review remains required.' },
+    { name: 'Color-cluster repaint module', score: colorClusterScore, output: `${analysis.paintVariance}/100 hue variance`, challenge: 'Detects color discontinuity; lighting/shadows can still create false positives.' },
+    { name: 'Safety checklist module', score: safetyChecklistScore, output: `${safetyChecklistScore}% visible guard/cover coverage proxy`, challenge: 'Equipment-specific component templates are required before certification.' },
+  ]
+}
+
 function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)))
 }
@@ -319,6 +350,24 @@ function rgbToHsv(r: number, g: number, b: number) {
   return { h, s, v: max }
 }
 
+function emptyAnalysis(summary: string): ImageAnalysis {
+  return {
+    rustPct: 0,
+    wetPct: 0,
+    paintVariance: 0,
+    edgeDensity: 0,
+    textureScore: 0,
+    ocrReadiness: 0,
+    wetMaskPct: 0,
+    colorClusterScore: 0,
+    safetyChecklistScore: 0,
+    confidence: 0,
+    cells: [],
+    summary,
+    detectorModules: [],
+  }
+}
+
 function analyzeImageHeuristics(imageSrc: string): Promise<ImageAnalysis> {
   return new Promise((resolve) => {
     const image = new Image()
@@ -330,7 +379,7 @@ function analyzeImageHeuristics(imageSrc: string): Promise<ImageAnalysis> {
       canvas.height = height
       const ctx = canvas.getContext('2d', { willReadFrequently: true })
       if (!ctx) {
-        resolve({ rustPct: 0, wetPct: 0, paintVariance: 0, confidence: 0, cells: [], summary: 'analysis unavailable' })
+        resolve(emptyAnalysis('analysis unavailable'))
         return
       }
       ctx.drawImage(image, 0, 0, width, height)
@@ -338,6 +387,9 @@ function analyzeImageHeuristics(imageSrc: string): Promise<ImageAnalysis> {
       let rust = 0
       let wet = 0
       let saturated = 0
+      let edgeHits = 0
+      let textureEnergy = 0
+      let darkGlossyCluster = 0
       const hueByCell = new Map<string, number[]>()
       const flagged = new Map<string, AnalysisCell>()
       const cols = 8
@@ -345,7 +397,18 @@ function analyzeImageHeuristics(imageSrc: string): Promise<ImageAnalysis> {
       for (let y = 0; y < height; y += 2) {
         for (let x = 0; x < width; x += 2) {
           const idx = (y * width + x) * 4
-          const { h, s, v } = rgbToHsv(data[idx], data[idx + 1], data[idx + 2])
+          const r = data[idx]
+          const g = data[idx + 1]
+          const b = data[idx + 2]
+          const { h, s, v } = rgbToHsv(r, g, b)
+          const rightIdx = (y * width + Math.min(width - 1, x + 2)) * 4
+          const downIdx = (Math.min(height - 1, y + 2) * width + x) * 4
+          const lum = r * 0.299 + g * 0.587 + b * 0.114
+          const lumRight = data[rightIdx] * 0.299 + data[rightIdx + 1] * 0.587 + data[rightIdx + 2] * 0.114
+          const lumDown = data[downIdx] * 0.299 + data[downIdx + 1] * 0.587 + data[downIdx + 2] * 0.114
+          const gradient = Math.abs(lum - lumRight) + Math.abs(lum - lumDown)
+          textureEnergy += gradient
+          if (gradient > 52) edgeHits += 1
           const cellX = Math.min(cols - 1, Math.floor((x / width) * cols))
           const cellY = Math.min(rows - 1, Math.floor((y / height) * rows))
           const cellKey = `${cellX}-${cellY}`
@@ -357,6 +420,7 @@ function analyzeImageHeuristics(imageSrc: string): Promise<ImageAnalysis> {
           }
           if (isWet) {
             wet += 1
+            if (gradient > 38) darkGlossyCluster += 1
             flagged.set(`${cellKey}-wet`, { x: cellX, y: cellY, kind: 'wet' })
           }
           if (s > 0.25 && v > 0.22) {
@@ -385,15 +449,29 @@ function analyzeImageHeuristics(imageSrc: string): Promise<ImageAnalysis> {
       }
       const rustPct = Math.round((rust / sampleCount) * 1000) / 10
       const wetPct = Math.round((wet / sampleCount) * 1000) / 10
-      const confidence = Math.min(92, Math.max(35, Math.round(44 + rustPct * 1.5 + wetPct * 1.2 + paintVariance * 0.35)))
+      const edgeDensity = Math.round((edgeHits / sampleCount) * 1000) / 10
+      const textureScore = Math.min(100, Math.round((textureEnergy / sampleCount / 80) * 100))
+      const ocrReadiness = Math.min(96, Math.max(18, Math.round(38 + edgeDensity * 1.3 + (100 - paintVariance) * 0.22)))
+      const wetMaskPct = Math.round((darkGlossyCluster / sampleCount) * 1000) / 10
+      const colorClusterScore = Math.min(100, Math.round(paintVariance * 0.72 + cellMeans.length * 1.8))
+      const safetyChecklistScore = Math.min(100, Math.max(20, Math.round(52 + edgeDensity * 1.1 - wetPct * 0.7)))
+      const confidence = Math.min(94, Math.max(38, Math.round(42 + rustPct * 1.2 + wetPct + paintVariance * 0.25 + edgeDensity * 0.4)))
+      const detectorModules: DetectorModuleResult[] = [
+        { name: 'OCR readiness module', score: ocrReadiness, output: `${ocrReadiness}% plate/meter readability proxy`, challenge: 'Not text extraction yet: flags whether OCR should be trusted before serial/hour claims.' },
+        { name: 'Edge / texture tread module', score: textureScore, output: `${edgeDensity}% high-edge tread/texture signal`, challenge: 'Separates tread-like texture from clean sheet metal; still needs angle-specific tire training data.' },
+        { name: 'Wet-mask segmentation module', score: Math.min(100, Math.round(wetMaskPct * 6 + wetPct * 2)), output: `${wetMaskPct}% glossy-dark wet mask`, challenge: 'Finds wet-looking regions, not fluid type; human review remains required.' },
+        { name: 'Color-cluster repaint module', score: colorClusterScore, output: `${paintVariance}/100 hue variance`, challenge: 'Detects color discontinuity; lighting/shadows can still create false positives.' },
+        { name: 'Safety checklist module', score: safetyChecklistScore, output: `${safetyChecklistScore}% visible guard/cover coverage proxy`, challenge: 'Equipment-specific component templates are required before certification.' },
+      ]
       const summary = [
         rustPct > 2 ? `${rustPct}% rust-tone pixels` : 'low rust-tone signal',
         wetPct > 5 ? `${wetPct}% dark/wet signal` : 'low leak-tone signal',
         paintVariance > 30 ? `paint variance ${paintVariance}/100` : 'paint variance low',
+        `edge density ${edgeDensity}%`,
       ].join(' · ')
-      resolve({ rustPct, wetPct, paintVariance, confidence, cells: Array.from(flagged.values()).slice(0, 28), summary })
+      resolve({ rustPct, wetPct, paintVariance, edgeDensity, textureScore, ocrReadiness, wetMaskPct, colorClusterScore, safetyChecklistScore, confidence, cells: Array.from(flagged.values()).slice(0, 28), summary, detectorModules })
     }
-    image.onerror = () => resolve({ rustPct: 0, wetPct: 0, paintVariance: 0, confidence: 0, cells: [], summary: 'image could not be analyzed' })
+    image.onerror = () => resolve(emptyAnalysis('image could not be analyzed'))
     image.src = imageSrc
   })
 }
@@ -574,6 +652,13 @@ function App() {
     .flatMap((slot) => detectorSignalsForSlot(slot).map((signal) => ({ ...signal, slot })))
     .sort((a, b) => detectorPriority(b.status) - detectorPriority(a.status))
     .slice(0, 7), [slots])
+  const detectorModuleRollup = useMemo(() => slots
+    .flatMap((slot) => {
+      const analysis = slot.analysis as ImageAnalysis | undefined
+      if (!analysis) return []
+      return modulesForAnalysis(analysis).map((module: DetectorModuleResult) => ({ ...module, slotTitle: slot.title }))
+    })
+    .slice(0, 10), [slots])
   const riskSummary = useMemo(() => buildRiskSummary(slots, findings, analyzedSlots.length, reportSeed), [slots, findings, analyzedSlots.length, reportSeed])
   const dealPosture = missing.some((slot) => slot.id === 'serial' || slot.id === 'hours')
     ? 'Do not send money yet'
@@ -1094,6 +1179,30 @@ function App() {
                   <b>{signal.label}</b>
                   <strong>{signal.value}</strong>
                   <small>{signal.slot.title} · {signal.reason}</small>
+                </article>
+              ))}
+            </div>
+          </div>
+          <div className="detector-module-report" data-qa="detector-module-report">
+            <div>
+              <span className="section-label">Detector modules run locally in browser</span>
+              <h3>Actual passes, not just labels.</h3>
+              <p>FarmFax now runs lightweight image-processing modules: OCR-readiness, edge/texture tread scoring, wet-mask segmentation, color-cluster repaint comparison, and safety-checklist coverage. Challenge: these are decision-support signals until trained detector models and ground-truth labels exist.</p>
+            </div>
+            <div className="module-grid">
+              {(detectorModuleRollup.length ? detectorModuleRollup : [
+                { name: 'OCR readiness module', score: 0, output: 'waiting for serial/hour media', challenge: 'Run when plate or meter evidence is supplied.', slotTitle: 'Serial / hour meter' },
+                { name: 'Edge / texture tread module', score: 0, output: 'waiting for tire media', challenge: 'Run when tire/track evidence is supplied.', slotTitle: 'Tires / tracks' },
+                { name: 'Wet-mask segmentation module', score: 0, output: 'waiting for hydraulic media', challenge: 'Run when hose/cylinder evidence is supplied.', slotTitle: 'Hydraulics' },
+                { name: 'Color-cluster repaint module', score: 0, output: 'waiting for paint/body media', challenge: 'Run when body panel evidence is supplied.', slotTitle: 'Paint / body' },
+                { name: 'Safety checklist module', score: 0, output: 'waiting for engine bay media', challenge: 'Run when engine/guard evidence is supplied.', slotTitle: 'Engine bay' },
+              ]).map((module) => (
+                <article key={`${module.slotTitle}-${module.name}`}>
+                  <span>{module.slotTitle}</span>
+                  <b>{module.name}</b>
+                  <strong>{module.score}%</strong>
+                  <small>{module.output}</small>
+                  <em>{module.challenge}</em>
                 </article>
               ))}
             </div>

@@ -164,6 +164,16 @@ h3 { margin:0 0 8px; }
 .slot-detector-chips span { display:block; border:1px solid rgba(255,255,255,.10); border-radius:999px; padding:6px 8px; color:#d7e4d1; background:rgba(255,255,255,.035); font:900 .62rem/1.15 ui-monospace, monospace; text-transform:uppercase; letter-spacing:.035em; }
 .slot-detector-chips span.review { color:#ffe3aa; border-color:rgba(255,202,103,.30); background:rgba(255,202,103,.06); }
 .slot-detector-chips span.missing { color:#ffd0c9; border-color:rgba(255,107,98,.30); background:rgba(255,107,98,.06); }
+.detector-module-report { margin:12px 0 16px; border:1px solid rgba(127,180,255,.22); border-radius:20px; padding:12px; background:linear-gradient(145deg, rgba(127,180,255,.07), rgba(0,0,0,.20)); }
+.detector-module-report h3 { margin:6px 0 8px; }
+.detector-module-report p { margin:0 0 12px; color:var(--muted); }
+.module-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:9px; }
+.module-grid article { border:1px solid rgba(255,255,255,.10); border-radius:15px; padding:10px; background:rgba(5,12,24,.72); }
+.module-grid article span { color:#9cc4ff; font:1000 .6rem/1 ui-monospace, monospace; letter-spacing:.10em; text-transform:uppercase; }
+.module-grid article b { display:block; margin:8px 0 6px; line-height:1.08; }
+.module-grid article strong { display:block; color:var(--green); font-size:1.28rem; line-height:1; }
+.module-grid article small { display:block; margin-top:7px; color:#d7e4d1; font-weight:850; }
+.module-grid article em { display:block; margin-top:7px; color:var(--muted); font-style:normal; font-size:.74rem; line-height:1.28; }
 .post-scan-decision { margin-top:14px; display:grid; grid-template-columns:minmax(0,1fr) minmax(360px,.78fr); gap:14px; }
 .decision-card, .report-preview-card { border:1px solid rgba(156,255,125,.18); border-radius:24px; padding:20px; background:linear-gradient(145deg, rgba(13,20,16,.96), rgba(2,6,4,.96)); box-shadow:var(--shadow); }
 .decision-card { background:radial-gradient(circle at 10% 0%, rgba(255,191,78,.16), transparent 38%), linear-gradient(145deg, rgba(20,23,14,.96), rgba(4,6,3,.96)); }
