@@ -34,6 +34,13 @@ type VideoAnalysis = {
   summary: string
 }
 
+type DetectorSignal = {
+  label: string
+  value: string
+  status: 'good' | 'review' | 'missing'
+  reason: string
+}
+
 type CaptureSlot = {
   id: SlotId
   title: string
@@ -190,6 +197,26 @@ function cameraGuideForSlot(slot: CaptureSlot | null) {
   if (slot.id === 'tires') return { primary: 'Fill frame with tread + sidewall', detail: 'Hold steady and include tread blocks, sidewall, and undercarriage edge.' }
   if (slot.id === 'engine') return { primary: 'Fill frame with engine bay', detail: 'Capture belts, hoses, filters, leaks, smoke context, and cold-start proof.' }
   return { primary: 'Fill frame with full machine side', detail: 'Hold steady, walk slowly, and keep paint, welds, loader arms, and panels in view.' }
+}
+
+function detectorSignalsForSlot(slot: CaptureSlot): DetectorSignal[] {
+  if (slot.state === 'missing') {
+    if (slot.id === 'engine') return [{ label: 'Missing guard / safety components', value: 'No engine/cold-start media', status: 'missing', reason: 'Missing engine bay proof blocks guard, belt, leak, smoke, and safety-component review.' }]
+    return [{ label: 'Proof missing', value: 'No media', status: 'missing', reason: 'FarmFax cannot inspect what was not captured.' }]
+  }
+  const analysis = slot.analysis
+  if (slot.id === 'tires') return [{ label: 'Tire tread wear', value: analysis ? `${Math.max(0, 100 - Math.round(analysis.paintVariance * 1.6))}% usable visual tread` : 'pending', status: analysis && analysis.paintVariance > 42 ? 'review' : 'good', reason: 'Checks tread/sidewall photo for wear, cracking, and undercarriage visibility.' }]
+  if (slot.id === 'hydraulics') return [{ label: 'Hose / cylinder wetness', value: analysis ? `${analysis.wetPct}% wet signal` : 'pending', status: analysis && analysis.wetPct > 8 ? 'review' : 'good', reason: 'Wet signal near hoses/cylinders can point to seepage, grease, or recent service residue.' }]
+  if (slot.id === 'serial') return [{ label: 'Serial plate readability', value: analysis ? `${analysis.confidence}% readable` : 'pending', status: analysis && analysis.confidence < 80 ? 'review' : 'good', reason: 'Readable plate anchors the machine to paperwork and service records.' }]
+  if (slot.id === 'hours') return [{ label: 'Hour meter OCR confidence', value: analysis ? `${analysis.confidence}% OCR-ready` : 'pending', status: analysis && analysis.confidence < 80 ? 'review' : 'good', reason: 'Dashboard/hour proof should be readable enough to compare against records and visible wear.' }]
+  if (slot.id === 'walkaround') return [{ label: 'Rust cluster map', value: analysis ? `${analysis.rustPct}% rust tone` : 'pending', status: analysis && analysis.rustPct > 8 ? 'review' : 'good', reason: 'Clusters rust/corrosion-like pixels around steps, mounts, panels, and loader areas.' }]
+  if (slot.id === 'paint') return [{ label: 'Repaint / color mismatch', value: analysis ? `${analysis.paintVariance}/100 variance` : 'pending', status: analysis && analysis.paintVariance > 35 ? 'review' : 'good', reason: 'Color variance can suggest repaint, replaced panels, storm damage, or collision repair.' }]
+  if (slot.id === 'engine') return [{ label: 'Missing guard / safety components', value: 'requires engine/cold-start proof', status: 'review', reason: 'Engine bay/cold-start media lets a reviewer check covers, belts, guards, leaks, smoke context, and obvious safety omissions.' }]
+  return []
+}
+
+function detectorPriority(status: DetectorSignal['status']) {
+  return status === 'missing' ? 3 : status === 'review' ? 2 : 1
 }
 
 function clampScore(value: number) {
@@ -543,6 +570,10 @@ function App() {
   const sellerQuestionPreview = reportSeed.buyerQuestions.slice(0, 3)
   const missingProofPreview = missing.slice(0, 3)
   const guideCopy = cameraGuideForSlot(cameraSlot)
+  const specificDetectorSignals = useMemo(() => slots
+    .flatMap((slot) => detectorSignalsForSlot(slot).map((signal) => ({ ...signal, slot })))
+    .sort((a, b) => detectorPriority(b.status) - detectorPriority(a.status))
+    .slice(0, 7), [slots])
   const riskSummary = useMemo(() => buildRiskSummary(slots, findings, analyzedSlots.length, reportSeed), [slots, findings, analyzedSlots.length, reportSeed])
   const dealPosture = missing.some((slot) => slot.id === 'serial' || slot.id === 'hours')
     ? 'Do not send money yet'
@@ -1050,6 +1081,23 @@ function App() {
               ))}
             </div>
           </div>
+          <div className="specific-detector-stack" data-qa="specific-detector-stack">
+            <div>
+              <span className="section-label">Specific detector stack</span>
+              <h3>More precise checks, still evidence-bound.</h3>
+              <p>These are visible-media detectors. They improve specificity without pretending to catch hidden mechanical failures.</p>
+            </div>
+            <div className="detector-grid">
+              {specificDetectorSignals.map((signal) => (
+                <article key={`${signal.slot.id}-${signal.label}`} className={signal.status}>
+                  <span>{signal.status}</span>
+                  <b>{signal.label}</b>
+                  <strong>{signal.value}</strong>
+                  <small>{signal.slot.title} · {signal.reason}</small>
+                </article>
+              ))}
+            </div>
+          </div>
           <div className="capture-grid">
             {slots.map((slot) => (
               <article className={`capture-slot ${slot.state}`} key={slot.id}>
@@ -1092,6 +1140,11 @@ function App() {
                       <span>paint {slot.analysis.paintVariance}/100</span>
                     </div>
                   )}
+                  <div className="slot-detector-chips" data-qa="slot-detector-chips">
+                    {detectorSignalsForSlot(slot).map((signal) => (
+                      <span key={`${slot.id}-${signal.label}`} className={signal.status}>{signal.label}: {signal.value}</span>
+                    ))}
+                  </div>
                   {slot.video && (
                     <div className="video-summary">
                       <b>{slot.video.frameCount} frames checked</b>
