@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const repoRoot = path.resolve(__dirname, '..')
 const dataDir = process.env.FARMFAX_DATA_DIR || path.join(repoRoot, '.farmfax-data')
 const port = Number(process.env.PORT || process.env.FARMFAX_BACKEND_PORT || 8787)
-const host = process.env.HOST || '127.0.0.1'
+const host = process.env.HOST || (process.env.RENDER || process.env.NODE_ENV === 'production' ? '0.0.0.0' : '127.0.0.1')
 const maxBodyBytes = 2_000_000
 const serviceVersion = '0.2.0'
 
