@@ -182,6 +182,16 @@ function cellLabel(kind: AnalysisCell['kind']) {
   return kind === 'wet' ? 'leak?' : kind
 }
 
+function cameraGuideForSlot(slot: CaptureSlot | null) {
+  if (!slot) return { primary: 'Fill frame', detail: 'Center the machine area inside the brackets.' }
+  if (slot.id === 'serial') return { primary: 'Fill frame with serial plate', detail: 'Move closer until the PIN fills the guide. Avoid glare and crop all four plate corners.' }
+  if (slot.id === 'hours') return { primary: 'Fill frame with hour meter', detail: 'Hold steady on the lit dashboard so the hour reading is readable.' }
+  if (slot.id === 'hydraulics') return { primary: 'Fill frame with cylinder + hoses', detail: 'Move closer on wet spots, fittings, and chrome rod surfaces.' }
+  if (slot.id === 'tires') return { primary: 'Fill frame with tread + sidewall', detail: 'Hold steady and include tread blocks, sidewall, and undercarriage edge.' }
+  if (slot.id === 'engine') return { primary: 'Fill frame with engine bay', detail: 'Capture belts, hoses, filters, leaks, smoke context, and cold-start proof.' }
+  return { primary: 'Fill frame with full machine side', detail: 'Hold steady, walk slowly, and keep paint, welds, loader arms, and panels in view.' }
+}
+
 function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)))
 }
@@ -519,6 +529,20 @@ function App() {
         { x: 5, y: 2, kind: 'paint' as const },
         { x: 6, y: 4, kind: 'wet' as const },
       ]
+  const zoneChecklist = useMemo(() => ([
+    { label: 'Exterior', ids: ['walkaround', 'paint'] as SlotId[] },
+    { label: 'Cab / dashboard', ids: ['serial', 'hours'] as SlotId[] },
+    { label: 'Hydraulics', ids: ['hydraulics'] as SlotId[] },
+    { label: 'Tires / tracks', ids: ['tires'] as SlotId[] },
+    { label: 'Engine / cold start', ids: ['engine'] as SlotId[] },
+  ].map((zone) => {
+    const zoneSlots = zone.ids.map((id) => slots.find((slot) => slot.id === id)).filter(Boolean) as CaptureSlot[]
+    const status = zoneSlots.some((slot) => slot.state === 'missing') ? 'missing' : zoneSlots.some((slot) => slot.state === 'review') ? 'review' : 'received'
+    return { ...zone, status, count: zoneSlots.filter((slot) => slot.state !== 'missing').length, total: zoneSlots.length }
+  })), [slots])
+  const sellerQuestionPreview = reportSeed.buyerQuestions.slice(0, 3)
+  const missingProofPreview = missing.slice(0, 3)
+  const guideCopy = cameraGuideForSlot(cameraSlot)
   const riskSummary = useMemo(() => buildRiskSummary(slots, findings, analyzedSlots.length, reportSeed), [slots, findings, analyzedSlots.length, reportSeed])
   const dealPosture = missing.some((slot) => slot.id === 'serial' || slot.id === 'hours')
     ? 'Do not send money yet'
@@ -1011,6 +1035,21 @@ function App() {
               <p className="scan-disclaimer">High-tech does not mean magic: FarmFax flags visible evidence and missing proof. It does not certify hidden defects.</p>
             </div>
           </div>
+          <div className="zone-checklist" data-qa="zone-checklist">
+            <div>
+              <span className="section-label">Defect checklist by zone</span>
+              <h3>Every expensive area gets a status.</h3>
+            </div>
+            <div className="zone-grid">
+              {zoneChecklist.map((zone) => (
+                <article key={zone.label} className={zone.status}>
+                  <span>{zone.status === 'received' ? 'received' : zone.status === 'review' ? 'review' : 'missing'}</span>
+                  <b>{zone.label}</b>
+                  <small>{zone.count}/{zone.total} views supplied</small>
+                </article>
+              ))}
+            </div>
+          </div>
           <div className="capture-grid">
             {slots.map((slot) => (
               <article className={`capture-slot ${slot.state}`} key={slot.id}>
@@ -1110,6 +1149,35 @@ function App() {
             <p>{selectedFinding.nextStep}</p>
           </article>
         </aside>
+      </section>
+
+      <section className="post-scan-decision" aria-label="before deposit decision">
+        <article className="decision-card" data-qa="before-deposit-decision">
+          <span>Before deposit decision</span>
+          <h2>{dealPosture}</h2>
+          <p>{nextMoveCopy}</p>
+          <div className="decision-actions">
+            <button type="button" onClick={() => document.getElementById('report')?.scrollIntoView({ behavior: 'smooth' })}>See buyer report</button>
+            <button className="ghost" type="button" onClick={() => void runCompleteSampleInspection()}>Load complete proof</button>
+          </div>
+        </article>
+        <article className="report-preview-card" data-qa="report-preview-card">
+          <div className="preview-topline"><span>FarmFax report preview</span><b>{conditionScore}/100</b></div>
+          <h3>{report.make_model_guess.make} {report.make_model_guess.model} · {report.hour_meter.toLocaleString()} hrs</h3>
+          <div className="preview-findings">
+            {findings.slice(0, 3).map((finding) => (
+              <p key={`preview-${finding.category}`}><b>{finding.category}:</b> {finding.finding}</p>
+            ))}
+          </div>
+          <div className="preview-proof-row">
+            <div><span>Missing proof</span><b>{missingProofPreview.length ? missingProofPreview.map((slot) => slot.title).join(', ') : 'None in required set'}</b></div>
+            <div><span>Seller asks</span><b>{sellerQuestionPreview.length}</b></div>
+          </div>
+          <div className="preview-questions">
+            {sellerQuestionPreview.map((question) => <small key={question}>{question}</small>)}
+          </div>
+          <button type="button" onClick={exportReport}>Download JSON report</button>
+        </article>
       </section>
 
       <section className="packet-layout" id="catalog">
@@ -1314,6 +1382,18 @@ function App() {
             <p>{cameraSlot.prompt}</p>
             <div className="camera-frame">
               <video ref={videoRef} playsInline muted autoPlay />
+              <div className="camera-guide-overlay" data-qa="camera-guide-overlay" aria-hidden="true">
+                <div className="guide-brackets"><i /><i /><i /><i /></div>
+                <div className="guide-copy">
+                  <b>{guideCopy.primary}</b>
+                  <span>{guideCopy.detail}</span>
+                </div>
+                <div className="guide-pills">
+                  <span>Hold steady</span>
+                  <span>Move closer</span>
+                  <span>Glare detected</span>
+                </div>
+              </div>
               {isCameraStarting && <div className="camera-status">Starting rear camera…</div>}
               {cameraError && <div className="camera-error">{cameraError}</div>}
             </div>
