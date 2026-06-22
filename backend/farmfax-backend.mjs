@@ -255,12 +255,20 @@ async function createShare(reportId, body) {
   return share
 }
 
-function openApiSpec() {
+function publicBaseUrl(req) {
+  const forwardedProto = req?.headers?.['x-forwarded-proto']
+  const proto = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto || (process.env.RENDER ? 'https' : 'http')
+  const forwardedHost = req?.headers?.['x-forwarded-host']
+  const requestHost = Array.isArray(forwardedHost) ? forwardedHost[0] : forwardedHost || req?.headers?.host
+  return requestHost ? `${proto}://${requestHost}` : `http://${host}:${port}`
+}
+
+function openApiSpec(req) {
   const endpointSummary = 'FarmFax report persistence, capture-session tracking, media metadata, and seller/mechanic handoff API.'
   return {
     openapi: '3.1.0',
     info: { title: 'FarmFax API', version: serviceVersion, description: `${endpointSummary} Decision-support only; not a certified inspection.` },
-    servers: [{ url: `http://${host}:${port}` }],
+    servers: [{ url: publicBaseUrl(req) }],
     paths: {
       '/health': { get: { summary: 'Health check' } },
       '/api/openapi.json': { get: { summary: 'OpenAPI contract' } },
@@ -337,7 +345,7 @@ async function handleRequest(req, res) {
   try {
     if (req.method === 'GET' && pathname === '/') return sendHtml(res, 200, docsHtml())
     if (req.method === 'GET' && pathname === '/docs') return sendHtml(res, 200, docsHtml())
-    if (req.method === 'GET' && pathname === '/api/openapi.json') return sendJson(res, 200, openApiSpec())
+    if (req.method === 'GET' && pathname === '/api/openapi.json') return sendJson(res, 200, openApiSpec(req))
 
     if (req.method === 'GET' && pathname === '/health') {
       return sendJson(res, 200, {
@@ -345,7 +353,7 @@ async function handleRequest(req, res) {
         service: 'farmfax-backend',
         version: serviceVersion,
         data_dir: dataDir,
-        endpoints: Object.keys(openApiSpec().paths),
+        endpoints: Object.keys(openApiSpec(req).paths),
         truth_layer: 'decision-support only; no certified inspection claims',
       })
     }
