@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "start": "node backend/farmfax-backend.mjs",
     "backend:dev": "node backend/farmfax-backend.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
