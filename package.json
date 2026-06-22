@@ -5,10 +5,13 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "backend:dev": "node backend/farmfax-backend.mjs",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "verify:demo": "npm run lint && npm run build && node scripts/verify-demo.mjs"
+    "verify:backend": "node scripts/verify-backend.mjs",
+    "verify:demo": "npm run lint && npm run build && node scripts/verify-demo.mjs",
+    "verify:all": "npm run verify:demo && npm run verify:backend"
   },
   "dependencies": {
     "react": "^19.2.6",

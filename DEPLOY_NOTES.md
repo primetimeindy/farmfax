@@ -124,13 +124,27 @@ Rules for production copy:
 
 ## Backend/model seam
 
-The frontend is intentionally static for hackathon reliability. The next backend can preserve the same report shape while adding:
+The deployed GitHub Pages demo remains intentionally static for hackathon reliability, but the repo now includes a working local FarmFax backend contract:
+
+```bash
+npm run backend:dev
+npm run verify:backend
+```
+
+Implemented backend endpoints:
+
+- `GET /health` — service readiness and endpoint inventory.
+- `POST /api/analyze` — validates a FarmFax report and returns a risk/action summary.
+- `POST /api/reports` — validates and persists a report to local JSON storage.
+- `GET /api/reports/:id` — retrieves a stored hosted-report payload and summary.
+
+The backend preserves the frontend report shape and is ready to become the hosted-report/API seam. Future production backend work can add:
 
 - OCR for serial/PIN plate and hour meter.
 - NVIDIA-accelerated CV for rust, leaks, paint mismatch, wear, weld repairs, missing guards, and deformation.
 - Nemotron-style structured multi-image and selected-video-frame reasoning.
 - Hermes/OpenEye-style visual session tracking for pass/fail/uncertain checklist verification.
-- Storage for hosted report links.
+- Durable cloud storage for hosted report links.
 - Seller response and mechanic/dealer review workflow.
 
 ## Legal/safety deployment copy
