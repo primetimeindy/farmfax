@@ -208,9 +208,9 @@ const commonPrompts: Record<SlotId, Pick<CaptureSlot, 'title' | 'prompt' | 'why'
     why: 'Paint mismatch can signal cosmetic repaint, repaired collision, or replacement panels.',
   },
   engine: {
-    title: 'Engine bay / cold start',
-    prompt: 'Capture engine bay plus 10s start video if available.',
-    why: 'Visual AI cannot certify internals, but can flag leaks, smoke context, and missing evidence.',
+    title: 'Engine bay / running proof',
+    prompt: 'Capture engine bay. If it does not run, say that plainly and capture belts, hoses, battery, leaks, guards, and obvious missing parts.',
+    why: 'A non-running tractor is still useful evidence: buyers need to know what is visible, what is missing, and what repair proof to request.',
   },
 }
 

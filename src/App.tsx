@@ -161,7 +161,8 @@ type FarmFaxReport = {
   missing_evidence: string[]
   open_record_commitment: string
   integration_stack: string[]
-  sponsor_integrations: Array<{ sponsor: string; role: string; demo_status: 'working demo' | 'planned backend seam' | 'simulated commerce seam'; proof: string }>
+  market_context_stats: Array<{ label: string; value: string; source: string }>
+  system_integrations: Array<{ name: string; role: string; status: 'working demo' | 'planned backend seam' | 'simulated commerce seam'; proof: string }>
 }
 
 const PUBLIC_DEMO_URL = 'https://primetimeindy.github.io/farmfax-demo/'
@@ -193,23 +194,30 @@ const catalogCandidates: CatalogCandidate[] = [
 
 const architectureStack = [
   {
-    name: 'Nous / Hermes',
-    role: 'Hermes-powered physical-world workflow orchestration',
+    name: 'Hermes workflow',
+    role: 'Physical-world workflow orchestration',
     status: 'planned backend seam' as const,
     line: 'Routes capture → evidence check → overclaim challenge → buyer report → export / hosted handoff.',
   },
   {
-    name: 'NVIDIA / Nemotron',
-    role: 'Multimodal inspection reasoning path',
+    name: 'Multimodal reasoning',
+    role: 'Photo, OCR-ready, and video-frame inspection path',
     status: 'planned backend seam' as const,
-    line: 'Upgrades browser heuristics into GPU-accelerated CV and structured reasoning over photos, OCR-ready plates, hour meters, and video frames.',
+    line: 'Upgrades browser heuristics into GPU-accelerated CV and structured reasoning over photos, serial plates, hour meters, and selected video frames.',
   },
   {
-    name: 'Stripe',
-    role: 'Paid trust infrastructure for equipment commerce',
+    name: 'Hosted report commerce',
+    role: 'Paid trust infrastructure for equipment transactions',
     status: 'simulated commerce seam' as const,
     line: 'Monetizes hosted report links, seller share pages, dealer branding, and expert review while keeping JSON/PDF export buyer-owned.',
   },
+]
+
+const marketContextStats = [
+  { label: 'Agricultural machinery market', value: '$193B in 2026', source: 'Mordor Intelligence agricultural machinery market estimate' },
+  { label: 'Tractors remain core', value: '35.9% of 2025 machinery value', source: 'Mordor Intelligence type-segment estimate' },
+  { label: 'Live resale marketplace proof', value: '8,192 agriculture listings', source: 'IronPlanet agriculture category snapshot, Jun 2026' },
+  { label: 'Repair access friction', value: '125 sensors in one combine', source: 'U.S. PIRG Deere in the Headlights' },
 ]
 
 function stateLabel(state: CaptureState) {
@@ -254,7 +262,7 @@ function detectorSignalsForSlot(slot: CaptureSlot): DetectorSignal[] {
   if (slot.id === 'hours') return [{ label: 'Hour meter OCR confidence', value: analysis ? `${analysis.confidence}% OCR-ready` : 'pending', status: analysis && analysis.confidence < 80 ? 'review' : 'good', reason: 'Dashboard/hour proof should be readable enough to compare against records and visible wear.' }]
   if (slot.id === 'walkaround') return [{ label: 'Rust cluster map', value: analysis ? `${analysis.rustPct}% rust tone` : 'pending', status: analysis && analysis.rustPct > 8 ? 'review' : 'good', reason: 'Clusters rust/corrosion-like pixels around steps, mounts, panels, and loader areas.' }]
   if (slot.id === 'paint') return [{ label: 'Repaint / color mismatch', value: analysis ? `${analysis.paintVariance}/100 variance` : 'pending', status: analysis && analysis.paintVariance > 35 ? 'review' : 'good', reason: 'Color variance can suggest repaint, replaced panels, storm damage, or collision repair.' }]
-  if (slot.id === 'engine') return [{ label: 'Missing guard / safety components', value: 'requires engine/cold-start proof', status: 'review', reason: 'Engine bay/cold-start media lets a reviewer check covers, belts, guards, leaks, smoke context, and obvious safety omissions.' }]
+  if (slot.id === 'engine') return [{ label: 'Missing guard / safety components', value: 'requires engine/running-status proof', status: 'review', reason: 'Engine bay media plus an honest running/non-running note lets a reviewer check covers, belts, guards, leaks, and obvious safety omissions.' }]
   return []
 }
 
@@ -695,7 +703,7 @@ function App() {
     { label: 'Cab / dashboard', ids: ['serial', 'hours'] as SlotId[] },
     { label: 'Hydraulics', ids: ['hydraulics'] as SlotId[] },
     { label: 'Tires / tracks', ids: ['tires'] as SlotId[] },
-    { label: 'Engine / cold start', ids: ['engine'] as SlotId[] },
+    { label: 'Engine bay / running proof', ids: ['engine'] as SlotId[] },
   ].map((zone) => {
     const zoneSlots = zone.ids.map((id) => slots.find((slot) => slot.id === id)).filter(Boolean) as CaptureSlot[]
     const status = zoneSlots.some((slot) => slot.state === 'missing') ? 'missing' : zoneSlots.some((slot) => slot.state === 'review') ? 'review' : 'received'
@@ -824,10 +832,11 @@ function App() {
     missing_evidence: missing.map((slot) => slot.title),
     open_record_commitment: reportSeed.openRecordCommitment,
     integration_stack: architectureStack.map((item) => item.name),
-    sponsor_integrations: architectureStack.map((item) => ({
-      sponsor: item.name,
+    market_context_stats: marketContextStats,
+    system_integrations: architectureStack.map((item) => ({
+      name: item.name,
       role: item.role,
-      demo_status: item.status,
+      status: item.status,
       proof: item.line,
     })),
   }), [acceptedCount, analyzedSlots, beforeDepositChecklist, conditionScore, detectorModuleExports, detectorQuestions, findings, mechanicHandoffSummary, missing, moduleRiskSummary, photoSourceCount, reportSeed, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, videoSourceCount])
@@ -850,7 +859,8 @@ function App() {
     module_risk_summary: report.module_risk_summary,
     seller_questions_from_detectors: report.seller_questions_from_detectors,
     proof_intelligence: report.proof_intelligence,
-    sponsor_integrations: report.sponsor_integrations,
+    market_context_stats: report.market_context_stats,
+    system_integrations: report.system_integrations,
     mechanic_handoff_summary: report.mechanic_handoff_summary,
     before_deposit_checklist: report.before_deposit_checklist,
     risk_summary: report.risk_summary.map((risk) => ({ id: risk.id, score: risk.score, level: risk.level, action: risk.buyerAction })),
@@ -875,8 +885,8 @@ function App() {
     },
     {
       status: 'planned',
-      label: 'Nemotron evidence reasoning',
-      detail: 'Turns submitted evidence, OCR, missing proof, and findings into plain buyer questions.',
+      label: 'Multimodal evidence reasoning',
+      detail: 'Turns submitted evidence, OCR-ready proof, missing proof, and findings into plain buyer questions.',
     },
     {
       status: 'planned',
@@ -885,7 +895,7 @@ function App() {
     },
     {
       status: 'simulated',
-      label: 'Stripe hosted report',
+      label: 'Hosted report checkout',
       detail: 'Payment screen only; free JSON/PDF export stays with the owner.',
     },
   ], [acceptedCount, analyzedSlots.length, missing.length, report.buyer_questions.length, report.risk_summary, reviewCount, videoSourceCount])
@@ -1203,7 +1213,7 @@ function App() {
       </section>
 
       <section className="architecture-row architecture-stack" aria-label="demo architecture stack">
-        <div className="stack-heading panel"><span>Demo stack</span><p>The farmer sees a clean diligence flow. Judges can see which pieces run now and which sponsor seams are intentionally marked as planned or simulated.</p></div>
+        <div className="stack-heading panel"><span>Demo stack</span><p>The farmer sees a clean diligence flow. Judges can see which pieces run now and which backend or commerce seams are intentionally marked as planned or simulated.</p></div>
         {architectureStack.map((item) => (
           <article className="panel" key={item.name}>
             <span>{item.name}</span>
@@ -1711,7 +1721,7 @@ function App() {
           <article data-qa="judge-proof-item"><b>Browser evidence pass</b><p>Photo heuristics and selected video-frame sampling run in the demo.</p></article>
           <article data-qa="judge-proof-item"><b>Buyer-owned export</b><p>JSON and PDF remain available before any paid hosted link.</p></article>
           <article data-qa="judge-proof-item"><b>Hermes orchestration seam</b><p>Capture → evidence check → report → export / hosted link is the planned route.</p></article>
-          <article data-qa="judge-proof-item"><b>Honest sponsor labels</b><p>Nemotron reasoning is planned, Stripe checkout is simulated, and unsupported claims are listed in JSON.</p></article>
+          <article data-qa="judge-proof-item"><b>Honest truth labels</b><p>Multimodal reasoning is planned, checkout is simulated, and unsupported claims are listed in JSON.</p></article>
         </div>
         <div className="defense-panel" data-qa="defense-panel">
           <article>
@@ -1734,26 +1744,38 @@ function App() {
         </div>
       </section>
 
-      <section className="sponsor-integration-panel" data-qa="sponsor-integration-panel">
+      <section className="market-context-panel" data-qa="market-context-panel">
         <div className="trace-heading">
-          <span>Sponsor integration map</span>
-          <p>FarmFax wires the sponsor story into the product without pretending every seam is production-complete.</p>
+          <span>Market context</span>
+          <p>Used farm equipment is a high-trust, high-dollar secondary market where repair access and missing proof change the buyer's risk.</p>
         </div>
-        <div className="sponsor-integration-grid">
-          {report.sponsor_integrations.map((item) => (
-            <article key={item.sponsor}>
-              <span>{item.demo_status}</span>
-              <b>{item.sponsor}</b>
-              <h3>{item.role}</h3>
-              <p>{item.proof}</p>
+        <div className="market-stat-grid">
+          {report.market_context_stats.map((item) => (
+            <article key={item.label}>
+              <span>{item.label}</span>
+              <b>{item.value}</b>
+              <p>{item.source}</p>
             </article>
           ))}
         </div>
-        <div className="truth-layer-callout">
-          <b>Honest sponsor rule</b>
-          <p>Hermes is the hackathon harness narrative. Nemotron is a planned reasoning backend. Stripe is the simulated paid hosted-report seam. The exported JSON carries the same sponsor_integrations map.</p>
-          <small>No Pi framing in the hackathon submission; Pi stays a separate local-coding experiment.</small>
+        <div className="repair-access-callout">
+          <b>Repair access problem</b>
+          <p>Modern equipment can be software-gated and dealer-dependent. The FTC found repair restrictions can include unavailable diagnostic software and limited parts access, while U.S. PIRG documents how sensor/controller networks and dealer delays can strand farmers during planting or harvest windows.</p>
+          <small>FarmFax does not solve right-to-repair. It gives buyers a portable evidence packet: running status, missing proof, visible condition, seller questions, and mechanic handoff before money changes hands.</small>
         </div>
+        <details className="system-map-details">
+          <summary>Show system map</summary>
+          <div className="system-map-grid">
+            {report.system_integrations.map((item) => (
+              <article key={item.name}>
+                <span>{item.status}</span>
+                <b>{item.name}</b>
+                <h3>{item.role}</h3>
+                <p>{item.proof}</p>
+              </article>
+            ))}
+          </div>
+        </details>
       </section>
 
       <section className="source-trail" data-qa="workflow-trace">
@@ -1806,7 +1828,7 @@ function App() {
                 }} />
               </label>
             </div>
-            <small>Evidence is stored in-browser for the demo. Production signs capture metadata before routing to Hermes/Nemotron.</small>
+            <small>Evidence is stored in-browser for the demo. Production signs capture metadata before routing to the Hermes workflow and multimodal reasoning layer.</small>
           </div>
         </div>
       )}
