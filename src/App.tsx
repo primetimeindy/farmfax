@@ -161,6 +161,7 @@ type FarmFaxReport = {
   missing_evidence: string[]
   open_record_commitment: string
   integration_stack: string[]
+  sponsor_integrations: Array<{ sponsor: string; role: string; demo_status: 'working demo' | 'planned backend seam' | 'simulated commerce seam'; proof: string }>
 }
 
 const PUBLIC_DEMO_URL = 'https://primetimeindy.github.io/farmfax-demo/'
@@ -192,16 +193,22 @@ const catalogCandidates: CatalogCandidate[] = [
 
 const architectureStack = [
   {
-    name: 'NVIDIA / Nemotron',
-    line: 'Planned reasoning layer for weighing submitted evidence and writing buyer questions. It does not certify the machine.',
+    name: 'Nous / Hermes',
+    role: 'Hermes-powered physical-world workflow orchestration',
+    status: 'planned backend seam' as const,
+    line: 'Routes capture → evidence check → overclaim challenge → buyer report → export / hosted handoff.',
   },
   {
-    name: 'Hermes',
-    line: 'Planned orchestration for capture, evidence checks, report generation, export, and the hosted-report seam.',
+    name: 'NVIDIA / Nemotron',
+    role: 'Multimodal inspection reasoning path',
+    status: 'planned backend seam' as const,
+    line: 'Upgrades browser heuristics into GPU-accelerated CV and structured reasoning over photos, OCR-ready plates, hour meters, and video frames.',
   },
   {
     name: 'Stripe',
-    line: 'Current demo simulates the hosted-report payment path. PDF and JSON export remain buyer-owned.',
+    role: 'Paid trust infrastructure for equipment commerce',
+    status: 'simulated commerce seam' as const,
+    line: 'Monetizes hosted report links, seller share pages, dealer branding, and expert review while keeping JSON/PDF export buyer-owned.',
   },
 ]
 
@@ -817,6 +824,12 @@ function App() {
     missing_evidence: missing.map((slot) => slot.title),
     open_record_commitment: reportSeed.openRecordCommitment,
     integration_stack: architectureStack.map((item) => item.name),
+    sponsor_integrations: architectureStack.map((item) => ({
+      sponsor: item.name,
+      role: item.role,
+      demo_status: item.status,
+      proof: item.line,
+    })),
   }), [acceptedCount, analyzedSlots, beforeDepositChecklist, conditionScore, detectorModuleExports, detectorQuestions, findings, mechanicHandoffSummary, missing, moduleRiskSummary, photoSourceCount, reportSeed, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, videoSourceCount])
 
   const openRecordPreview = useMemo(() => ({
@@ -837,6 +850,7 @@ function App() {
     module_risk_summary: report.module_risk_summary,
     seller_questions_from_detectors: report.seller_questions_from_detectors,
     proof_intelligence: report.proof_intelligence,
+    sponsor_integrations: report.sponsor_integrations,
     mechanic_handoff_summary: report.mechanic_handoff_summary,
     before_deposit_checklist: report.before_deposit_checklist,
     risk_summary: report.risk_summary.map((risk) => ({ id: risk.id, score: risk.score, level: risk.level, action: risk.buyerAction })),
@@ -1717,6 +1731,28 @@ function App() {
           <button type="button" onClick={() => void runJudgeDemo()}>Run judge demo</button>
           <button className="ghost" type="button" onClick={() => void runCompleteSampleInspection()}>Load complete sample</button>
           <button className="ghost" type="button" onClick={exportReport}>Download JSON report</button>
+        </div>
+      </section>
+
+      <section className="sponsor-integration-panel" data-qa="sponsor-integration-panel">
+        <div className="trace-heading">
+          <span>Sponsor integration map</span>
+          <p>FarmFax wires the sponsor story into the product without pretending every seam is production-complete.</p>
+        </div>
+        <div className="sponsor-integration-grid">
+          {report.sponsor_integrations.map((item) => (
+            <article key={item.sponsor}>
+              <span>{item.demo_status}</span>
+              <b>{item.sponsor}</b>
+              <h3>{item.role}</h3>
+              <p>{item.proof}</p>
+            </article>
+          ))}
+        </div>
+        <div className="truth-layer-callout">
+          <b>Honest sponsor rule</b>
+          <p>Hermes is the hackathon harness narrative. Nemotron is a planned reasoning backend. Stripe is the simulated paid hosted-report seam. The exported JSON carries the same sponsor_integrations map.</p>
+          <small>No Pi framing in the hackathon submission; Pi stays a separate local-coding experiment.</small>
         </div>
       </section>
 
