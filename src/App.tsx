@@ -113,6 +113,8 @@ type DetectorModuleExport = DetectorModuleResult & {
   risk: 'green' | 'yellow' | 'red'
 }
 
+type RunningStatus = 'non_running' | 'not_shown' | 'unknown'
+
 type FarmFaxReport = {
   report_id: string
   schema_version: string
@@ -121,7 +123,10 @@ type FarmFaxReport = {
   demo_mode: boolean
   equipment_type: string
   serial_number: string
-  hour_meter: number
+  hour_meter: number | null
+  hour_meter_status: 'shown' | 'unknown'
+  running_status: RunningStatus
+  running_status_source: string
   make_model_guess: CatalogCandidate
   condition_score: number
   confidence: number
@@ -161,7 +166,7 @@ type FarmFaxReport = {
   missing_evidence: string[]
   open_record_commitment: string
   integration_stack: string[]
-  market_context_stats: Array<{ label: string; value: string; source: string }>
+  market_context_stats: Array<{ label: string; value: string; source: string; date: string; caveat: string }>
   system_integrations: Array<{ name: string; role: string; status: 'working demo' | 'planned backend seam' | 'simulated commerce seam'; proof: string }>
 }
 
@@ -214,11 +219,13 @@ const architectureStack = [
 ]
 
 const marketContextStats = [
-  { label: 'Agricultural machinery market', value: '$193B in 2026', source: 'Mordor Intelligence agricultural machinery market estimate' },
-  { label: 'Tractors remain core', value: '35.9% of 2025 machinery value', source: 'Mordor Intelligence type-segment estimate' },
-  { label: 'Live resale marketplace proof', value: '8,192 agriculture listings', source: 'IronPlanet agriculture category snapshot, Jun 2026' },
-  { label: 'Repair access friction', value: '125 sensors in one combine', source: 'U.S. PIRG Deere in the Headlights' },
+  { label: 'Agricultural machinery market', value: '$193B in 2026', source: 'Mordor Intelligence agricultural machinery market estimate', date: '2026', caveat: 'Market-size context only; not a valuation for this tractor.' },
+  { label: 'Tractors remain core', value: '35.9% of 2025 machinery value', source: 'Mordor Intelligence type-segment estimate', date: '2025', caveat: 'Category mix, not condition or resale proof.' },
+  { label: 'Live resale marketplace proof', value: '8,192 agriculture listings', source: 'IronPlanet agriculture category snapshot', date: 'Jun 2026', caveat: 'Listing count snapshot; inventory changes.' },
+  { label: 'Repair access friction', value: '125 sensors in one combine', source: 'U.S. PIRG Deere in the Headlights', date: '2023', caveat: 'Repair-access example; not a claim about this tractor.' },
 ]
+
+const hourMeterLabel = (hours: number | null) => (hours == null ? 'Unknown' : `${hours.toLocaleString()} hrs`)
 
 function stateLabel(state: CaptureState) {
   if (state === 'accepted') return 'photo received'
@@ -767,6 +774,8 @@ function App() {
     const penalty = findings.reduce((sum, finding) => sum + severityWeight(finding.severity), 0) + missing.length * 5
     return Math.round(Math.max(0, Math.min(100, reportSeed.conditionScore - penalty * 0.15 + acceptedCount)))
   }, [acceptedCount, findings, missing.length, reportSeed.conditionScore])
+  const runningStatus: RunningStatus = slots.find((slot) => slot.id === 'engine')?.state === 'missing' ? 'not_shown' : 'unknown'
+  const runningStatusSource = runningStatus === 'not_shown' ? 'engine/running proof missing' : 'engine bay media supplied; running not proven'
 
   const report: FarmFaxReport = useMemo(() => ({
     report_id: reportSeed.reportId,
@@ -776,7 +785,10 @@ function App() {
     demo_mode: true,
     equipment_type: reportSeed.equipmentType,
     serial_number: reportSeed.serialNumber,
-    hour_meter: reportSeed.hourMeter ?? 0,
+    hour_meter: reportSeed.hourMeter,
+    hour_meter_status: reportSeed.hourMeter == null ? 'unknown' : 'shown',
+    running_status: runningStatus,
+    running_status_source: runningStatusSource,
     make_model_guess: reportSeed.makeModelGuess,
     condition_score: conditionScore,
     confidence: reportSeed.confidence,
@@ -839,7 +851,7 @@ function App() {
       status: item.status,
       proof: item.line,
     })),
-  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, conditionScore, detectorModuleExports, detectorQuestions, findings, mechanicHandoffSummary, missing, moduleRiskSummary, photoSourceCount, reportSeed, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, videoSourceCount])
+  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, conditionScore, detectorModuleExports, detectorQuestions, findings, mechanicHandoffSummary, missing, moduleRiskSummary, photoSourceCount, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, videoSourceCount])
 
   const openRecordPreview = useMemo(() => ({
     schema: report.schema_version,
@@ -852,7 +864,10 @@ function App() {
       type: report.equipment_type,
       serial_pin: report.serial_number,
       make_model_guess: `${report.make_model_guess.make} ${report.make_model_guess.model}`,
-      hour_meter: reportSeed.hourMeter ?? 'unknown',
+      hour_meter: report.hour_meter,
+      hour_meter_status: report.hour_meter_status,
+      running_status: report.running_status,
+      running_status_source: report.running_status_source,
     },
     evidence: report.visual_analysis.length ? report.visual_analysis.map((item) => ({ slot: item.slot, summary: item.summary, confidence: item.confidence })) : slots.map((slot) => ({ slot: slot.id, state: slot.state, has_image: Boolean(slot.image) })),
     detector_modules: report.detector_modules.map((module) => ({ slot: module.slot, module: module.name, score: module.score, risk: module.risk, output: module.output })),
@@ -865,7 +880,7 @@ function App() {
     before_deposit_checklist: report.before_deposit_checklist,
     risk_summary: report.risk_summary.map((risk) => ({ id: risk.id, score: risk.score, level: risk.level, action: risk.buyerAction })),
     portability: 'Core record exports as JSON/PDF; paid hosting does not own the equipment history.',
-  }), [report, reportSeed.hourMeter, slots])
+  }), [report, slots])
 
   const workflowTrace = useMemo(() => [
     {
@@ -1454,7 +1469,7 @@ function App() {
         </article>
         <article className="report-preview-card" data-qa="report-preview-card">
           <div className="preview-topline"><span>FarmFax report preview</span><b>{conditionScore}/100</b></div>
-          <h3>{report.make_model_guess.make} {report.make_model_guess.model} · {report.hour_meter.toLocaleString()} hrs</h3>
+          <h3>{report.make_model_guess.make} {report.make_model_guess.model} · {hourMeterLabel(report.hour_meter)}</h3>
           <div className="preview-findings">
             {findings.slice(0, 3).map((finding) => (
               <p key={`preview-${finding.category}`}><b>{finding.category}:</b> {finding.finding}</p>
@@ -1536,13 +1551,13 @@ function App() {
             </article>
             <article>
               <span>hour meter</span>
-              <b>{reportSeed.hourMeter == null ? 'Unknown' : `${report.hour_meter.toLocaleString()} hrs`}</b>
-              <p>Ask for service records near this hour reading and compare wear in person.</p>
+              <b>{hourMeterLabel(report.hour_meter)}</b>
+              <p>{report.hour_meter == null ? 'Ask for a readable hour-meter photo before relying on usage.' : 'Ask for service records near this hour reading and compare wear in person.'}</p>
             </article>
             <article>
-              <span>external IDs</span>
-              <b>dealer stock · auction lot · owner log</b>
-              <p>Future adapters can carry OEM, dealer, auction, and owner references without locking the record inside one system.</p>
+              <span>running_status</span>
+              <b>{report.running_status}</b>
+              <p>{report.running_status_source}</p>
             </article>
           </div>
           <div className="candidate-list">
@@ -1754,7 +1769,8 @@ function App() {
             <article key={item.label}>
               <span>{item.label}</span>
               <b>{item.value}</b>
-              <p>{item.source}</p>
+              <p>{item.source} · {item.date}</p>
+              <small>{item.caveat}</small>
             </article>
           ))}
         </div>
