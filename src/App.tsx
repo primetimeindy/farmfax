@@ -259,17 +259,17 @@ function cameraGuideForSlot(slot: CaptureSlot | null) {
 
 function detectorSignalsForSlot(slot: CaptureSlot): DetectorSignal[] {
   if (slot.state === 'missing') {
-    if (slot.id === 'engine') return [{ label: 'Missing guard / safety components', value: 'No engine/cold-start media', status: 'missing', reason: 'Missing engine bay proof blocks guard, belt, leak, smoke, and safety-component review.' }]
+    if (slot.id === 'engine') return [{ label: 'Guard / cover visibility check', value: 'No engine/cold-start media', status: 'missing', reason: 'Missing engine bay proof blocks a basic checklist view of guards, covers, belts, leaks, and smoke context.' }]
     return [{ label: 'Proof missing', value: 'No media', status: 'missing', reason: 'FarmFax cannot inspect what was not captured.' }]
   }
   const analysis = slot.analysis
-  if (slot.id === 'tires') return [{ label: 'Tire tread wear', value: analysis ? `${Math.max(0, 100 - Math.round(analysis.paintVariance * 1.6))}% usable visual tread` : 'pending', status: analysis && analysis.paintVariance > 42 ? 'review' : 'good', reason: 'Checks tread/sidewall photo for wear, cracking, and undercarriage visibility.' }]
+  if (slot.id === 'tires') return [{ label: 'Tread photo evidence proxy', value: analysis ? `${Math.max(0, 100 - Math.round(analysis.paintVariance * 1.6))}% usable visual-tread proxy` : 'pending', status: analysis && analysis.paintVariance > 42 ? 'review' : 'good', reason: 'Checks whether the tread/sidewall photo is useful for buyer review of wear, cracking, and undercarriage visibility.' }]
   if (slot.id === 'hydraulics') return [{ label: 'Hose / cylinder wetness', value: analysis ? `${analysis.wetPct}% wet signal` : 'pending', status: analysis && analysis.wetPct > 8 ? 'review' : 'good', reason: 'Wet signal near hoses/cylinders can point to seepage, grease, or recent service residue.' }]
   if (slot.id === 'serial') return [{ label: 'Serial plate readability', value: analysis ? `${analysis.confidence}% readable` : 'pending', status: analysis && analysis.confidence < 80 ? 'review' : 'good', reason: 'Readable plate anchors the machine to paperwork and service records.' }]
-  if (slot.id === 'hours') return [{ label: 'Hour meter OCR confidence', value: analysis ? `${analysis.confidence}% OCR-ready` : 'pending', status: analysis && analysis.confidence < 80 ? 'review' : 'good', reason: 'Dashboard/hour proof should be readable enough to compare against records and visible wear.' }]
+  if (slot.id === 'hours') return [{ label: 'Hour meter OCR readiness', value: analysis ? `${analysis.confidence}% OCR-ready` : 'pending', status: analysis && analysis.confidence < 80 ? 'review' : 'good', reason: 'Dashboard/hour proof should be readable enough for later OCR or record comparison; no hour extraction is claimed.' }]
   if (slot.id === 'walkaround') return [{ label: 'Rust cluster map', value: analysis ? `${analysis.rustPct}% rust tone` : 'pending', status: analysis && analysis.rustPct > 8 ? 'review' : 'good', reason: 'Clusters rust/corrosion-like pixels around steps, mounts, panels, and loader areas.' }]
   if (slot.id === 'paint') return [{ label: 'Repaint / color mismatch', value: analysis ? `${analysis.paintVariance}/100 variance` : 'pending', status: analysis && analysis.paintVariance > 35 ? 'review' : 'good', reason: 'Color variance can suggest repaint, replaced panels, storm damage, or collision repair.' }]
-  if (slot.id === 'engine') return [{ label: 'Missing guard / safety components', value: 'requires engine/running-status proof', status: 'review', reason: 'Engine bay media plus an honest running/non-running note lets a reviewer check covers, belts, guards, leaks, and obvious safety omissions.' }]
+  if (slot.id === 'engine') return [{ label: 'Guard / cover visibility check', value: 'requires engine/running-status proof', status: 'review', reason: 'Engine bay media plus an honest running/non-running note gives a reviewer a basic view of covers, belts, guards, leaks, and visible omissions.' }]
   return []
 }
 

@@ -51,13 +51,13 @@ const requiredSourceLabels = [
   'data-qa="report-preview-card"',
   'FarmFax report preview',
   'data-qa="specific-detector-stack"',
-  'Tire tread wear',
+  'Tread photo evidence proxy',
   'Hose / cylinder wetness',
   'Serial plate readability',
-  'Hour meter OCR confidence',
+  'Hour meter OCR readiness',
   'Rust cluster map',
   'Repaint / color mismatch',
-  'Missing guard / safety components',
+  'Guard / cover visibility check',
   'data-qa="slot-detector-chips"',
   'data-qa="detector-module-report"',
   'OCR readiness module',
@@ -116,6 +116,12 @@ const requiredSourceLabels = [
   'demo_truth',
 ]
 
+const rejectedSourceLabels = [
+  'Tire tread wear',
+  'Hour meter OCR confidence',
+  'Missing guard / safety components',
+]
+
 async function assertFile(path) {
   const fileUrl = new URL(path, root)
   await access(fileUrl, constants.R_OK)
@@ -136,6 +142,11 @@ const appSource = [
 for (const label of requiredSourceLabels) {
   if (!appSource.includes(label)) throw new Error(`missing required demo label/hook in source: ${label}`)
   console.log(`ok label ${label}`)
+}
+
+for (const label of rejectedSourceLabels) {
+  if (appSource.includes(label)) throw new Error(`found rejected overclaim label in source: ${label}`)
+  console.log(`ok rejected label ${label}`)
 }
 
 const qr = await readFile(new URL('public/farmfax-qr.svg', root), 'utf8')
