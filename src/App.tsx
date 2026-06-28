@@ -133,6 +133,8 @@ type CaptureOrderStep = {
   instruction: string
   analysis_reason: string
   status: CaptureState
+  steps: string[]
+  video_steps: string[]
 }
 
 type FarmFaxReport = {
@@ -151,6 +153,12 @@ type FarmFaxReport = {
     truth_note: string
   }
   capture_order: CaptureOrderStep[]
+  media_driven_result: {
+    headline: string
+    basis: string[]
+    next_capture_step: string
+    truth_note: string
+  }
   equipment_type: string
   serial_number: string
   hour_meter: number | null
@@ -296,6 +304,23 @@ function captureMediaNeeded(slotId: SlotId) {
   if (slotId === 'walkaround') return 'video preferred, photos ok'
   if (slotId === 'hydraulics' || slotId === 'engine') return 'photo + short video if possible'
   return 'photo required'
+}
+
+function captureStepList(slot: CaptureSlot) {
+  if (slot.id === 'walkaround') return ['Stand 8–12 feet back and fit the full tractor in frame.', 'Record a slow clockwise walkaround or take front, left, rear, and right photos.', 'Pause on loader arms, hitch, cab, body panels, and obvious dents or rust.', 'Save this first so FarmFax can anchor the rest of the evidence.']
+  if (slot.id === 'serial') return ['Find the serial/PIN plate or stamped ID.', 'Move close enough that the plate fills most of the frame.', 'Avoid glare; include all four plate corners and nearby decals.', 'Retake if the numbers cannot be read on your phone screen.']
+  if (slot.id === 'hours') return ['Turn ignition/display on if safe.', 'Center the hour meter and dashboard lights.', 'Hold steady for 2 seconds; avoid reflections on glass.', 'Capture service-warning lights if visible.']
+  if (slot.id === 'hydraulics') return ['Start at lift cylinders and hoses.', 'Capture chrome rods, seals, couplers, wet spots, and the ground underneath.', 'If safe, record a short clip while hydraulics move.', 'Retake close-ups where oil, grease, or fresh wiping is visible.']
+  if (slot.id === 'tires') return ['Get low to the ground at tire/track height.', 'Fill frame with tread/lugs, sidewall, cracks, and rim edge.', 'Capture both worn and best-looking sides if they differ.', 'Include undercarriage edge where possible.']
+  if (slot.id === 'paint') return ['Sweep hood, panels, loader arms, welds, frame rails, and hitch.', 'Pause on color mismatch, overspray, dents, weld repairs, and rust bubbles.', 'Keep lighting even so paint mismatch is not just shadow.', 'Capture any decals that identify model/series.']
+  return ['Open or aim into the engine bay only if safe.', 'Capture belts, hoses, battery, filters, guards/covers, leaks, and missing parts.', 'If it runs, record cold start, smoke, idle, and shutdown; if not, state non-running plainly in notes.', 'Do not imply the app inspected hidden mechanical condition.']
+}
+
+function videoStepList(slot: CaptureSlot) {
+  if (slot.id === 'walkaround') return ['Video target: 20–45 seconds, slow movement, no fast pans.', 'Keep the entire machine visible, then move closer to problem areas.']
+  if (slot.id === 'hydraulics') return ['Video target: 5–15 seconds on cylinder/hoses during movement if safe.', 'FarmFax samples frames only; also take still close-ups of leaks.']
+  if (slot.id === 'engine') return ['Video target: 10–20 seconds for cold-start/running proof if safe.', 'If non-running, record visible engine bay and explain what is missing or disconnected.']
+  return ['Video optional: use a still photo first; short clip can help show context.', 'FarmFax samples selected frames, not every second.']
 }
 
 function cameraGuideForSlot(slot: CaptureSlot | null) {
@@ -765,6 +790,8 @@ function App() {
     instruction: captureInstruction(slot),
     analysis_reason: slot.why,
     status: slot.state,
+    steps: captureStepList(slot),
+    video_steps: videoStepList(slot),
   })), [slots])
   const photoSourceCount = analyzedSlots.filter((slot) => slot.mediaType !== 'video').length
   const sampledFrameCount = slots.reduce((sum, slot) => sum + (slot.video?.frameCount ?? 0), 0)
@@ -836,6 +863,19 @@ function App() {
       : riskSummary.some((risk) => risk.severity === 'yellow')
         ? 'The packet is usable, but ask for the missing or cleaner photos before you rely on the listing.'
         : 'Photos look complete enough for a seller call. Still match serial paperwork and service records before paying.'
+  const nextMissingStep = captureOrder.find((step) => step.status === 'missing') ?? captureOrder.find((step) => step.status === 'review')
+  const mediaDrivenResult = useMemo(() => ({
+    headline: `${dealPosture}: ${nextMoveCopy}`,
+    basis: [
+      `${acceptedCount} accepted capture${acceptedCount === 1 ? '' : 's'}, ${reviewCount} review item${reviewCount === 1 ? '' : 's'}, ${missing.length} missing view${missing.length === 1 ? '' : 's'}`,
+      `${moduleRiskSummary.length} detector follow-up${moduleRiskSummary.length === 1 ? '' : 's'} from submitted media`,
+      `${reportDisplayName} is the report subject; entered make/model still needs serial/PIN and paperwork confirmation`,
+      highestRiskFinding ? `Top visible finding: ${highestRiskFinding.category} — ${highestRiskFinding.finding}` : 'No visible finding selected yet',
+    ],
+    next_capture_step: nextMissingStep ? `${nextMissingStep.order}. ${nextMissingStep.title}: ${nextMissingStep.instruction}` : 'All required capture slots have media; review seller questions and export the report.',
+    truth_note: 'FarmFax changes the report based on uploaded photos, sampled video frames, missing views, and entered tractor details. It does not certify hidden condition.',
+  }), [acceptedCount, dealPosture, highestRiskFinding, missing.length, moduleRiskSummary.length, nextMissingStep, nextMoveCopy, reportDisplayName, reviewCount])
+
   const mechanicHandoffSummary = useMemo(() => [
     `${reportSeed.makeModelGuess.make} ${reportSeed.makeModelGuess.model} · ${reportSeed.hourMeter == null ? 'hour meter unknown' : `${reportSeed.hourMeter.toLocaleString()} hrs`} · serial/PIN ${reportSeed.serialNumber}`,
     `Top buyer concern: ${highestRiskFinding.category} — ${highestRiskFinding.finding}`,
@@ -872,6 +912,7 @@ function App() {
       truth_note: enteredEquipmentName ? 'Make/model was entered by the recorder and still needs serial/PIN and paperwork confirmation.' : 'No custom make/model entered; report shows scenario/catalog guess only.',
     },
     capture_order: captureOrder,
+    media_driven_result: mediaDrivenResult,
     equipment_type: reportSeed.equipmentType,
     serial_number: reportSeed.serialNumber,
     hour_meter: reportSeed.hourMeter,
@@ -940,7 +981,7 @@ function App() {
       status: item.status,
       proof: item.line,
     })),
-  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, captureOrder, conditionScore, customSession, detectorModuleExports, detectorQuestions, enteredEquipmentName, findings, mechanicHandoffSummary, missing, moduleRiskSummary, photoSourceCount, reportDisplayName, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, tractorMake, tractorModel, tractorNotes, videoSourceCount])
+  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, captureOrder, conditionScore, customSession, detectorModuleExports, detectorQuestions, enteredEquipmentName, findings, mechanicHandoffSummary, mediaDrivenResult, missing, moduleRiskSummary, photoSourceCount, reportDisplayName, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, tractorMake, tractorModel, tractorNotes, videoSourceCount])
 
   const openRecordPreview = useMemo(() => ({
     schema: report.schema_version,
@@ -950,6 +991,7 @@ function App() {
     session: report.session,
     custom_equipment: report.custom_equipment,
     capture_order: report.capture_order,
+    media_driven_result: report.media_driven_result,
     input_sources: report.input_sources,
     demo_truth: report.demo_truth,
     equipment_identity: {
@@ -1452,6 +1494,10 @@ function App() {
                   </button>
                   <span>{step.media_needed}</span>
                   <p>{step.instruction}</p>
+                  <div className="automated-step-list">
+                    {step.steps.map((item, itemIndex) => <small key={`${step.slot}-photo-${itemIndex}`}>Photo step {itemIndex + 1}: {item}</small>)}
+                    {step.video_steps.map((item, itemIndex) => <small key={`${step.slot}-video-${itemIndex}`}>Video step {itemIndex + 1}: {item}</small>)}
+                  </div>
                 </li>
               ))}
             </ol>
@@ -1563,6 +1609,9 @@ function App() {
                   <h3>{slot.title}</h3>
                   <p>{slot.prompt}</p>
                   <small>{slot.why}</small>
+                  <ol className="slot-step-list" aria-label={`${slot.title} automated capture steps`}>
+                    {captureStepList(slot).map((item) => <li key={`${slot.id}-${item}`}>{item}</li>)}
+                  </ol>
                 </div>
                 <div className="slot-media-actions">
                   <button className="camera-button" type="button" onClick={() => openCamera(slot)}>Take photo</button>
@@ -1822,6 +1871,13 @@ function App() {
                 <small>{risk.evidence}</small>
               </article>
             ))}
+          </div>
+          <div className="media-driven-result" data-qa="media-driven-result">
+            <span>Media-driven result</span>
+            <h3>{report.media_driven_result.headline}</h3>
+            {report.media_driven_result.basis.map((item) => <p key={item}>{item}</p>)}
+            <b>Next capture: {report.media_driven_result.next_capture_step}</b>
+            <small>{report.media_driven_result.truth_note}</small>
           </div>
           <div className="risk-disclosure">FarmFax reviews submitted photos, short videos, and entered details only. It is not a mechanic inspection, title search, theft check, lien check, appraisal, repair estimate, warranty, or guarantee.</div>
           <div className="evidence-strip" data-qa="evidence-summary">

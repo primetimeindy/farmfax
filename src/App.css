@@ -484,3 +484,13 @@ h3 { margin:0 0 8px; }
   .custom-session-panel { grid-template-columns:1fr; }
   .session-form-grid, .session-summary { grid-template-columns:1fr; }
 }
+.automated-step-list, .slot-step-list { display:grid; gap:6px; margin-top:9px; }
+.automated-step-list small { display:block; border:1px solid rgba(255,255,255,.09); border-radius:10px; padding:7px 8px; color:#d7e4d1; background:rgba(255,255,255,.035); line-height:1.28; }
+.slot-step-list { padding-left:18px; color:#d7e4d1; font-size:.78rem; line-height:1.32; }
+.slot-step-list li { margin:4px 0; }
+.media-driven-result { margin:12px 0; border:1px solid rgba(110,247,194,.24); border-radius:18px; padding:14px; background:linear-gradient(145deg, rgba(110,247,194,.075), rgba(0,0,0,.18)); }
+.media-driven-result span { color:var(--mint); font:1000 .66rem/1 ui-monospace, monospace; letter-spacing:.12em; text-transform:uppercase; }
+.media-driven-result h3 { margin:8px 0 10px; color:var(--green); }
+.media-driven-result p { margin:7px 0; color:#d7e4d1; }
+.media-driven-result b, .media-driven-result small { display:block; margin-top:10px; }
+.media-driven-result small { color:var(--muted); }

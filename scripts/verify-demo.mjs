@@ -125,6 +125,11 @@ const requiredSourceLabels = [
   'custom_equipment',
   'capture_order',
   'Make/model was entered by the recorder',
+  'data-qa="media-driven-result"',
+  'Media-driven result',
+  'media_driven_result',
+  'Photo step',
+  'Video step',
 ]
 
 const rejectedSourceLabels = [
