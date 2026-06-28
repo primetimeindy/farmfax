@@ -743,6 +743,7 @@ function App() {
   const [tractorModel, setTractorModel] = useState('')
   const [tractorNotes, setTractorNotes] = useState('')
   const [sessionStatus, setSessionStatus] = useState('')
+  const [reportGenerated, setReportGenerated] = useState(false)
   const [stripeOpen, setStripeOpen] = useState(false)
   const [isSampleVideoLoading, setIsSampleVideoLoading] = useState(false)
   const [selectedFinding, setSelectedFinding] = useState<Finding>(findings[0])
@@ -991,6 +992,7 @@ function App() {
     session: report.session,
     custom_equipment: report.custom_equipment,
     capture_order: report.capture_order,
+    report_generated: reportGenerated,
     media_driven_result: report.media_driven_result,
     input_sources: report.input_sources,
     demo_truth: report.demo_truth,
@@ -1016,7 +1018,7 @@ function App() {
     before_deposit_checklist: report.before_deposit_checklist,
     risk_summary: report.risk_summary.map((risk) => ({ id: risk.id, score: risk.score, level: risk.level, action: risk.buyerAction })),
     portability: 'Core record exports as JSON/PDF; paid hosting does not own the equipment history.',
-  }), [report, slots])
+  }), [report, reportGenerated, slots])
 
   const workflowTrace = useMemo(() => [
     {
@@ -1065,6 +1067,7 @@ function App() {
 
   async function saveSlotImage(slotId: SlotId, image: string, requestId = nextUploadRequest(slotId)) {
     if (!isCurrentUpload(slotId, requestId)) return
+    setReportGenerated(false)
     setScenarioState((current) => scenarioReducer(current, { type: 'replace-slot-image', slotId, image, mediaType: 'image' }))
     const analysis = await analyzeImageHeuristics(image)
     if (!isCurrentUpload(slotId, requestId)) return
@@ -1075,6 +1078,7 @@ function App() {
     try {
       const { poster, video } = await analyzeVideoFile(file)
       if (!isCurrentUpload(slotId, requestId)) return
+      setReportGenerated(false)
       setScenarioState((current) => scenarioReducer(current, {
         type: 'replace-slot-image',
         slotId,
@@ -1163,6 +1167,7 @@ function App() {
     }
     setMediaErrors({})
     setIsSampleVideoLoading(false)
+    setReportGenerated(false)
     setScenarioState(createScenarioState(scenarioId))
   }
 
@@ -1251,6 +1256,17 @@ function App() {
     }
   }, [])
 
+  function startNewReportFlow() {
+    newCustomSession()
+    window.setTimeout(() => document.getElementById('custom-session')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+  }
+
+  function generateCustomReport() {
+    saveCustomSession()
+    setReportGenerated(true)
+    window.setTimeout(() => document.getElementById('report')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+  }
+
   function saveCustomSession() {
     const savedAt = nowIso()
     const payload = {
@@ -1313,6 +1329,7 @@ function App() {
     setTractorMake('')
     setTractorModel('')
     setTractorNotes('')
+    setReportGenerated(false)
     setScenarioState(createScenarioState('incomplete-seller-listing'))
     setSessionStatus('new blank recording session ready')
     window.setTimeout(() => setSessionStatus(''), 2400)
@@ -1430,28 +1447,39 @@ function App() {
         </div>
       </section>
 
-      <section className="custom-session-panel panel" data-qa="custom-session-builder">
+      <section id="custom-session" className="custom-session-panel panel" data-qa="custom-session-builder">
         <div>
           <span className="section-label">custom savable session</span>
           <h2>Record this tractor into its own FarmFax report.</h2>
           <p className="muted">Enter the make/model you know, follow the ordered capture list, then save or export the session. Entered make/model is labeled as recorder-provided until serial/PIN and paperwork confirm it.</p>
         </div>
         <div className="session-form-grid">
-          <label>Session name<input data-qa="custom-session-name" value={customSessionName} onChange={(event) => setCustomSessionName(event.target.value)} /></label>
-          <label>Tractor make<input data-qa="tractor-make-input" placeholder="e.g. John Deere" value={tractorMake} onChange={(event) => setTractorMake(event.target.value)} /></label>
-          <label>Model / series<input data-qa="tractor-model-input" placeholder="e.g. 5075E" value={tractorModel} onChange={(event) => setTractorModel(event.target.value)} /></label>
-          <label className="wide">Recorder notes<input data-qa="tractor-notes-input" placeholder="e.g. non-running, parked 2 years, seller says battery dead" value={tractorNotes} onChange={(event) => setTractorNotes(event.target.value)} /></label>
+          <label>Session name<input data-qa="custom-session-name" value={customSessionName} onChange={(event) => { setReportGenerated(false); setCustomSessionName(event.target.value) }} /></label>
+          <label>Tractor make<input data-qa="tractor-make-input" placeholder="e.g. John Deere" value={tractorMake} onChange={(event) => { setReportGenerated(false); setTractorMake(event.target.value) }} /></label>
+          <label>Model / series<input data-qa="tractor-model-input" placeholder="e.g. 5075E" value={tractorModel} onChange={(event) => { setReportGenerated(false); setTractorModel(event.target.value) }} /></label>
+          <label className="wide">Recorder notes<input data-qa="tractor-notes-input" placeholder="e.g. non-running, parked 2 years, seller says battery dead" value={tractorNotes} onChange={(event) => { setReportGenerated(false); setTractorNotes(event.target.value) }} /></label>
         </div>
         <div className="session-actions">
-          <button type="button" data-qa="save-custom-session" onClick={saveCustomSession}>Save session on this device</button>
+          <button type="button" data-qa="start-new-report" onClick={startNewReportFlow}>Start new report</button>
+          <button type="button" data-qa="save-custom-session" onClick={saveCustomSession}>Save progress</button>
           <button className="ghost" type="button" data-qa="load-custom-session" onClick={loadCustomSession}>Load saved session</button>
-          <button className="ghost" type="button" data-qa="new-custom-session" onClick={newCustomSession}>New blank tractor session</button>
+          <button className="ghost" type="button" data-qa="new-custom-session" onClick={newCustomSession}>Reset blank session</button>
+          <button type="button" data-qa="generate-custom-report" onClick={generateCustomReport}>Generate scored report</button>
           {sessionStatus && <small>{sessionStatus}</small>}
         </div>
         <div className="session-summary">
           <span>session_id</span><b>{customSessionIdValue}</b>
           <span>report subject</span><b>{reportDisplayName}</b>
           <span>capture plan</span><b>7 ordered photos/videos</b>
+        </div>
+        <div className="report-flow-panel" data-qa="new-report-workflow">
+          <span className="section-label">new report workflow</span>
+          <ol>
+            <li><b>Start new report</b><small>Creates a fresh blank tractor session.</small></li>
+            <li><b>Record with guidance</b><small>Follow each photo/video step in order and upload into the matching slot.</small></li>
+            <li><b>Generate scored report</b><small>After submission, FarmFax scores evidence, surfaces risks, missing proof, and seller suggestions.</small></li>
+          </ol>
+          <p>{reportGenerated ? 'Report generated from the current submitted evidence.' : 'Report not generated yet — record/submit evidence, then press Generate scored report.'}</p>
         </div>
       </section>
 
@@ -1501,6 +1529,10 @@ function App() {
                 </li>
               ))}
             </ol>
+            <div className="submit-evidence-bar" data-qa="submit-evidence-generate">
+              <b>{reportGenerated ? 'Report is generated' : 'When your photos/videos are submitted, generate the scored report.'}</b>
+              <button type="button" onClick={generateCustomReport}>Generate scored report from submitted media</button>
+            </div>
           </div>
           <div className="scan-cockpit" data-qa="scan-cockpit">
             <div className="scan-viewport">
@@ -1848,7 +1880,14 @@ function App() {
       <section className="packet-layout" id="report">
         <div className="panel report-panel">
           <div className="section-label">buyer risk report</div>
-          <h2>A sharper pre-buy conversation.</h2>
+          <h2>{reportGenerated ? 'Generated scored tractor report.' : 'Generate after recording and submitting media.'}</h2>
+          {!reportGenerated && (
+            <div className="report-pending-card" data-qa="report-pending-state">
+              <b>Report not generated yet</b>
+              <p>Start a new report, enter make/model, follow the ordered photo/video guidance, upload evidence into each slot, then press Generate scored report. The score and suggestions below will be based on submitted evidence and missing proof.</p>
+              <button type="button" onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Go record/submit photos and videos</button>
+            </div>
+          )}
           <div className="report-score">
             <strong>{report.condition_score}</strong>
             <div>

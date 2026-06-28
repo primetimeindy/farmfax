@@ -130,6 +130,15 @@ const requiredSourceLabels = [
   'media_driven_result',
   'Photo step',
   'Video step',
+  'data-qa="start-new-report"',
+  'Start new report',
+  'data-qa="generate-custom-report"',
+  'Generate scored report',
+  'data-qa="new-report-workflow"',
+  'new report workflow',
+  'data-qa="submit-evidence-generate"',
+  'data-qa="report-pending-state"',
+  'Report not generated yet',
 ]
 
 const rejectedSourceLabels = [
