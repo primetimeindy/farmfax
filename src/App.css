@@ -504,3 +504,40 @@ h3 { margin:0 0 8px; }
 .report-pending-card b { color:var(--amber); }
 @media (max-width: 860px) { .report-flow-panel ol { grid-template-columns:1fr; } .submit-evidence-bar { align-items:stretch; flex-direction:column; } }
 .guided-capture-status { border:1px solid rgba(156,255,125,.26); border-radius:12px; padding:9px 10px; color:var(--green); background:rgba(156,255,125,.07); font-weight:900; }
+
+
+/* Photo-first FarmFax sprint: reduce prose, emphasize capture -> PDF. */
+.photo-first-note { color: var(--mint); font-weight: 1000; }
+.skip-slot-button { width: 100%; min-height: 40px; padding: 9px 11px; color: var(--amber) !important; border-color: rgba(255,191,78,.32) !important; }
+.capture-slot.skipped { border-color: rgba(255,191,78,.38); background: rgba(255,191,78,.045); }
+.capture-slot.skipped span { color: var(--amber); }
+.buy-skip-calculator, .score-explanation { margin-top: 12px; border: 1px solid rgba(255,255,255,.13); border-radius: 18px; padding: 14px; background: rgba(0,0,0,.22); }
+.buy-skip-calculator span, .score-explanation span { color: var(--mint); font:1000 .68rem/1 ui-monospace, monospace; letter-spacing:.12em; text-transform:uppercase; }
+.buy-skip-calculator h3 { margin: 8px 0; font-size: clamp(1.6rem, 3vw, 2.8rem); letter-spacing: -.04em; }
+.buy-skip-calculator.buy { border-color: rgba(156,255,125,.35); }
+.buy-skip-calculator.buy h3 { color: var(--green); }
+.buy-skip-calculator.negotiate { border-color: rgba(255,191,78,.42); }
+.buy-skip-calculator.negotiate h3 { color: var(--amber); }
+.buy-skip-calculator.skip { border-color: rgba(255,107,98,.45); }
+.buy-skip-calculator.skip h3 { color: var(--red); }
+.buy-skip-calculator b { display:block; margin-top: 8px; color: var(--ink); }
+.score-explanation { display:flex; flex-wrap:wrap; align-items:center; gap: 8px; }
+.score-explanation b { border:1px solid rgba(255,255,255,.12); border-radius:999px; padding:8px 10px; color:#d7e4d1; background:rgba(255,255,255,.04); font-size:.82rem; }
+/* Hide demo/proof prose on the main website; source/verifier still keep it for judging artifacts. */
+.proof-strip, .sample-selector, .architecture-row, .report-intelligence-panel, .report-trust-loop, .judge-conversion-panel, .judge-proof-panel, .market-context-panel, .source-trail { display:none; }
+.detector-module-report, .specific-detector-stack, .zone-checklist { display:none; }
+.slot-step-list, .automated-step-list { display:none; }
+.hero-card { min-height: 360px; }
+.lede { max-width: 760px; }
+@media print {
+  body.pdf-print-mode .app-shell > section:not(.pdf-report-shell),
+  body.pdf-print-mode .topbar,
+  body.pdf-print-mode .commerce-panel,
+  body.pdf-print-mode .hero-actions,
+  body.pdf-print-mode .advanced-details summary { display:none !important; }
+  body.pdf-print-mode .pdf-report-shell { display:block !important; }
+  body.pdf-print-mode .report-panel { display:block !important; border:0 !important; padding: 0 !important; }
+  body.pdf-print-mode .advanced-details { display:block !important; border:0 !important; }
+  body.pdf-print-mode .advanced-details .open-record-preview { display:none !important; }
+  body.pdf-print-mode .question-grid { grid-template-columns:1fr 1fr; }
+}

@@ -1,4 +1,4 @@
-export type CaptureState = 'accepted' | 'review' | 'missing'
+export type CaptureState = 'accepted' | 'review' | 'missing' | 'skipped'
 export type Severity = 'green' | 'yellow' | 'red'
 export type RiskLevel = 'low' | 'medium' | 'high'
 
@@ -134,6 +134,7 @@ export type ScenarioAction =
   | { type: 'replace-slot-image'; slotId: SlotId; image: string; analysis?: ImageAnalysis; mediaType?: MediaType; video?: VideoAnalysis }
   | { type: 'set-slot-analysis'; slotId: SlotId; image: string; analysis: ImageAnalysis; mediaType?: MediaType; video?: VideoAnalysis }
   | { type: 'mark-slot-review'; slotId: SlotId }
+  | { type: 'mark-slot-skipped'; slotId: SlotId }
   | { type: 'clear-slot'; slotId: SlotId }
 
 const slotCopy = (slot: ScenarioSlotSeed): CaptureSlot => ({
@@ -477,6 +478,11 @@ export function scenarioReducer(state: ScenarioState, action: ScenarioAction): S
       return {
         ...state,
         slots: state.slots.map((slot) => (slot.id === action.slotId ? { ...slot, state: 'review' } : slot)),
+      }
+    case 'mark-slot-skipped':
+      return {
+        ...state,
+        slots: state.slots.map((slot) => (slot.id === action.slotId ? { ...slot, state: 'skipped', image: undefined, analysis: undefined, video: undefined, mediaType: undefined } : slot)),
       }
     case 'clear-slot':
       return {

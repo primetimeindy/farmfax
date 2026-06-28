@@ -6,7 +6,7 @@ import './App.css'
 
 const FARMFAX_API_URL = import.meta.env.VITE_FARMFAX_API_URL || 'http://127.0.0.1:8787'
 
-type CaptureState = 'accepted' | 'review' | 'missing'
+type CaptureState = 'accepted' | 'review' | 'missing' | 'skipped'
 type Severity = 'green' | 'yellow' | 'red'
 type SlotId = 'walkaround' | 'serial' | 'hours' | 'hydraulics' | 'tires' | 'paint' | 'engine'
 
@@ -53,7 +53,7 @@ type VideoAnalysis = {
 type DetectorSignal = {
   label: string
   value: string
-  status: 'good' | 'review' | 'missing'
+  status: 'good' | 'review' | 'missing' | 'skipped'
   reason: string
 }
 
@@ -175,14 +175,23 @@ type FarmFaxReport = {
     sampled_video_frames: number
     accepted_slots: number
     missing_slots: number
+    skipped_slots: number
   }
   submitted_media: {
     supplied_slots: string[]
     missing_slots: string[]
+    skipped_slots: string[]
     videos: number
     photos: number
   }
   advice_summary: string[]
+  scoring_explanation: string[]
+  buy_or_skip_calculator: {
+    verdict: 'buy' | 'negotiate' | 'skip'
+    label: string
+    reason: string
+    max_deposit_action: string
+  }
   demo_truth: {
     browser_photo_checks: 'implemented'
     browser_video_frame_sampling: 'implemented'
@@ -362,6 +371,7 @@ function cameraGuideForSlot(slot: CaptureSlot | null) {
 }
 
 function detectorSignalsForSlot(slot: CaptureSlot): DetectorSignal[] {
+  if (slot.state === 'skipped') return [{ label: 'Skipped by buyer', value: 'Skipped', status: 'skipped', reason: 'FarmFax can still generate the PDF, but this skipped view lowers confidence and becomes an owner question.' }]
   if (slot.state === 'missing') {
     if (slot.id === 'engine') return [{ label: 'Guard / cover visibility check', value: 'No engine/cold-start media', status: 'missing', reason: 'Missing engine bay proof blocks a basic checklist view of guards, covers, belts, leaks, and smoke context.' }]
     return [{ label: 'Proof missing', value: 'No media', status: 'missing', reason: 'FarmFax cannot inspect what was not captured.' }]
@@ -424,6 +434,7 @@ function questionFromDetector(item: DetectorModuleExport) {
 }
 
 function realAdviceForMissing(slot: CaptureSlot): Finding {
+  const skipped = slot.state === 'skipped'
   const critical = slot.id === 'serial' || slot.id === 'hours' || slot.id === 'engine' || slot.id === 'hydraulics'
   const category = slot.id === 'serial' ? 'Serial/PIN missing'
     : slot.id === 'hours' ? 'Hour meter missing'
@@ -431,12 +442,12 @@ function realAdviceForMissing(slot: CaptureSlot): Finding {
         : slot.id === 'hydraulics' ? 'Hydraulics missing'
           : `${slot.title} missing`
   return {
-    severity: critical ? 'red' : 'yellow',
-    category,
-    finding: `${slot.title} was not submitted, so this report cannot judge that part of the tractor.`,
-    confidence: 96,
+    severity: critical && !skipped ? 'red' : 'yellow',
+    category: skipped ? `Skipped: ${slot.title}` : category,
+    finding: skipped ? `${slot.title} was skipped, so the PDF lists it as unanswered buyer risk.` : `${slot.title} was not submitted, so this report cannot judge that part of the tractor.`,
+    confidence: skipped ? 76 : 96,
     evidence: slot.id,
-    nextStep: slot.id === 'serial' ? 'Do not send a deposit until serial/PIN is readable and matched to paperwork.'
+    nextStep: skipped ? `Ask the owner to supply ${slot.title.toLowerCase()} proof before relying on the score.` : slot.id === 'serial' ? 'Do not send a deposit until serial/PIN is readable and matched to paperwork.'
       : slot.id === 'hours' ? 'Get ignition-on hour-meter proof and compare hours to wear/service records.'
         : slot.id === 'engine' ? 'Get engine bay plus cold-start/running or honest non-running proof before pricing repairs.'
           : slot.id === 'hydraulics' ? 'Get cylinder/hoses/couplers photos; hydraulic leaks are expensive and safety-relevant.'
@@ -485,6 +496,7 @@ function riskSeverity(level: RiskLevel): Severity {
 
 function buildRiskSummary(slots: CaptureSlot[], baseFindings: Finding[], analyzedCount: number, reportSeed: ScenarioReportSeed): RiskCard[] {
   const missing = slots.filter((slot) => slot.state === 'missing')
+  const skipped = slots.filter((slot) => slot.state === 'skipped')
   const needsReview = slots.filter((slot) => slot.state === 'review')
   const accepted = slots.filter((slot) => slot.state === 'accepted')
   const serial = slots.find((slot) => slot.id === 'serial')
@@ -542,7 +554,7 @@ function buildRiskSummary(slots: CaptureSlot[], baseFindings: Finding[], analyze
   return [
     { id: 'identity', label: 'Serial / paperwork', score: identityScore, level: identityLevel, severity: riskSeverity(identityLevel), verdict: identityLevel === 'high' ? 'Machine identity cannot be trusted from current photos.' : identityLevel === 'medium' ? 'Serial/model cues are plausible, but paperwork still needs checking.' : 'Visible model cues match the listing.', evidence: 'serial plate · model cues · paperwork not checked', buyerAction: 'Compare PIN plate to bill of sale, lien/title paperwork, dealer stock record, and service invoices.', factors: identityFactors },
     { id: 'safety', label: 'Costly repair / safety', score: safetyScore, level: safetyLevel, severity: riskSeverity(safetyLevel), verdict: safetyLevel === 'high' ? 'Do not skip inspection before buying or operating.' : safetyLevel === 'medium' ? 'Possible repair or safety concern needs closer inspection.' : 'No obvious safety-critical issue in supplied photos.', evidence: `${redFindings.length} red flag · engine ${engine?.state ?? 'unknown'} · hydraulics ${hydraulics?.state ?? 'unknown'}`, buyerAction: 'Inspect welds, pins, mounts, guards, hoses, loader arms, frame rails, and operator safety equipment.', factors: safetyFactors },
-    { id: 'evidence', label: 'Proof supplied', score: evidenceScore, level: evidenceLevel, severity: riskSeverity(evidenceLevel), verdict: evidenceLevel === 'high' ? 'Too little evidence to judge this machine.' : evidenceLevel === 'medium' ? 'Important proof is missing or needs a retake.' : 'Core views are captured.', evidence: `${accepted.length}/7 photos received · ${missing.length} still needed · ${analyzedCount}/7 checked`, buyerAction: 'Ask seller for missing or cleaner photos before relying on the report.', factors: evidenceFactors },
+    { id: 'evidence', label: 'Proof supplied', score: evidenceScore, level: evidenceLevel, severity: riskSeverity(evidenceLevel), verdict: evidenceLevel === 'high' ? 'Too little evidence to judge this machine.' : evidenceLevel === 'medium' ? 'Important proof is missing or needs a retake.' : 'Core views are captured.', evidence: `${accepted.length}/7 captures received · ${missing.length} missing · ${skipped.length} skipped · ${analyzedCount}/7 checked`, buyerAction: 'Ask seller for missing or cleaner photos before relying on the report.', factors: evidenceFactors },
     { id: 'hours', label: 'Hours check', score: hourScore, level: hourLevel, severity: riskSeverity(hourLevel), verdict: hourLevel === 'high' ? 'Hour evidence has serious gaps or missing proof.' : hourLevel === 'medium' ? 'Displayed hours should be checked against records and wear.' : 'Hour evidence appears usable, pending normal record review.', evidence: `${hourLabel} shown · service records not supplied`, buyerAction: 'Ask for service invoices, ECU/dealer diagnostics if available, and prior auction/dealer listings.', factors: hourFactors },
     { id: 'leverage', label: 'Offer leverage', score: leverageScore, level: leverageLevel, severity: riskSeverity(leverageLevel), verdict: leverageLevel === 'high' ? 'Strong reason to require repair proof or a contingency.' : leverageLevel === 'medium' ? 'Moderate leverage from visible issues and unanswered proof.' : 'Limited visible leverage; use report mainly for diligence.', evidence: `${redFindings.length} red · ${yellowFindings.length} yellow · ${missing.length} missing`, buyerAction: 'Use findings to request records, additional photos, inspection contingency, or seller concession — not as an appraisal.', factors: leverageFactors },
   ]
@@ -847,6 +859,7 @@ function App() {
   const reviewCount = slots.filter((slot) => slot.state === 'review').length
   const analyzedSlots = slots.filter((slot) => slot.analysis)
   const missing = slots.filter((slot) => slot.state === 'missing')
+  const skipped = slots.filter((slot) => slot.state === 'skipped')
   const videoSourceCount = slots.filter((slot) => slot.mediaType === 'video').length
   const enteredEquipmentName = [tractorMake.trim(), tractorModel.trim()].filter(Boolean).join(' ')
   const reportDisplayName = enteredEquipmentName || `${reportSeed.makeModelGuess.make} ${reportSeed.makeModelGuess.model}`
@@ -872,7 +885,7 @@ function App() {
   })), [slots])
   const photoSourceCount = analyzedSlots.filter((slot) => slot.mediaType !== 'video').length
   const sampledFrameCount = slots.reduce((sum, slot) => sum + (slot.video?.frameCount ?? 0), 0)
-  const scanReadiness = Math.round(((acceptedCount + reviewCount * 0.55) / slots.length) * 100)
+  const scanReadiness = Math.round(((acceptedCount + reviewCount * 0.55 + skipped.length * 0.2) / slots.length) * 100)
   const highestRiskFinding = findings.find((finding) => finding.severity === 'red') ?? findings.find((finding) => finding.severity === 'yellow') ?? findings[0]
   const scanMode = missing.length ? 'Evidence missing' : reviewCount ? 'Human review needed' : 'Ready for buyer report'
   const scanFocus = highestRiskFinding ? slotTitle(slots, highestRiskFinding.evidence) : 'Walkaround'
@@ -896,7 +909,7 @@ function App() {
     { label: 'Engine bay / running proof', ids: ['engine'] as SlotId[] },
   ].map((zone) => {
     const zoneSlots = zone.ids.map((id) => slots.find((slot) => slot.id === id)).filter(Boolean) as CaptureSlot[]
-    const status = zoneSlots.some((slot) => slot.state === 'missing') ? 'missing' : zoneSlots.some((slot) => slot.state === 'review') ? 'review' : 'received'
+    const status = zoneSlots.some((slot) => slot.state === 'missing') ? 'missing' : zoneSlots.some((slot) => slot.state === 'skipped') ? 'skipped' : zoneSlots.some((slot) => slot.state === 'review') ? 'review' : 'received'
     return { ...zone, status, count: zoneSlots.filter((slot) => slot.state !== 'missing').length, total: zoneSlots.length }
   })), [slots])
   const baseSellerQuestionPreview = (reportGenerated ? realMediaFindings.map((finding) => finding.nextStep) : reportSeed.buyerQuestions).slice(0, 3)
@@ -926,15 +939,15 @@ function App() {
     .map(questionFromDetector), [detectorModuleExports])
   const sellerQuestionPreview = [...baseSellerQuestionPreview, ...detectorQuestions].slice(0, 3)
   const riskSummary = useMemo(() => buildRiskSummary(slots, findings, analyzedSlots.length, reportSeed), [slots, findings, analyzedSlots.length, reportSeed])
-  const dealPosture = missing.some((slot) => slot.id === 'serial' || slot.id === 'hours')
+  const dealPosture = [...missing, ...skipped].some((slot) => slot.id === 'serial' || slot.id === 'hours')
     ? 'Do not send money yet'
     : riskSummary.some((risk) => risk.severity === 'red')
       ? 'Inspect before any deposit'
       : riskSummary.some((risk) => risk.severity === 'yellow')
         ? 'Ask seller for proof first'
         : 'Looks worth a call'
-  const nextMoveCopy = missing.some((slot) => slot.id === 'serial' || slot.id === 'hours')
-    ? 'Ask for the missing serial plate and hour meter photos before you drive out, wire money, or place a deposit.'
+  const nextMoveCopy = [...missing, ...skipped].some((slot) => slot.id === 'serial' || slot.id === 'hours')
+    ? 'Get serial/PIN and hour-meter proof before deposit. Skips are allowed, but they count against the buy/skip score.'
     : riskSummary.some((risk) => risk.id === 'safety' && risk.severity === 'red')
       ? 'Have the leak, weld, frame, and engine evidence inspected before any deposit. Use the questions below to slow the deal down.'
       : riskSummary.some((risk) => risk.severity === 'yellow')
@@ -968,17 +981,18 @@ function App() {
   ], [detectorQuestions.length, missing, moduleRiskSummary])
   const conditionScore = useMemo(() => {
     const missingPenalty = missing.length * 3
+    const skippedPenalty = skipped.length * 5
     const reviewPenalty = reviewCount * 4
     const findingPenalty = findings.reduce((sum, finding) => sum + (finding.severity === 'red' ? 8 : finding.severity === 'yellow' ? 4 : -2), 0)
     const detectorPenalty = moduleRiskSummary.reduce((sum, module) => sum + (module.risk === 'red' ? 8 : module.risk === 'yellow' ? 4 : 0), 0)
     const mediaBonus = Math.min(12, analyzedSlots.length * 2 + sampledFrameCount)
-    return Math.round(Math.max(0, Math.min(100, 96 - missingPenalty - reviewPenalty - findingPenalty - detectorPenalty + mediaBonus)))
-  }, [analyzedSlots.length, findings, missing.length, moduleRiskSummary, reviewCount, sampledFrameCount])
+    return Math.round(Math.max(0, Math.min(100, 96 - missingPenalty - skippedPenalty - reviewPenalty - findingPenalty - detectorPenalty + mediaBonus)))
+  }, [analyzedSlots.length, findings, missing.length, moduleRiskSummary, reviewCount, sampledFrameCount, skipped.length])
   const runningStatus: RunningStatus = slots.find((slot) => slot.id === 'engine')?.state === 'missing' ? 'not_shown' : 'unknown'
   const runningStatusSource = runningStatus === 'not_shown' ? 'engine/running proof missing' : 'engine bay media supplied; running not proven'
   const serialSlot = slots.find((slot) => slot.id === 'serial')
   const hoursSlot = slots.find((slot) => slot.id === 'hours')
-  const reportConfidence = Math.max(18, Math.min(90, Math.round(acceptedCount * 8 + analyzedSlots.length * 5 + sampledFrameCount - missing.length * 7 - reviewCount * 4)))
+  const reportConfidence = Math.max(18, Math.min(90, Math.round(acceptedCount * 8 + analyzedSlots.length * 5 + sampledFrameCount - missing.length * 7 - skipped.length * 5 - reviewCount * 4)))
   const submittedIdentity: CatalogCandidate = useMemo(() => ({
     make: tractorMake.trim() || 'Recorder-entered',
     model: tractorModel.trim() || 'Unknown model',
@@ -987,6 +1001,19 @@ function App() {
     basis: 'Make/model entered by recorder; serial/PIN and paperwork match still required.',
   }), [serialSlot?.state, tractorMake, tractorModel])
   const reportAdviceSummary = useMemo(() => [dealPosture, ...findings.map((finding) => finding.nextStep), ...moduleRiskSummary.map((module) => module.action)].filter(Boolean).slice(0, 5), [dealPosture, findings, moduleRiskSummary])
+  const scoringExplanation = useMemo(() => [
+    `Base 96`,
+    `-${missing.length * 3} missing evidence`,
+    `-${skipped.length * 5} skipped evidence`,
+    `-${reviewCount * 4} retake/review`,
+    `+${Math.min(12, analyzedSlots.length * 2 + sampledFrameCount)} submitted-media bonus`,
+  ], [analyzedSlots.length, missing.length, reviewCount, sampledFrameCount, skipped.length])
+  const buySkipCalculator = useMemo(() => {
+    const criticalGap = [...missing, ...skipped].some((slot) => slot.id === 'serial' || slot.id === 'hours')
+    if (criticalGap || conditionScore < 45) return { verdict: 'skip' as const, label: 'SKIP / NO DEPOSIT', reason: 'Identity or hour proof is missing/skipped, or score is too low for a safe remote buy.', max_deposit_action: '$0 until proof is supplied' }
+    if (conditionScore < 72 || riskSummary.some((risk) => risk.severity === 'red')) return { verdict: 'negotiate' as const, label: 'NEGOTIATE / INSPECT', reason: 'There is enough evidence to continue, but repair or proof gaps should lower price or require mechanic review.', max_deposit_action: 'Refundable deposit only after seller answers questions' }
+    return { verdict: 'buy' as const, label: 'BUY CANDIDATE', reason: 'Core media is supplied and no red proof gate is active. Still verify paperwork and records.', max_deposit_action: 'Proceed only after paperwork match' }
+  }, [conditionScore, missing, riskSummary, skipped])
 
   const report: FarmFaxReport = useMemo(() => ({
     report_id: reportGenerated ? customSession.session_id : reportSeed.reportId,
@@ -1021,14 +1048,18 @@ function App() {
       sampled_video_frames: sampledFrameCount,
       accepted_slots: acceptedCount,
       missing_slots: missing.length,
+      skipped_slots: skipped.length,
     },
     submitted_media: {
       supplied_slots: slots.filter((slot) => slot.state !== 'missing').map((slot) => slot.title),
       missing_slots: missing.map((slot) => slot.title),
+      skipped_slots: skipped.map((slot) => slot.title),
       videos: videoSourceCount,
       photos: photoSourceCount,
     },
     advice_summary: reportAdviceSummary,
+    scoring_explanation: scoringExplanation,
+    buy_or_skip_calculator: buySkipCalculator,
     demo_truth: {
       browser_photo_checks: 'implemented',
       browser_video_frame_sampling: 'implemented',
@@ -1071,7 +1102,7 @@ function App() {
     before_deposit_checklist: beforeDepositChecklist,
     risk_summary: riskSummary,
     buyer_questions: [...findings.map((finding) => finding.nextStep), ...detectorQuestions].slice(0, 8),
-    missing_evidence: missing.map((slot) => slot.title),
+    missing_evidence: [...missing.map((slot) => slot.title), ...skipped.map((slot) => `${slot.title} (skipped)`)],
     open_record_commitment: 'Real report generated from submitted media and missing-proof checks; buyer owns the export.',
     integration_stack: architectureStack.map((item) => item.name),
     market_context_stats: marketContextStats,
@@ -1081,7 +1112,7 @@ function App() {
       status: item.status,
       proof: item.line,
     })),
-  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, captureOrder, conditionScore, customSession, detectorModuleExports, detectorQuestions, enteredEquipmentName, findings, mechanicHandoffSummary, mediaDrivenResult, missing, moduleRiskSummary, photoSourceCount, reportAdviceSummary, reportConfidence, reportDisplayName, reportGenerated, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, serialSlot?.state, hoursSlot?.state, slots, submittedIdentity, riskSummary, tractorMake, tractorModel, tractorNotes, videoSourceCount])
+  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, captureOrder, conditionScore, customSession, detectorModuleExports, detectorQuestions, enteredEquipmentName, findings, mechanicHandoffSummary, mediaDrivenResult, missing, moduleRiskSummary, photoSourceCount, buySkipCalculator, reportAdviceSummary, reportConfidence, scoringExplanation, reportDisplayName, reportGenerated, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, serialSlot?.state, hoursSlot?.state, slots, submittedIdentity, riskSummary, tractorMake, tractorModel, tractorNotes, videoSourceCount, skipped])
 
   const openRecordPreview = useMemo(() => ({
     schema: report.schema_version,
@@ -1097,6 +1128,8 @@ function App() {
     input_sources: report.input_sources,
     submitted_media: report.submitted_media,
     advice_summary: report.advice_summary,
+    scoring_explanation: report.scoring_explanation,
+    buy_or_skip_calculator: report.buy_or_skip_calculator,
     demo_truth: report.demo_truth,
     equipment_identity: {
       type: report.equipment_type,
@@ -1126,7 +1159,7 @@ function App() {
     {
       status: 'working demo',
       label: '7-view capture checklist',
-      detail: `${acceptedCount}/7 accepted · ${reviewCount} need review · ${missing.length} missing`,
+      detail: `${acceptedCount}/7 accepted · ${reviewCount} review · ${missing.length} missing · ${skipped.length} skipped`,
     },
     {
       status: 'working demo',
@@ -1153,7 +1186,7 @@ function App() {
       label: 'Hosted report checkout',
       detail: 'Payment screen only; free JSON/PDF export stays with the owner.',
     },
-  ], [acceptedCount, analyzedSlots.length, missing.length, report.buyer_questions.length, report.risk_summary, reviewCount, videoSourceCount])
+  ], [acceptedCount, analyzedSlots.length, missing.length, report.buyer_questions.length, report.risk_summary, reviewCount, videoSourceCount, skipped])
 
   const shareUrl = PUBLIC_DEMO_URL
 
@@ -1268,6 +1301,25 @@ function App() {
     } catch {
       window.prompt('Copy FarmFax demo URL', shareUrl)
     }
+  }
+
+  function skipSlot(slotId: SlotId) {
+    stopCamera()
+    setReportGenerated(false)
+    setScenarioState((current) => scenarioReducer(current, { type: 'mark-slot-skipped', slotId }))
+    setSessionStatus('slot skipped — PDF will list it as missing proof')
+    window.setTimeout(() => setSessionStatus(''), 2200)
+    continueGuidedCapture(slotId)
+  }
+
+  function generatePdfReport() {
+    saveCustomSession()
+    setReportGenerated(true)
+    document.body.classList.add('pdf-print-mode')
+    window.setTimeout(() => {
+      window.print()
+      window.setTimeout(() => document.body.classList.remove('pdf-print-mode'), 1200)
+    }, 120)
   }
 
   function updateSlotMedia(slotId: SlotId, event: ChangeEvent<HTMLInputElement>) {
@@ -1502,6 +1554,7 @@ function App() {
     setTractorModel('')
     setTractorNotes('')
     setReportGenerated(false)
+    setGuidedCaptureActive(false)
     setScenarioState(createBlankRealReportState())
     setSessionStatus('new blank recording session ready')
     window.setTimeout(() => setSessionStatus(''), 2400)
@@ -1545,14 +1598,13 @@ function App() {
         <div className="hero-copy-block">
           <p className="eyebrow">Real equipment condition report</p>
           <div className="demo-badge">Real report mode · browser analysis · no backend required</div>
-          <h1>Check the machine before you buy.</h1>
+          <h1>Record it. Score it. PDF it.</h1>
           <p className="lede">
-            FarmFax turns guided phone photos and short videos into an evidence-backed buyer report: visible condition,
-            missing proof, serial/PIN and hour-meter notes, seller questions, and buyer-owned JSON/PDF export.
+            Take the required photos/videos. Skip what you can't capture. Generate a free PDF with findings, reasoning, owner questions, and buy/skip score.
           </p>
           <div className="hero-actions primary-actions">
-            <button onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth' })}>Start photo checklist</button>
-            <button className="ghost" onClick={() => document.getElementById('report')?.scrollIntoView({ behavior: 'smooth' })}>See buyer report</button>
+            <button onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth' })}>Start capture</button>
+            <button className="ghost" onClick={() => document.getElementById('report')?.scrollIntoView({ behavior: 'smooth' })}>View PDF report</button>
           </div>
           <div className="judge-fast-path" aria-label="judge demo controls">
             <span>Judges:</span>
@@ -1621,9 +1673,9 @@ function App() {
 
       <section id="custom-session" className="custom-session-panel panel" data-qa="custom-session-builder">
         <div>
-          <span className="section-label">custom savable session</span>
-          <h2>Record this tractor into its own FarmFax report.</h2>
-          <p className="muted">Enter the make/model you know, follow the ordered capture list, then save or export the session. Entered make/model is labeled as recorder-provided until serial/PIN and paperwork confirm it.</p>
+          <span className="section-label">free sample report</span>
+          <h2>Start. Capture. Generate PDF.</h2>
+          <p className="muted">Camera-first flow. Skip any view you cannot capture; skipped proof is scored and explained in the PDF.</p>
         </div>
         <div className="session-form-grid">
           <label>Session name<input data-qa="custom-session-name" value={customSessionName} onChange={(event) => { setReportGenerated(false); setCustomSessionName(event.target.value) }} /></label>
@@ -1637,7 +1689,8 @@ function App() {
           <button type="button" data-qa="save-custom-session" onClick={saveCustomSession}>Save progress</button>
           <button className="ghost" type="button" data-qa="load-custom-session" onClick={loadCustomSession}>Load saved session</button>
           <button className="ghost" type="button" data-qa="new-custom-session" onClick={newCustomSession}>Reset blank session</button>
-          <button type="button" data-qa="generate-custom-report" onClick={generateCustomReport}>Generate scored report</button>
+          <button type="button" data-qa="generate-custom-report" onClick={generateCustomReport}>Generate report</button>
+          <button type="button" data-qa="generate-pdf-report" onClick={generatePdfReport}>Generate PDF report</button>
           {sessionStatus && <small>{sessionStatus}</small>}
         </div>
         <div className="session-summary">
@@ -1652,7 +1705,7 @@ function App() {
             <li><b>Record with guidance</b><small>Follow each photo/video step in order and upload into the matching slot.</small></li>
             <li><b>Generate scored report</b><small>After submission, FarmFax scores evidence, surfaces risks, missing proof, and seller suggestions.</small></li>
           </ol>
-          <p>{reportGenerated ? 'Report generated from the current submitted evidence.' : 'Report not generated yet — record/submit evidence, then press Generate scored report.'}</p>
+          <p>{reportGenerated ? 'PDF-ready report generated.' : 'Capture or skip each view, then generate the report.'}</p>
         </div>
       </section>
 
@@ -1669,9 +1722,9 @@ function App() {
       <section className="analysis-layout farm-layout" id="capture">
         <div className="panel capture-panel">
           <div className="section-label">guided evidence capture</div>
-          <h2>Seven views that reduce blind spots.</h2>
+          <h2>Capture checklist.</h2>
           <div className="capture-intro-row">
-            <p className="muted">Start with photos. Add a short video when motion, sound, smoke, or hydraulics matter. FarmFax samples selected frames; it does not inspect full video.</p>
+            <p className="muted">Photos first. Video when motion, leaks, smoke, or sound matter.</p>
             <button className="ghost sample-video-button" data-qa="sample-video-button" type="button" onClick={() => void runSampleVideo('hydraulics')} disabled={isSampleVideoLoading}>
               {isSampleVideoLoading ? 'Checking sample…' : 'Try sample video'}
             </button>
@@ -1684,8 +1737,8 @@ function App() {
           <div className="capture-order-panel" data-qa="ordered-capture-instructions">
             <div>
               <span className="section-label">record in this order</span>
-              <h3>Photo/video shot list for analysis</h3>
-              <p className="muted">Use this sequence while you are standing at the tractor. Press Auto camera capture to load each needed photo/video slot, then FarmFax advances to the next missing view.</p>
+              <h3>Tap, record, or skip.</h3>
+              <p className="muted">Auto camera opens the next needed view.</p>
             </div>
             <ol className="capture-order-list">
               {captureOrder.map((step) => (
@@ -1705,7 +1758,8 @@ function App() {
             <div className="submit-evidence-bar" data-qa="submit-evidence-generate">
               <b>{reportGenerated ? 'Report is generated' : 'When your photos/videos are submitted, generate the scored report.'}</b>
               <button type="button" data-qa="auto-camera-capture-inline" onClick={startGuidedCameraCapture}>Auto-load camera for next needed shot</button>
-              <button type="button" onClick={generateCustomReport}>Generate scored report from submitted media</button>
+              <button type="button" onClick={generateCustomReport}>Generate scored report</button>
+              <button type="button" data-qa="generate-pdf-report-inline" onClick={generatePdfReport}>Generate PDF</button>
             </div>
           </div>
           <div className="scan-cockpit" data-qa="scan-cockpit">
@@ -1820,7 +1874,8 @@ function App() {
                   </ol>
                 </div>
                 <div className="slot-media-actions">
-                  <button className="camera-button" type="button" onClick={() => openCamera(slot)}>Take photo</button>
+                  <button className="camera-button" type="button" onClick={() => openCamera(slot)}>Take photo/video</button>
+                  <button className="ghost skip-slot-button" data-qa="skip-capture-slot" type="button" onClick={() => skipSlot(slot.id)}>Skip this view</button>
                   <label>
                     <div className="capture-preview">
                       {slot.image ? (
@@ -1828,7 +1883,7 @@ function App() {
                           <img src={slot.image} alt={`${slot.title} capture`} />
                           {slot.mediaType === 'video' && <span className="video-badge">video sampled</span>}
                         </>
-                      ) : <div className="phone-placeholder">Tap to upload photo or video</div>}
+                      ) : <div className="phone-placeholder">Tap upload</div>}
                       {slot.analysis && (
                         <div className="heuristic-mask" aria-label="browser-side rust paint leak heuristic overlay">
                           {slot.analysis.cells.map((cell, index) => (
@@ -1922,7 +1977,7 @@ function App() {
           <h2>{dealPosture}</h2>
           <p>{nextMoveCopy}</p>
           <div className="decision-actions">
-            <button type="button" onClick={() => document.getElementById('report')?.scrollIntoView({ behavior: 'smooth' })}>See buyer report</button>
+            <button type="button" onClick={() => document.getElementById('report')?.scrollIntoView({ behavior: 'smooth' })}>View PDF report</button>
             <button className="ghost" type="button" onClick={() => void runCompleteSampleInspection()}>Load complete proof</button>
           </div>
         </article>
@@ -2051,14 +2106,14 @@ function App() {
         </aside>
       </section>
 
-      <section className="packet-layout" id="report">
-        <div className="panel report-panel">
-          <div className="section-label">buyer risk report</div>
-          <h2>{reportGenerated ? 'Generated scored tractor report.' : 'Generate after recording and submitting media.'}</h2>
+      <section className="packet-layout pdf-report-shell" id="report">
+        <div className="panel report-panel" data-qa="auto-populated-pdf-report">
+          <div className="section-label">auto-populated PDF report</div>
+          <h2>{reportGenerated ? 'PDF-ready equipment report.' : 'Generate after capture.'}</h2>
           {!reportGenerated && (
             <div className="report-pending-card" data-qa="report-pending-state">
               <b>Report not generated yet</b>
-              <p>Start a new report, enter make/model, follow the ordered photo/video guidance, upload evidence into each slot, then press Generate scored report. The score and practical suggestions will be based on submitted evidence: wear, rust, wet/leak signals, paint mismatch, tire evidence, identity proof, and missing views.</p>
+              <p>Capture photos/videos or skip unavailable views. Then generate the PDF report.</p>
               <button type="button" onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Go record/submit photos and videos</button>
             </div>
           )}
@@ -2067,13 +2122,23 @@ function App() {
             <div>
               <b>{report.custom_equipment.display_name}</b>
               <p>{report.custom_equipment.truth_note}</p>
-              <p>Screening score from submitted media only. FarmFax helps you decide what to ask next; it is not a mechanical inspection, title check, appraisal, warranty, or guarantee.</p>
+              <p>Score from submitted media, skipped views, visible rust/wet/paint/tire signals, and missing identity/hour proof.</p>
             </div>
           </div>
           <div className="deal-posture priority-action">
             <span>recommended next step</span>
             <h3>{dealPosture}</h3>
             <p>{nextMoveCopy}</p>
+          </div>
+          <div className={`buy-skip-calculator ${report.buy_or_skip_calculator.verdict}`} data-qa="buy-or-skip-calculator">
+            <span>Buy / skip calculator</span>
+            <h3>{report.buy_or_skip_calculator.label}</h3>
+            <p>{report.buy_or_skip_calculator.reason}</p>
+            <b>{report.buy_or_skip_calculator.max_deposit_action}</b>
+          </div>
+          <div className="score-explanation" data-qa="score-explanation">
+            <span>Score explained</span>
+            {report.scoring_explanation.map((item) => <b key={item}>{item}</b>)}
           </div>
           <div className="risk-strip">
             {report.risk_summary.map((risk) => (
@@ -2088,7 +2153,7 @@ function App() {
           <div className="media-driven-result" data-qa="media-driven-result">
             <span>Media-driven result</span>
             <h3>{report.media_driven_result.headline}</h3>
-            {report.media_driven_result.basis.map((item) => <p key={item}>{item}</p>)}
+            {report.media_driven_result.basis.slice(0, 2).map((item) => <p key={item}>{item}</p>)}
             <b>Next capture: {report.media_driven_result.next_capture_step}</b>
             <small>{report.media_driven_result.truth_note}</small>
           </div>
@@ -2141,8 +2206,8 @@ function App() {
             </div>
           </details>
           <div className="hero-actions">
-            <button onClick={exportReport}>Download JSON report</button>
-            <button className="ghost" onClick={() => window.print()}>Print / save PDF</button>
+            <button data-qa="pdf-report-button" onClick={generatePdfReport}>Generate PDF report</button>
+            <button className="ghost" onClick={exportReport}>Download JSON data</button>
           </div>
         </div>
 
@@ -2323,6 +2388,7 @@ function App() {
               ) : (
                 <button type="button" data-qa="stop-evidence-video" onClick={stopVideoRecording}>Stop video + submit</button>
               )}
+              <button className="ghost" type="button" data-qa="skip-camera-slot" onClick={() => { skipSlot(cameraSlot.id); closeCamera() }}>Skip this view</button>
               <label className="upload-button">
                 Upload photo/video
                 <input accept="image/*,video/*" capture="environment" type="file" onChange={(event) => {
