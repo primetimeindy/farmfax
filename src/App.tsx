@@ -316,6 +316,7 @@ function createBlankRealReportState(): ScenarioState {
 function stateLabel(state: CaptureState) {
   if (state === 'accepted') return 'photo received'
   if (state === 'review') return 'retake recommended'
+  if (state === 'skipped') return 'skipped'
   return 'still needed'
 }
 
