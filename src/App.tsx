@@ -142,6 +142,7 @@ type FarmFaxReport = {
   schema_version: string
   generated_at: string
   scenario_id: ScenarioId
+  report_source: 'submitted_media' | 'preview'
   demo_mode: boolean
   session: CustomSessionRecord
   custom_equipment: {
@@ -162,7 +163,7 @@ type FarmFaxReport = {
   equipment_type: string
   serial_number: string
   hour_meter: number | null
-  hour_meter_status: 'shown' | 'unknown'
+  hour_meter_status: 'shown' | 'media_supplied_unknown' | 'unknown'
   running_status: RunningStatus
   running_status_source: string
   make_model_guess: CatalogCandidate
@@ -175,6 +176,13 @@ type FarmFaxReport = {
     accepted_slots: number
     missing_slots: number
   }
+  submitted_media: {
+    supplied_slots: string[]
+    missing_slots: string[]
+    videos: number
+    photos: number
+  }
+  advice_summary: string[]
   demo_truth: {
     browser_photo_checks: 'implemented'
     browser_video_frame_sampling: 'implemented'
@@ -304,12 +312,6 @@ function stateLabel(state: CaptureState) {
 
 function slotTitle(slots: CaptureSlot[], slotId: SlotId) {
   return slots.find((slot) => slot.id === slotId)?.title ?? slotId
-}
-
-function severityWeight(severity: Severity) {
-  if (severity === 'red') return 15
-  if (severity === 'yellow') return 7
-  return -2
 }
 
 function cellLabel(kind: AnalysisCell['kind']) {
@@ -965,18 +967,34 @@ function App() {
     { label: 'Send seller questions', status: detectorQuestions.length ? 'review' as const : 'done' as const, action: detectorQuestions.length ? 'Copy generated questions and require answers/photos before sending money.' : 'Use baseline seller questions before inspection.' },
   ], [detectorQuestions.length, missing, moduleRiskSummary])
   const conditionScore = useMemo(() => {
-    const penalty = findings.reduce((sum, finding) => sum + severityWeight(finding.severity), 0) + missing.length * 5
-    return Math.round(Math.max(0, Math.min(100, reportSeed.conditionScore - penalty * 0.15 + acceptedCount)))
-  }, [acceptedCount, findings, missing.length, reportSeed.conditionScore])
+    const missingPenalty = missing.length * 8
+    const reviewPenalty = reviewCount * 5
+    const findingPenalty = findings.reduce((sum, finding) => sum + (finding.severity === 'red' ? 16 : finding.severity === 'yellow' ? 8 : -2), 0)
+    const detectorPenalty = moduleRiskSummary.reduce((sum, module) => sum + (module.risk === 'red' ? 10 : module.risk === 'yellow' ? 5 : 0), 0)
+    const mediaBonus = Math.min(10, analyzedSlots.length * 2 + sampledFrameCount)
+    return Math.round(Math.max(0, Math.min(100, 82 - missingPenalty - reviewPenalty - findingPenalty - detectorPenalty + mediaBonus)))
+  }, [analyzedSlots.length, findings, missing.length, moduleRiskSummary, reviewCount, sampledFrameCount])
   const runningStatus: RunningStatus = slots.find((slot) => slot.id === 'engine')?.state === 'missing' ? 'not_shown' : 'unknown'
   const runningStatusSource = runningStatus === 'not_shown' ? 'engine/running proof missing' : 'engine bay media supplied; running not proven'
+  const serialSlot = slots.find((slot) => slot.id === 'serial')
+  const hoursSlot = slots.find((slot) => slot.id === 'hours')
+  const reportConfidence = Math.max(18, Math.min(90, Math.round(acceptedCount * 8 + analyzedSlots.length * 5 + sampledFrameCount - missing.length * 7 - reviewCount * 4)))
+  const submittedIdentity: CatalogCandidate = useMemo(() => ({
+    make: tractorMake.trim() || 'Recorder-entered',
+    model: tractorModel.trim() || 'Unknown model',
+    family: 'tractor',
+    confidence: serialSlot?.state === 'missing' ? 35 : 62,
+    basis: 'Make/model entered by recorder; serial/PIN and paperwork match still required.',
+  }), [serialSlot?.state, tractorMake, tractorModel])
+  const reportAdviceSummary = useMemo(() => [dealPosture, ...findings.map((finding) => finding.nextStep), ...moduleRiskSummary.map((module) => module.action)].filter(Boolean).slice(0, 5), [dealPosture, findings, moduleRiskSummary])
 
   const report: FarmFaxReport = useMemo(() => ({
-    report_id: reportSeed.reportId,
+    report_id: reportGenerated ? customSession.session_id : reportSeed.reportId,
     schema_version: 'farmfax.report.v0.1-open',
     generated_at: new Date().toISOString(),
     scenario_id: scenarioState.selectedScenarioId,
-    demo_mode: true,
+    report_source: reportGenerated ? 'submitted_media' : 'preview',
+    demo_mode: !reportGenerated,
     session: customSession,
     custom_equipment: {
       make_entered: tractorMake.trim(),
@@ -989,14 +1007,14 @@ function App() {
     capture_order: captureOrder,
     media_driven_result: mediaDrivenResult,
     equipment_type: reportSeed.equipmentType,
-    serial_number: reportSeed.serialNumber,
-    hour_meter: reportSeed.hourMeter,
-    hour_meter_status: reportSeed.hourMeter == null ? 'unknown' : 'shown',
+    serial_number: serialSlot?.state === 'missing' ? 'UNKNOWN' : 'MEDIA_SUPPLIED_NOT_OCR_VERIFIED',
+    hour_meter: null,
+    hour_meter_status: hoursSlot?.state === 'missing' ? 'unknown' : 'media_supplied_unknown',
     running_status: runningStatus,
     running_status_source: runningStatusSource,
-    make_model_guess: reportSeed.makeModelGuess,
+    make_model_guess: enteredEquipmentName ? submittedIdentity : reportSeed.makeModelGuess,
     condition_score: conditionScore,
-    confidence: reportSeed.confidence,
+    confidence: reportConfidence,
     input_sources: {
       photos: photoSourceCount,
       videos: videoSourceCount,
@@ -1004,6 +1022,13 @@ function App() {
       accepted_slots: acceptedCount,
       missing_slots: missing.length,
     },
+    submitted_media: {
+      supplied_slots: slots.filter((slot) => slot.state !== 'missing').map((slot) => slot.title),
+      missing_slots: missing.map((slot) => slot.title),
+      videos: videoSourceCount,
+      photos: photoSourceCount,
+    },
+    advice_summary: reportAdviceSummary,
     demo_truth: {
       browser_photo_checks: 'implemented',
       browser_video_frame_sampling: 'implemented',
@@ -1045,9 +1070,9 @@ function App() {
     mechanic_handoff_summary: mechanicHandoffSummary,
     before_deposit_checklist: beforeDepositChecklist,
     risk_summary: riskSummary,
-    buyer_questions: [...(reportGenerated ? realMediaFindings.map((finding) => finding.nextStep) : reportSeed.buyerQuestions), ...detectorQuestions].slice(0, 8),
+    buyer_questions: [...findings.map((finding) => finding.nextStep), ...detectorQuestions].slice(0, 8),
     missing_evidence: missing.map((slot) => slot.title),
-    open_record_commitment: reportSeed.openRecordCommitment,
+    open_record_commitment: 'Real report generated from submitted media and missing-proof checks; buyer owns the export.',
     integration_stack: architectureStack.map((item) => item.name),
     market_context_stats: marketContextStats,
     system_integrations: architectureStack.map((item) => ({
@@ -1056,19 +1081,22 @@ function App() {
       status: item.status,
       proof: item.line,
     })),
-  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, captureOrder, conditionScore, customSession, detectorModuleExports, detectorQuestions, enteredEquipmentName, findings, mechanicHandoffSummary, mediaDrivenResult, missing, moduleRiskSummary, photoSourceCount, realMediaFindings, reportDisplayName, reportGenerated, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, tractorMake, tractorModel, tractorNotes, videoSourceCount])
+  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, captureOrder, conditionScore, customSession, detectorModuleExports, detectorQuestions, enteredEquipmentName, findings, mechanicHandoffSummary, mediaDrivenResult, missing, moduleRiskSummary, photoSourceCount, reportAdviceSummary, reportConfidence, reportDisplayName, reportGenerated, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, serialSlot?.state, hoursSlot?.state, slots, submittedIdentity, riskSummary, tractorMake, tractorModel, tractorNotes, videoSourceCount])
 
   const openRecordPreview = useMemo(() => ({
     schema: report.schema_version,
     generated_at: report.generated_at,
     scenario_id: report.scenario_id,
     demo_mode: report.demo_mode,
+    report_source: report.report_source,
     session: report.session,
     custom_equipment: report.custom_equipment,
     capture_order: report.capture_order,
     report_generated: reportGenerated,
     media_driven_result: report.media_driven_result,
     input_sources: report.input_sources,
+    submitted_media: report.submitted_media,
+    advice_summary: report.advice_summary,
     demo_truth: report.demo_truth,
     equipment_identity: {
       type: report.equipment_type,

@@ -102,8 +102,8 @@ const requiredSourceLabels = [
   '125 sensors in one combine',
   'system_integrations',
   'market_context_stats',
-  'hour_meter: reportSeed.hourMeter',
-  "hour_meter_status: reportSeed.hourMeter == null ? 'unknown' : 'shown'",
+  'hour_meter: null',
+  "hour_meter_status: hoursSlot?.state === 'missing' ? 'unknown' : 'media_supplied_unknown'",
   'running_status',
   'running_status_source',
   "const runningStatus: RunningStatus = slots.find((slot) => slot.id === 'engine')?.state === 'missing' ? 'not_shown' : 'unknown'",
@@ -155,6 +155,11 @@ const requiredSourceLabels = [
   'Paint / repair history',
   'Tire / tread evidence',
   'New real report',
+  'report_source',
+  'submitted_media',
+  'advice_summary',
+  'MEDIA_SUPPLIED_NOT_OCR_VERIFIED',
+  'media_supplied_unknown',
 ]
 
 const rejectedSourceLabels = [
