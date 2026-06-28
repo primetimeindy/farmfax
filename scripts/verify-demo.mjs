@@ -146,6 +146,15 @@ const requiredSourceLabels = [
   'data-qa="record-evidence-video"',
   'Record evidence video',
   'Stop video + submit',
+  'Real equipment condition report',
+  'Real report mode',
+  'realAdviceForMissing',
+  'buildRealMediaFindings',
+  'Rust / corrosion',
+  'Wet / leak signal',
+  'Paint / repair history',
+  'Tire / tread evidence',
+  'New real report',
 ]
 
 const rejectedSourceLabels = [

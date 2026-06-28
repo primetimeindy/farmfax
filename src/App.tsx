@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { ChangeEvent } from 'react'
 import { createScenarioState, farmFaxScenarios, scenarioReducer } from './farmfax/scenarios'
-import type { ScenarioId, ScenarioReportSeed } from './farmfax/scenarios'
+import type { ScenarioId, ScenarioReportSeed, ScenarioState } from './farmfax/scenarios'
 import './App.css'
 
 const FARMFAX_API_URL = import.meta.env.VITE_FARMFAX_API_URL || 'http://127.0.0.1:8787'
@@ -270,6 +270,32 @@ const marketContextStats = [
 
 const hourMeterLabel = (hours: number | null) => (hours == null ? 'Unknown' : `${hours.toLocaleString()} hrs`)
 
+function createBlankRealReportState(): ScenarioState {
+  const state = createScenarioState('incomplete-seller-listing')
+  return {
+    ...state,
+    findings: [] as Finding[],
+    reportSeed: {
+      ...state.reportSeed,
+      reportId: `ffx-real-report-${new Date().toISOString().slice(0, 10)}`,
+      serialNumber: 'UNKNOWN',
+      hourMeter: null,
+      conditionScore: 76,
+      confidence: 0,
+      makeModelGuess: {
+        ...state.reportSeed.makeModelGuess,
+        make: 'Unknown',
+        model: 'Tractor',
+        confidence: 0,
+        basis: 'New real report: model not inferred until recorder enters make/model and supplies serial/decal evidence.',
+      },
+      buyerQuestions: [] as string[],
+      openRecordCommitment: 'Real report generated from submitted photos, video frames, entered details, and missing-proof checks.',
+    },
+    slots: state.slots.map((slot) => ({ ...slot, state: 'missing' as const, image: undefined, analysis: undefined, video: undefined, mediaType: undefined })),
+  }
+}
+
 function stateLabel(state: CaptureState) {
   if (state === 'accepted') return 'photo received'
   if (state === 'review') return 'retake recommended'
@@ -388,11 +414,55 @@ function detectorAction(module: DetectorModuleResult, risk: DetectorModuleExport
 }
 
 function questionFromDetector(item: DetectorModuleExport) {
-  if (item.name.includes('OCR')) return `Can you send one straight-on close-up of the serial/PIN plate and hour meter? FarmFax OCR readiness is ${item.score}%.`
-  if (item.name.includes('Wet-mask')) return `The hydraulic wet-mask module found ${item.output}. Can you send a wiped-clean cylinder/hoses video after cycling hydraulics?`
-  if (item.name.includes('Color-cluster')) return `FarmFax found ${item.output} on paint/body color clusters. Has any panel been repainted, welded, or repaired?`
-  if (item.name.includes('Safety')) return `Can you send engine-bay guard/cover photos? FarmFax safety coverage proxy is ${item.score}%.`
-  return `Can you send a closer tire/track tread photo? FarmFax texture score is ${item.score}%.`
+  if (item.name.includes('OCR')) return `Send a closer serial/hour photo. Current readability proxy: ${item.score}%.`
+  if (item.name.includes('Wet-mask')) return `Check hydraulics: ${item.output}. Wipe area, cycle loader, then recheck for fresh wetness.`
+  if (item.name.includes('Color-cluster')) return `Ask about repaint or repair. Paint variance: ${item.output}.`
+  if (item.name.includes('Safety')) return `Send engine bay/guard photos. Guard/cover coverage proxy: ${item.score}%.`
+  return `Send a low-angle tire/tread close-up. Texture score: ${item.score}%.`
+}
+
+function realAdviceForMissing(slot: CaptureSlot): Finding {
+  const critical = slot.id === 'serial' || slot.id === 'hours' || slot.id === 'engine' || slot.id === 'hydraulics'
+  const category = slot.id === 'serial' ? 'Serial/PIN missing'
+    : slot.id === 'hours' ? 'Hour meter missing'
+      : slot.id === 'engine' ? 'Engine/running proof missing'
+        : slot.id === 'hydraulics' ? 'Hydraulics missing'
+          : `${slot.title} missing`
+  return {
+    severity: critical ? 'red' : 'yellow',
+    category,
+    finding: `${slot.title} was not submitted, so this report cannot judge that part of the tractor.`,
+    confidence: 96,
+    evidence: slot.id,
+    nextStep: slot.id === 'serial' ? 'Do not send a deposit until serial/PIN is readable and matched to paperwork.'
+      : slot.id === 'hours' ? 'Get ignition-on hour-meter proof and compare hours to wear/service records.'
+        : slot.id === 'engine' ? 'Get engine bay plus cold-start/running or honest non-running proof before pricing repairs.'
+          : slot.id === 'hydraulics' ? 'Get cylinder/hoses/couplers photos; hydraulic leaks are expensive and safety-relevant.'
+            : `Capture ${slot.title.toLowerCase()} before relying on condition.`,
+  }
+}
+
+function buildRealMediaFindings(slots: CaptureSlot[]): Finding[] {
+  const findings: Finding[] = []
+  for (const slot of slots) {
+    const analysis = slot.analysis
+    if (slot.state === 'missing' || !analysis) {
+      findings.push(realAdviceForMissing(slot))
+      continue
+    }
+    if (analysis.rustPct > 10) findings.push({ severity: 'red', category: 'Rust / corrosion', finding: `${analysis.rustPct}% rust-tone signal in ${slot.title}.`, confidence: analysis.confidence, evidence: slot.id, nextStep: 'Inspect frame rails, loader mounts, step brackets, hitch points, and welds for metal loss; use rust as negotiation leverage.' })
+    else if (analysis.rustPct > 4) findings.push({ severity: 'yellow', category: 'Rust / corrosion', finding: `${analysis.rustPct}% rust-tone signal in ${slot.title}.`, confidence: analysis.confidence, evidence: slot.id, nextStep: 'Ask for closer photos after cleaning; check whether rust is surface-only or structural.' })
+    if (analysis.wetPct > 10 || (analysis.wetMaskPct ?? 0) > 5) findings.push({ severity: 'red', category: 'Wet / leak signal', finding: `${analysis.wetPct}% dark/wet signal in ${slot.title}.`, confidence: analysis.confidence, evidence: slot.id, nextStep: 'Wipe area clean, run hydraulics/engine, then recheck. Price in possible hoses, seals, fluids, or shop diagnosis.' })
+    else if (analysis.wetPct > 4) findings.push({ severity: 'yellow', category: 'Wet / leak signal', finding: `${analysis.wetPct}% wet-looking signal in ${slot.title}.`, confidence: analysis.confidence, evidence: slot.id, nextStep: 'Ask whether this is grease, washing, or an active leak; request a follow-up photo after operation.' })
+    if (analysis.paintVariance > 40) findings.push({ severity: 'yellow', category: 'Paint / repair history', finding: `Paint variance ${analysis.paintVariance}/100 in ${slot.title}.`, confidence: analysis.confidence, evidence: slot.id, nextStep: 'Ask about repaint, replaced panels, weld repair, rollover/collision history, or storm damage.' })
+    if ((slot.id === 'serial' || slot.id === 'hours') && analysis.confidence < 78) findings.push({ severity: 'red', category: slot.id === 'serial' ? 'Serial readability' : 'Hour meter readability', finding: `${slot.title} is not readable enough for paperwork confidence.`, confidence: analysis.confidence, evidence: slot.id, nextStep: slot.id === 'serial' ? 'Retake straight-on with no glare; match PIN to bill of sale before deposit.' : 'Retake ignition-on dashboard; compare hours with pedals, seat, tires, pins, and service records.' })
+    if (slot.id === 'tires' && (analysis.textureScore ?? 100) < 36) findings.push({ severity: 'yellow', category: 'Tire / tread evidence', finding: 'Tire/tread photo does not show enough useful texture detail.', confidence: analysis.confidence, evidence: slot.id, nextStep: 'Get low-angle tread, sidewall cracks, rim, lugs, and undercarriage edge; tire replacement can change the deal price.' })
+    if (slot.id === 'engine' && (analysis.safetyChecklistScore ?? 100) < 64) findings.push({ severity: 'yellow', category: 'Engine bay / guards', finding: 'Engine bay view has limited guard/cover/component visibility.', confidence: analysis.confidence, evidence: slot.id, nextStep: 'Capture belts, hoses, battery, filters, guards/covers, leaks, smoke context, and running/non-running proof.' })
+  }
+  if (!findings.length) {
+    findings.push({ severity: 'green', category: 'No major visible issue', finding: 'Submitted media did not show major rust, wet/leak, paint, tire, or identity red flags.', confidence: 82, evidence: 'walkaround', nextStep: 'Still verify serial paperwork, service records, cold start, and in-person operation before money changes hands.' })
+  }
+  return findings.slice(0, 10)
 }
 
 function clampScore(value: number) {
@@ -729,11 +799,12 @@ async function analyzeVideoFile(file: File): Promise<{ poster: string; video: Vi
 }
 
 function App() {
-  const [scenarioState, setScenarioState] = useState(() => createScenarioState('risky-tractor'))
+  const [scenarioState, setScenarioState] = useState(() => createBlankRealReportState())
+  const [reportGenerated, setReportGenerated] = useState(false)
   const slots = scenarioState.slots
-  const findings = scenarioState.findings
+  const realMediaFindings = useMemo(() => buildRealMediaFindings(slots), [slots])
+  const findings = realMediaFindings
   const reportSeed = scenarioState.reportSeed
-  const activeScenario = farmFaxScenarios.find((scenario) => scenario.id === scenarioState.selectedScenarioId) ?? farmFaxScenarios[0]
   const [equipmentType, setEquipmentType] = useState('tractor')
   const [customSessionIdValue, setCustomSessionIdValue] = useState(() => customSessionId())
   const [customSessionName, setCustomSessionName] = useState('Real tractor recording session')
@@ -743,7 +814,6 @@ function App() {
   const [tractorModel, setTractorModel] = useState('')
   const [tractorNotes, setTractorNotes] = useState('')
   const [sessionStatus, setSessionStatus] = useState('')
-  const [reportGenerated, setReportGenerated] = useState(false)
   const [stripeOpen, setStripeOpen] = useState(false)
   const [isSampleVideoLoading, setIsSampleVideoLoading] = useState(false)
   const [selectedFinding, setSelectedFinding] = useState<Finding>(findings[0])
@@ -827,7 +897,7 @@ function App() {
     const status = zoneSlots.some((slot) => slot.state === 'missing') ? 'missing' : zoneSlots.some((slot) => slot.state === 'review') ? 'review' : 'received'
     return { ...zone, status, count: zoneSlots.filter((slot) => slot.state !== 'missing').length, total: zoneSlots.length }
   })), [slots])
-  const baseSellerQuestionPreview = reportSeed.buyerQuestions.slice(0, 3)
+  const baseSellerQuestionPreview = (reportGenerated ? realMediaFindings.map((finding) => finding.nextStep) : reportSeed.buyerQuestions).slice(0, 3)
   const missingProofPreview = missing.slice(0, 3)
   const guideCopy = cameraGuideForSlot(cameraSlot)
   const specificDetectorSignals = useMemo(() => slots
@@ -975,7 +1045,7 @@ function App() {
     mechanic_handoff_summary: mechanicHandoffSummary,
     before_deposit_checklist: beforeDepositChecklist,
     risk_summary: riskSummary,
-    buyer_questions: [...reportSeed.buyerQuestions, ...detectorQuestions],
+    buyer_questions: [...(reportGenerated ? realMediaFindings.map((finding) => finding.nextStep) : reportSeed.buyerQuestions), ...detectorQuestions].slice(0, 8),
     missing_evidence: missing.map((slot) => slot.title),
     open_record_commitment: reportSeed.openRecordCommitment,
     integration_stack: architectureStack.map((item) => item.name),
@@ -986,7 +1056,7 @@ function App() {
       status: item.status,
       proof: item.line,
     })),
-  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, captureOrder, conditionScore, customSession, detectorModuleExports, detectorQuestions, enteredEquipmentName, findings, mechanicHandoffSummary, mediaDrivenResult, missing, moduleRiskSummary, photoSourceCount, reportDisplayName, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, tractorMake, tractorModel, tractorNotes, videoSourceCount])
+  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, captureOrder, conditionScore, customSession, detectorModuleExports, detectorQuestions, enteredEquipmentName, findings, mechanicHandoffSummary, mediaDrivenResult, missing, moduleRiskSummary, photoSourceCount, realMediaFindings, reportDisplayName, reportGenerated, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, tractorMake, tractorModel, tractorNotes, videoSourceCount])
 
   const openRecordPreview = useMemo(() => ({
     schema: report.schema_version,
@@ -1404,7 +1474,7 @@ function App() {
     setTractorModel('')
     setTractorNotes('')
     setReportGenerated(false)
-    setScenarioState(createScenarioState('incomplete-seller-listing'))
+    setScenarioState(createBlankRealReportState())
     setSessionStatus('new blank recording session ready')
     window.setTimeout(() => setSessionStatus(''), 2400)
   }
@@ -1445,8 +1515,8 @@ function App() {
 
       <section className="hero-card farm-hero">
         <div className="hero-copy-block">
-          <p className="eyebrow">Open condition intelligence for used farm equipment</p>
-          <div className="demo-badge">{activeScenario.demoBadge} · browser demo · no backend required</div>
+          <p className="eyebrow">Real equipment condition report</p>
+          <div className="demo-badge">Real report mode · browser analysis · no backend required</div>
           <h1>Check the machine before you buy.</h1>
           <p className="lede">
             FarmFax turns guided phone photos and short videos into an evidence-backed buyer report: visible condition,
@@ -1504,8 +1574,8 @@ function App() {
       <section className="sample-selector panel" aria-label="sample inspection selector">
         <div>
           <span className="section-label">choose a sample inspection</span>
-          <h2>Run the story judges need to see.</h2>
-          <p className="muted">Use complete, risky, or missing-proof sample data — then replace it with your own phone photos and short videos.</p>
+          <h2>Optional sample data — use only for demo.</h2>
+          <p className="muted">For a real report, press Start new report and capture your own tractor media.</p>
         </div>
         <div className="scenario-switcher" aria-label="sample scenario selector">
           {farmFaxScenarios.map((scenario) => (
@@ -1960,7 +2030,7 @@ function App() {
           {!reportGenerated && (
             <div className="report-pending-card" data-qa="report-pending-state">
               <b>Report not generated yet</b>
-              <p>Start a new report, enter make/model, follow the ordered photo/video guidance, upload evidence into each slot, then press Generate scored report. The score and suggestions below will be based on submitted evidence and missing proof.</p>
+              <p>Start a new report, enter make/model, follow the ordered photo/video guidance, upload evidence into each slot, then press Generate scored report. The score and practical suggestions will be based on submitted evidence: wear, rust, wet/leak signals, paint mismatch, tire evidence, identity proof, and missing views.</p>
               <button type="button" onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Go record/submit photos and videos</button>
             </div>
           )}
