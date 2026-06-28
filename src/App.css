@@ -385,13 +385,13 @@ h3 { margin:0 0 8px; }
 .trace-step.simulated span { color:var(--ink); background:rgba(99,91,255,.9); }
 .trace-step b { display:block; margin:10px 0 6px; color:var(--ink); font-size:.98rem; }
 .trace-step p { margin:0; color:#c4d4c6; font-size:.84rem; line-height:1.35; }
-.modal-backdrop { position:fixed; inset:0; z-index:30; display:grid; place-items:center; padding:22px; background:rgba(0,0,0,.74); backdrop-filter:blur(12px); }
-.stripe-modal, .camera-modal { width:min(560px, calc(100vw - 36px)); color:#101426; border-radius:28px; padding:26px; background:linear-gradient(160deg, #fff, #eef0ff 55%, #dce2ff); box-shadow:0 35px 130px rgba(0,0,0,.65); }
-.camera-modal { width:min(760px, calc(100vw - 28px)); color:var(--ink); background:linear-gradient(160deg, #17201b, #0a0f0c 58%, #141b26); border:1px solid rgba(110,247,194,.24); }
+.modal-backdrop { position:fixed; inset:0; z-index:30; display:grid; place-items:start center; padding:18px; background:rgba(0,0,0,.74); backdrop-filter:blur(12px); overflow-y:auto; overflow-x:hidden; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; touch-action:pan-y; }
+.stripe-modal, .camera-modal { width:min(560px, calc(100vw - 36px)); color:#101426; border-radius:28px; padding:26px; background:linear-gradient(160deg, #fff, #eef0ff 55%, #dce2ff); box-shadow:0 35px 130px rgba(0,0,0,.65); max-height:calc(100svh - 36px); overflow-y:auto; -webkit-overflow-scrolling:touch; overscroll-behavior:contain; }
+.camera-modal { width:min(760px, calc(100vw - 28px)); color:var(--ink); background:linear-gradient(160deg, #17201b, #0a0f0c 58%, #141b26); border:1px solid rgba(110,247,194,.24); touch-action:pan-y; }
 .camera-modal h2 { color:var(--ink); }
 .camera-modal p, .camera-modal small { color:#c4d4c6; line-height:1.45; }
-.camera-frame { position:relative; margin:14px 0; min-height:320px; border-radius:22px; overflow:hidden; border:1px solid rgba(255,255,255,.12); background:#010302; display:grid; place-items:center; }
-.camera-frame video { width:100%; height:100%; min-height:320px; object-fit:cover; display:block; }
+.camera-frame { position:relative; margin:14px 0; min-height:min(320px, 42svh); max-height:48svh; border-radius:22px; overflow:hidden; border:1px solid rgba(255,255,255,.12); background:#010302; display:grid; place-items:center; }
+.camera-frame video { width:100%; height:100%; min-height:min(320px, 42svh); object-fit:cover; display:block; }
 .camera-guide-overlay { position:absolute; inset:0; z-index:2; pointer-events:none; background:radial-gradient(circle at 50% 50%, transparent 38%, rgba(0,0,0,.34) 72%); }
 .guide-brackets { position:absolute; inset:54px 58px; border:1px solid rgba(156,255,125,.18); }
 .guide-brackets i { position:absolute; width:52px; height:52px; border-color:var(--green); border-style:solid; filter:drop-shadow(0 0 18px rgba(156,255,125,.75)); }
