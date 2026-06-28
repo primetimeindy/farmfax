@@ -114,6 +114,17 @@ const requiredSourceLabels = [
   'sample-photos/',
   'input_sources',
   'demo_truth',
+  'data-qa="custom-session-builder"',
+  'custom savable session',
+  'data-qa="tractor-make-input"',
+  'data-qa="tractor-model-input"',
+  'data-qa="save-custom-session"',
+  'data-qa="ordered-capture-instructions"',
+  'record in this order',
+  'Photo/video shot list for analysis',
+  'custom_equipment',
+  'capture_order',
+  'Make/model was entered by the recorder',
 ]
 
 const rejectedSourceLabels = [

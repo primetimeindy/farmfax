@@ -115,12 +115,42 @@ type DetectorModuleExport = DetectorModuleResult & {
 
 type RunningStatus = 'non_running' | 'not_shown' | 'unknown'
 
+type CustomSessionRecord = {
+  session_id: string
+  session_name: string
+  created_at: string
+  saved_at?: string
+  tractor_make_entered: string
+  tractor_model_entered: string
+  recorder_notes: string
+}
+
+type CaptureOrderStep = {
+  order: number
+  slot: SlotId
+  title: string
+  media_needed: string
+  instruction: string
+  analysis_reason: string
+  status: CaptureState
+}
+
 type FarmFaxReport = {
   report_id: string
   schema_version: string
   generated_at: string
   scenario_id: ScenarioId
   demo_mode: boolean
+  session: CustomSessionRecord
+  custom_equipment: {
+    make_entered: string
+    model_entered: string
+    display_name: string
+    recorder_notes: string
+    input_status: 'entered_by_recorder' | 'not_entered'
+    truth_note: string
+  }
+  capture_order: CaptureOrderStep[]
   equipment_type: string
   serial_number: string
   hour_meter: number | null
@@ -172,6 +202,11 @@ type FarmFaxReport = {
 
 const PUBLIC_DEMO_URL = 'https://primetimeindy.github.io/farmfax-demo/'
 const assetUrl = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`
+
+const CUSTOM_SESSION_STORAGE_KEY = 'farmfax.custom.session.v1'
+const customSessionId = () => `farmfax-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 7)}`
+const nowIso = () => new Date().toISOString()
+
 
 const catalogCandidates: CatalogCandidate[] = [
   {
@@ -245,6 +280,22 @@ function severityWeight(severity: Severity) {
 
 function cellLabel(kind: AnalysisCell['kind']) {
   return kind === 'wet' ? 'leak?' : kind
+}
+
+function captureInstruction(slot: CaptureSlot) {
+  if (slot.id === 'walkaround') return 'Record first: slow 360° walkaround video, or four photos: front, left, rear, right.'
+  if (slot.id === 'serial') return 'Second: move close on the serial/PIN plate; avoid glare and include the full plate plus nearby decals.'
+  if (slot.id === 'hours') return 'Third: ignition-on dashboard/hour meter. Hold steady until numbers are readable.'
+  if (slot.id === 'hydraulics') return 'Fourth: hoses, cylinders, couplers, wet spots, and ground underneath; add short motion video if possible.'
+  if (slot.id === 'tires') return 'Fifth: tire or track tread, sidewall, lugs, cracks, and undercarriage edge at ground level.'
+  if (slot.id === 'paint') return 'Sixth: hood, loader arms, welds, frame rails, dents, and repaint/body mismatch zones.'
+  return 'Seventh: engine bay and running-status proof. If it does not run, say so plainly and capture visible parts.'
+}
+
+function captureMediaNeeded(slotId: SlotId) {
+  if (slotId === 'walkaround') return 'video preferred, photos ok'
+  if (slotId === 'hydraulics' || slotId === 'engine') return 'photo + short video if possible'
+  return 'photo required'
 }
 
 function cameraGuideForSlot(slot: CaptureSlot | null) {
@@ -659,6 +710,14 @@ function App() {
   const reportSeed = scenarioState.reportSeed
   const activeScenario = farmFaxScenarios.find((scenario) => scenario.id === scenarioState.selectedScenarioId) ?? farmFaxScenarios[0]
   const [equipmentType, setEquipmentType] = useState('tractor')
+  const [customSessionIdValue, setCustomSessionIdValue] = useState(() => customSessionId())
+  const [customSessionName, setCustomSessionName] = useState('Real tractor recording session')
+  const [customSessionCreatedAt, setCustomSessionCreatedAt] = useState(() => nowIso())
+  const [customSessionSavedAt, setCustomSessionSavedAt] = useState('')
+  const [tractorMake, setTractorMake] = useState('')
+  const [tractorModel, setTractorModel] = useState('')
+  const [tractorNotes, setTractorNotes] = useState('')
+  const [sessionStatus, setSessionStatus] = useState('')
   const [stripeOpen, setStripeOpen] = useState(false)
   const [isSampleVideoLoading, setIsSampleVideoLoading] = useState(false)
   const [selectedFinding, setSelectedFinding] = useState<Finding>(findings[0])
@@ -687,6 +746,26 @@ function App() {
   const analyzedSlots = slots.filter((slot) => slot.analysis)
   const missing = slots.filter((slot) => slot.state === 'missing')
   const videoSourceCount = slots.filter((slot) => slot.mediaType === 'video').length
+  const enteredEquipmentName = [tractorMake.trim(), tractorModel.trim()].filter(Boolean).join(' ')
+  const reportDisplayName = enteredEquipmentName || `${reportSeed.makeModelGuess.make} ${reportSeed.makeModelGuess.model}`
+  const customSession = useMemo<CustomSessionRecord>(() => ({
+    session_id: customSessionIdValue,
+    session_name: customSessionName.trim() || 'Untitled FarmFax session',
+    created_at: customSessionCreatedAt,
+    saved_at: customSessionSavedAt || undefined,
+    tractor_make_entered: tractorMake.trim(),
+    tractor_model_entered: tractorModel.trim(),
+    recorder_notes: tractorNotes.trim(),
+  }), [customSessionCreatedAt, customSessionIdValue, customSessionName, customSessionSavedAt, tractorMake, tractorModel, tractorNotes])
+  const captureOrder = useMemo<CaptureOrderStep[]>(() => slots.map((slot, index) => ({
+    order: index + 1,
+    slot: slot.id,
+    title: slot.title,
+    media_needed: captureMediaNeeded(slot.id),
+    instruction: captureInstruction(slot),
+    analysis_reason: slot.why,
+    status: slot.state,
+  })), [slots])
   const photoSourceCount = analyzedSlots.filter((slot) => slot.mediaType !== 'video').length
   const sampledFrameCount = slots.reduce((sum, slot) => sum + (slot.video?.frameCount ?? 0), 0)
   const scanReadiness = Math.round(((acceptedCount + reviewCount * 0.55) / slots.length) * 100)
@@ -783,6 +862,16 @@ function App() {
     generated_at: new Date().toISOString(),
     scenario_id: scenarioState.selectedScenarioId,
     demo_mode: true,
+    session: customSession,
+    custom_equipment: {
+      make_entered: tractorMake.trim(),
+      model_entered: tractorModel.trim(),
+      display_name: reportDisplayName,
+      recorder_notes: tractorNotes.trim(),
+      input_status: enteredEquipmentName ? 'entered_by_recorder' : 'not_entered',
+      truth_note: enteredEquipmentName ? 'Make/model was entered by the recorder and still needs serial/PIN and paperwork confirmation.' : 'No custom make/model entered; report shows scenario/catalog guess only.',
+    },
+    capture_order: captureOrder,
     equipment_type: reportSeed.equipmentType,
     serial_number: reportSeed.serialNumber,
     hour_meter: reportSeed.hourMeter,
@@ -851,19 +940,24 @@ function App() {
       status: item.status,
       proof: item.line,
     })),
-  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, conditionScore, detectorModuleExports, detectorQuestions, findings, mechanicHandoffSummary, missing, moduleRiskSummary, photoSourceCount, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, videoSourceCount])
+  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, captureOrder, conditionScore, customSession, detectorModuleExports, detectorQuestions, enteredEquipmentName, findings, mechanicHandoffSummary, missing, moduleRiskSummary, photoSourceCount, reportDisplayName, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, riskSummary, tractorMake, tractorModel, tractorNotes, videoSourceCount])
 
   const openRecordPreview = useMemo(() => ({
     schema: report.schema_version,
     generated_at: report.generated_at,
     scenario_id: report.scenario_id,
     demo_mode: report.demo_mode,
+    session: report.session,
+    custom_equipment: report.custom_equipment,
+    capture_order: report.capture_order,
     input_sources: report.input_sources,
     demo_truth: report.demo_truth,
     equipment_identity: {
       type: report.equipment_type,
       serial_pin: report.serial_number,
+      make_model_entered: report.custom_equipment.display_name,
       make_model_guess: `${report.make_model_guess.make} ${report.make_model_guess.model}`,
+      make_model_truth_note: report.custom_equipment.truth_note,
       hour_meter: report.hour_meter,
       hour_meter_status: report.hour_meter_status,
       running_status: report.running_status,
@@ -1115,12 +1209,79 @@ function App() {
     }
   }, [])
 
+  function saveCustomSession() {
+    const savedAt = nowIso()
+    const payload = {
+      customSessionIdValue,
+      customSessionName,
+      customSessionCreatedAt,
+      customSessionSavedAt: savedAt,
+      tractorMake,
+      tractorModel,
+      tractorNotes,
+      equipmentType,
+      scenarioState,
+    }
+    localStorage.setItem(CUSTOM_SESSION_STORAGE_KEY, JSON.stringify(payload))
+    setCustomSessionSavedAt(savedAt)
+    setSessionStatus('session saved on this device')
+    window.setTimeout(() => setSessionStatus(''), 2400)
+  }
+
+  function loadCustomSession() {
+    const raw = localStorage.getItem(CUSTOM_SESSION_STORAGE_KEY)
+    if (!raw) {
+      setSessionStatus('no saved session on this device yet')
+      window.setTimeout(() => setSessionStatus(''), 2400)
+      return
+    }
+    try {
+      const saved = JSON.parse(raw) as {
+        customSessionIdValue?: string
+        customSessionName?: string
+        customSessionCreatedAt?: string
+        customSessionSavedAt?: string
+        tractorMake?: string
+        tractorModel?: string
+        tractorNotes?: string
+        equipmentType?: string
+        scenarioState?: typeof scenarioState
+      }
+      setCustomSessionIdValue(saved.customSessionIdValue || customSessionId())
+      setCustomSessionName(saved.customSessionName || 'Restored FarmFax session')
+      setCustomSessionCreatedAt(saved.customSessionCreatedAt || nowIso())
+      setCustomSessionSavedAt(saved.customSessionSavedAt || '')
+      setTractorMake(saved.tractorMake || '')
+      setTractorModel(saved.tractorModel || '')
+      setTractorNotes(saved.tractorNotes || '')
+      setEquipmentType(saved.equipmentType || 'tractor')
+      if (saved.scenarioState) setScenarioState(saved.scenarioState)
+      setSessionStatus('saved session loaded')
+    } catch {
+      setSessionStatus('saved session could not be loaded')
+    }
+    window.setTimeout(() => setSessionStatus(''), 2400)
+  }
+
+  function newCustomSession() {
+    setCustomSessionIdValue(customSessionId())
+    setCustomSessionName('Real tractor recording session')
+    setCustomSessionCreatedAt(nowIso())
+    setCustomSessionSavedAt('')
+    setTractorMake('')
+    setTractorModel('')
+    setTractorNotes('')
+    setScenarioState(createScenarioState('incomplete-seller-listing'))
+    setSessionStatus('new blank recording session ready')
+    window.setTimeout(() => setSessionStatus(''), 2400)
+  }
+
   function exportReport() {
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `${report.report_id}.json`
+    link.download = `${report.session.session_id}-${report.custom_equipment.display_name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'tractor'}-farmfax-report.json`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -1227,6 +1388,31 @@ function App() {
         </div>
       </section>
 
+      <section className="custom-session-panel panel" data-qa="custom-session-builder">
+        <div>
+          <span className="section-label">custom savable session</span>
+          <h2>Record this tractor into its own FarmFax report.</h2>
+          <p className="muted">Enter the make/model you know, follow the ordered capture list, then save or export the session. Entered make/model is labeled as recorder-provided until serial/PIN and paperwork confirm it.</p>
+        </div>
+        <div className="session-form-grid">
+          <label>Session name<input data-qa="custom-session-name" value={customSessionName} onChange={(event) => setCustomSessionName(event.target.value)} /></label>
+          <label>Tractor make<input data-qa="tractor-make-input" placeholder="e.g. John Deere" value={tractorMake} onChange={(event) => setTractorMake(event.target.value)} /></label>
+          <label>Model / series<input data-qa="tractor-model-input" placeholder="e.g. 5075E" value={tractorModel} onChange={(event) => setTractorModel(event.target.value)} /></label>
+          <label className="wide">Recorder notes<input data-qa="tractor-notes-input" placeholder="e.g. non-running, parked 2 years, seller says battery dead" value={tractorNotes} onChange={(event) => setTractorNotes(event.target.value)} /></label>
+        </div>
+        <div className="session-actions">
+          <button type="button" data-qa="save-custom-session" onClick={saveCustomSession}>Save session on this device</button>
+          <button className="ghost" type="button" data-qa="load-custom-session" onClick={loadCustomSession}>Load saved session</button>
+          <button className="ghost" type="button" data-qa="new-custom-session" onClick={newCustomSession}>New blank tractor session</button>
+          {sessionStatus && <small>{sessionStatus}</small>}
+        </div>
+        <div className="session-summary">
+          <span>session_id</span><b>{customSessionIdValue}</b>
+          <span>report subject</span><b>{reportDisplayName}</b>
+          <span>capture plan</span><b>7 ordered photos/videos</b>
+        </div>
+      </section>
+
       <section className="architecture-row architecture-stack" aria-label="demo architecture stack">
         <div className="stack-heading panel"><span>Demo stack</span><p>The farmer sees a clean diligence flow. Judges can see which pieces run now and which backend or commerce seams are intentionally marked as planned or simulated.</p></div>
         {architectureStack.map((item) => (
@@ -1251,6 +1437,24 @@ function App() {
             {['tractor', 'skid steer', 'trailer', 'implement'].map((type) => (
               <button key={type} className={equipmentType === type ? 'active' : 'ghost'} disabled={type !== 'tractor'} onClick={() => type === 'tractor' && setEquipmentType(type)}>{type}{type !== 'tractor' ? ' soon' : ''}</button>
             ))}
+          </div>
+          <div className="capture-order-panel" data-qa="ordered-capture-instructions">
+            <div>
+              <span className="section-label">record in this order</span>
+              <h3>Photo/video shot list for analysis</h3>
+              <p className="muted">Use this sequence while you are standing at the tractor. Each completed slot flows into the custom buyer report.</p>
+            </div>
+            <ol className="capture-order-list">
+              {captureOrder.map((step) => (
+                <li key={step.slot} className={step.status}>
+                  <button className="ghost" type="button" onClick={() => document.getElementById(`slot-${step.slot}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>
+                    {step.order}. {step.title}
+                  </button>
+                  <span>{step.media_needed}</span>
+                  <p>{step.instruction}</p>
+                </li>
+              ))}
+            </ol>
           </div>
           <div className="scan-cockpit" data-qa="scan-cockpit">
             <div className="scan-viewport">
@@ -1353,7 +1557,7 @@ function App() {
           </div>
           <div className="capture-grid">
             {slots.map((slot) => (
-              <article className={`capture-slot ${slot.state}`} key={slot.id}>
+              <article id={`slot-${slot.id}`} className={`capture-slot ${slot.state}`} key={slot.id}>
                 <div>
                   <span>{stateLabel(slot.state)}</span>
                   <h3>{slot.title}</h3>
@@ -1469,7 +1673,7 @@ function App() {
         </article>
         <article className="report-preview-card" data-qa="report-preview-card">
           <div className="preview-topline"><span>FarmFax report preview</span><b>{conditionScore}/100</b></div>
-          <h3>{report.make_model_guess.make} {report.make_model_guess.model} · {hourMeterLabel(report.hour_meter)}</h3>
+          <h3>{report.custom_equipment.display_name} · {hourMeterLabel(report.hour_meter)}</h3>
           <div className="preview-findings">
             {findings.slice(0, 3).map((finding) => (
               <p key={`preview-${finding.category}`}><b>{finding.category}:</b> {finding.finding}</p>
@@ -1545,6 +1749,11 @@ function App() {
           <h2>Match the machine to the paper trail.</h2>
           <div className="identity-grid">
             <article>
+              <span>make/model entered</span>
+              <b>{report.custom_equipment.display_name}</b>
+              <p>{report.custom_equipment.truth_note}</p>
+            </article>
+            <article>
               <span>serial / PIN shown</span>
               <b>{report.serial_number}</b>
               <p>Compare this to the bill of sale, lien/title paperwork, and service records before sending money.</p>
@@ -1594,7 +1803,8 @@ function App() {
           <div className="report-score">
             <strong>{report.condition_score}</strong>
             <div>
-              <b>{report.make_model_guess.make} {report.make_model_guess.model}</b>
+              <b>{report.custom_equipment.display_name}</b>
+              <p>{report.custom_equipment.truth_note}</p>
               <p>Screening score from submitted media only. FarmFax helps you decide what to ask next; it is not a mechanical inspection, title check, appraisal, warranty, or guarantee.</p>
             </div>
           </div>
@@ -1629,6 +1839,8 @@ function App() {
             ))}
           </div>
           <div className="data-disclosures">
+            <p><b>Session:</b> {report.session.session_name} · {report.session.session_id}</p>
+            <p><b>Recorder make/model:</b> {report.custom_equipment.display_name} — {report.custom_equipment.truth_note}</p>
             <p><b>Proof still needed:</b> {report.missing_evidence.length ? report.missing_evidence.join(', ') : 'none'}</p>
             <p><b>Your copy:</b> {report.open_record_commitment}</p>
             <p><b>Plain rule:</b> FarmFax reports visible evidence and missing proof. Unknowns stay unknown.</p>
