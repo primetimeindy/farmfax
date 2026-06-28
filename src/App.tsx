@@ -324,6 +324,113 @@ function slotTitle(slots: CaptureSlot[], slotId: SlotId) {
   return slots.find((slot) => slot.id === slotId)?.title ?? slotId
 }
 
+function reportFindingTitle(slots: CaptureSlot[], finding: Finding) {
+  return `${slotTitle(slots, finding.evidence)} evidence`
+}
+
+function pdfText(text: string) {
+  return text
+    .normalize('NFKD')
+    .replace(/[^\x20-\x7E]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function escapePdfText(text: string) {
+  return pdfText(text).replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)')
+}
+
+function wrapPdfText(text: string, maxLength = 92) {
+  const words = pdfText(text).split(' ')
+  const lines: string[] = []
+  let line = ''
+  for (const word of words) {
+    const next = line ? `${line} ${word}` : word
+    if (next.length > maxLength && line) {
+      lines.push(line)
+      line = word
+    } else {
+      line = next
+    }
+  }
+  if (line) lines.push(line)
+  return lines
+}
+
+function buildPdfReportBlob(report: FarmFaxReport, slots: CaptureSlot[], dealPosture: string, nextMoveCopy: string) {
+  const lines = [
+    'FarmFax Equipment Report',
+    `Subject: ${report.custom_equipment.display_name}`,
+    `Score: ${report.condition_score}/100`,
+    `Decision: ${report.buy_or_skip_calculator.label}`,
+    `Recommended next step: ${dealPosture}`,
+    nextMoveCopy,
+    '',
+    'Evidence checked',
+    ...slots.map((slot) => {
+      const media = slot.mediaType === 'video' ? `video sampled (${slot.video?.frameCount ?? 0} frames)` : slot.image ? 'photo submitted' : slot.state === 'skipped' ? 'skipped' : 'not submitted'
+      return `${slot.title}: ${media}; status ${slot.state}`
+    }),
+    '',
+    'Specific report callouts',
+    ...report.findings.slice(0, 8).flatMap((finding, index) => [
+      `${index + 1}. ${reportFindingTitle(slots, finding)} - ${finding.severity.toUpperCase()} (${finding.confidence}%)`,
+      `What was seen: ${finding.finding}`,
+      `Where it came from: ${slotTitle(slots, finding.evidence)} capture slot`,
+      `Owner question/action: ${finding.nextStep}`,
+    ]),
+    '',
+    'Score math',
+    ...report.scoring_explanation,
+    '',
+    'Proof still needed',
+    report.missing_evidence.length ? report.missing_evidence.join(', ') : 'None in required set',
+    '',
+    'Seller questions',
+    ...report.buyer_questions.slice(0, 6).map((question, index) => `${index + 1}. ${question}`),
+    '',
+    'Limits: FarmFax reports visible submitted media and missing proof only. It is not a mechanic inspection, title search, lien check, appraisal, warranty, or guarantee.',
+  ]
+    .flatMap((line) => (line ? wrapPdfText(line) : ['']))
+    .slice(0, 58)
+
+  const commands = ['BT']
+  lines.forEach((line, index) => {
+    const y = 760 - index * 12
+    const size = index === 0 ? 18 : line.endsWith('checked') || line.endsWith('callouts') || line.endsWith('math') || line.endsWith('needed') || line.endsWith('questions') ? 12 : 9
+    commands.push(`/F1 ${size} Tf`)
+    commands.push(`1 0 0 1 54 ${y} Tm (${escapePdfText(line)}) Tj`)
+  })
+  commands.push('ET')
+  const stream = commands.join('\n')
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+    `<< /Length ${new TextEncoder().encode(stream).length} >>\nstream\n${stream}\nendstream`,
+  ]
+  let pdf = '%PDF-1.4\n'
+  const offsets = [0]
+  objects.forEach((object, index) => {
+    offsets.push(new TextEncoder().encode(pdf).length)
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`
+  })
+  const xrefOffset = new TextEncoder().encode(pdf).length
+  pdf += `xref\n0 ${objects.length + 1}\n`
+  pdf += '0000000000 65535 f \n'
+  for (let index = 1; index <= objects.length; index += 1) {
+    pdf += `${String(offsets[index]).padStart(10, '0')} 00000 n \n`
+  }
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefOffset}\n%%EOF`
+  return new Blob([pdf], { type: 'application/pdf' })
+}
+
+function reportFilename(report: FarmFaxReport, extension: 'json' | 'pdf') {
+  const slug = report.custom_equipment.display_name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'tractor'
+  return `${report.session.session_id}-${slug}-farmfax-report.${extension}`
+}
+
 function cellLabel(kind: AnalysisCell['kind']) {
   return kind === 'wet' ? 'leak?' : kind
 }
@@ -1316,11 +1423,17 @@ function App() {
   function generatePdfReport() {
     saveCustomSession()
     setReportGenerated(true)
-    document.body.classList.add('pdf-print-mode')
-    window.setTimeout(() => {
-      window.print()
-      window.setTimeout(() => document.body.classList.remove('pdf-print-mode'), 1200)
-    }, 120)
+    const blob = buildPdfReportBlob(report, slots, dealPosture, nextMoveCopy)
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = reportFilename(report, 'pdf')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    setSessionStatus('PDF report downloaded')
+    window.setTimeout(() => setSessionStatus(''), 2400)
   }
 
   function updateSlotMedia(slotId: SlotId, event: ChangeEvent<HTMLInputElement>) {
@@ -1566,7 +1679,7 @@ function App() {
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `${report.session.session_id}-${report.custom_equipment.display_name.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() || 'tractor'}-farmfax-report.json`
+    link.download = reportFilename(report, 'json')
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -1589,9 +1702,9 @@ function App() {
       <header className="topbar">
         <div><span className="live-dot" /> FarmFax // used equipment check</div>
         <nav>
-          <a href="#capture">Photos needed</a>
-          <a href="#catalog">Paperwork check</a>
-          <a href="#report">Buyer report</a>
+          <a href="#custom-session">Start Report</a>
+          <a href="#capture">Capture</a>
+          <a href="#report">PDF / Score</a>
         </nav>
       </header>
 
@@ -1599,13 +1712,14 @@ function App() {
         <div className="hero-copy-block">
           <p className="eyebrow">Real equipment condition report</p>
           <div className="demo-badge">Real report mode · browser analysis · no backend required</div>
-          <h1>Record it. Score it. PDF it.</h1>
+          <h1>Start. Capture. Download.</h1>
           <p className="lede">
-            Take the required photos/videos. Skip what you can't capture. Generate a free PDF with findings, reasoning, owner questions, and buy/skip score.
+            FarmFax is now a three-step report flow: start a report, take tractor photos/video, download the PDF with score and exact evidence callouts.
           </p>
           <div className="hero-actions primary-actions">
-            <button onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth' })}>Start capture</button>
-            <button className="ghost" onClick={() => document.getElementById('report')?.scrollIntoView({ behavior: 'smooth' })}>View PDF report</button>
+            <button onClick={startNewReportFlow}>Start Report</button>
+            <button className="ghost" onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth' })}>Picture/video capture</button>
+            <button className="ghost" onClick={generatePdfReport}>Download PDF / Score</button>
           </div>
           <div className="judge-fast-path" aria-label="judge demo controls">
             <span>Judges:</span>
@@ -1618,7 +1732,7 @@ function App() {
           </div>
         </div>
         <aside className="summary-card machine-card">
-          <span>recommended next move</span>
+          <span>PDF score</span>
           <strong>{conditionScore}</strong>
           <p><b>{dealPosture}</b><br />{nextMoveCopy}</p>
           <div className="mini-stats">
@@ -1674,9 +1788,9 @@ function App() {
 
       <section id="custom-session" className="custom-session-panel panel" data-qa="custom-session-builder">
         <div>
-          <span className="section-label">free sample report</span>
-          <h2>Start. Capture. Generate PDF.</h2>
-          <p className="muted">Camera-first flow. Skip any view you cannot capture; skipped proof is scored and explained in the PDF.</p>
+          <span className="section-label">Step 1</span>
+          <h2>Start Report.</h2>
+          <p className="muted">Create a blank report, then go straight to picture/video capture. Optional details can be added, but the core flow stays simple.</p>
         </div>
         <div className="session-form-grid">
           <label>Session name<input data-qa="custom-session-name" value={customSessionName} onChange={(event) => { setReportGenerated(false); setCustomSessionName(event.target.value) }} /></label>
@@ -1685,13 +1799,11 @@ function App() {
           <label className="wide">Recorder notes<input data-qa="tractor-notes-input" placeholder="e.g. non-running, parked 2 years, seller says battery dead" value={tractorNotes} onChange={(event) => { setReportGenerated(false); setTractorNotes(event.target.value) }} /></label>
         </div>
         <div className="session-actions">
-          <button type="button" data-qa="start-new-report" onClick={startNewReportFlow}>Start new report</button>
-          <button type="button" data-qa="auto-camera-capture" onClick={startGuidedCameraCapture}>Auto camera capture</button>
-          <button type="button" data-qa="save-custom-session" onClick={saveCustomSession}>Save progress</button>
-          <button className="ghost" type="button" data-qa="load-custom-session" onClick={loadCustomSession}>Load saved session</button>
-          <button className="ghost" type="button" data-qa="new-custom-session" onClick={newCustomSession}>Reset blank session</button>
-          <button type="button" data-qa="generate-custom-report" onClick={generateCustomReport}>Generate report</button>
-          <button type="button" data-qa="generate-pdf-report" onClick={generatePdfReport}>Generate PDF report</button>
+          <button type="button" data-qa="start-new-report" onClick={startNewReportFlow}>Start Report</button>
+          <button type="button" data-qa="auto-camera-capture" onClick={startGuidedCameraCapture}>Picture/video capture</button>
+          <button type="button" data-qa="generate-pdf-report" onClick={generatePdfReport}>Download PDF report / Score</button>
+          <button className="utility-hidden" type="button" data-qa="load-custom-session" onClick={loadCustomSession}>Load saved session</button>
+          <button className="utility-hidden" type="button" data-qa="generate-custom-report" onClick={generateCustomReport}>Generate scored report</button>
           {sessionStatus && <small>{sessionStatus}</small>}
         </div>
         <div className="session-summary">
@@ -1702,9 +1814,9 @@ function App() {
         <div className="report-flow-panel" data-qa="new-report-workflow">
           <span className="section-label">new report workflow</span>
           <ol>
-            <li><b>Start new report</b><small>Creates a fresh blank tractor session.</small></li>
-            <li><b>Record with guidance</b><small>Follow each photo/video step in order and upload into the matching slot.</small></li>
-            <li><b>Generate scored report</b><small>After submission, FarmFax scores evidence, surfaces risks, missing proof, and seller suggestions.</small></li>
+            <li><b>Start Report</b><small>Creates a fresh blank tractor report.</small></li>
+            <li><b>Picture/video capture</b><small>Take or upload media for each required view.</small></li>
+            <li><b>Download PDF / Score</b><small>Produces the report file and score immediately.</small></li>
           </ol>
           <p>{reportGenerated ? 'PDF-ready report generated.' : 'Capture or skip each view, then generate the report.'}</p>
         </div>
@@ -1722,10 +1834,10 @@ function App() {
 
       <section className="analysis-layout farm-layout" id="capture">
         <div className="panel capture-panel">
-          <div className="section-label">guided evidence capture</div>
-          <h2>Capture checklist.</h2>
+          <div className="section-label">Step 2</div>
+          <h2>Picture/video capture.</h2>
           <div className="capture-intro-row">
-            <p className="muted">Photos first. Video when motion, leaks, smoke, or sound matter.</p>
+            <p className="muted">Take a photo or video. Skip only if the owner cannot provide that view.</p>
             <button className="ghost sample-video-button" data-qa="sample-video-button" type="button" onClick={() => void runSampleVideo('hydraulics')} disabled={isSampleVideoLoading}>
               {isSampleVideoLoading ? 'Checking sample…' : 'Try sample video'}
             </button>
@@ -1757,10 +1869,9 @@ function App() {
               ))}
             </ol>
             <div className="submit-evidence-bar" data-qa="submit-evidence-generate">
-              <b>{reportGenerated ? 'Report is generated' : 'When your photos/videos are submitted, generate the scored report.'}</b>
+              <b>{reportGenerated ? 'Report is generated' : 'When your photos/videos are submitted, download the scored PDF.'}</b>
               <button type="button" data-qa="auto-camera-capture-inline" onClick={startGuidedCameraCapture}>Auto-load camera for next needed shot</button>
-              <button type="button" onClick={generateCustomReport}>Generate scored report</button>
-              <button type="button" data-qa="generate-pdf-report-inline" onClick={generatePdfReport}>Generate PDF</button>
+              <button type="button" data-qa="generate-pdf-report-inline" onClick={generatePdfReport}>Download PDF / Score</button>
             </div>
           </div>
           <div className="scan-cockpit" data-qa="scan-cockpit">
@@ -1997,7 +2108,7 @@ function App() {
           <div className="preview-questions">
             {sellerQuestionPreview.map((question) => <small key={question}>{question}</small>)}
           </div>
-          <button type="button" onClick={exportReport}>Download JSON report</button>
+          <button type="button" onClick={generatePdfReport}>Download PDF report / Score</button>
         </article>
       </section>
 
@@ -2109,12 +2220,12 @@ function App() {
 
       <section className="packet-layout pdf-report-shell" id="report">
         <div className="panel report-panel" data-qa="auto-populated-pdf-report">
-          <div className="section-label">auto-populated PDF report</div>
-          <h2>{reportGenerated ? 'PDF-ready equipment report.' : 'Generate after capture.'}</h2>
+          <div className="section-label">Step 3</div>
+          <h2>{reportGenerated ? 'PDF report / score.' : 'Download PDF report / score.'}</h2>
           {!reportGenerated && (
             <div className="report-pending-card" data-qa="report-pending-state">
               <b>Report not generated yet</b>
-              <p>Capture photos/videos or skip unavailable views. Then generate the PDF report.</p>
+              <p>Capture photos/videos or skip unavailable views. Then download the PDF report and score.</p>
               <button type="button" onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}>Go record/submit photos and videos</button>
             </div>
           )}
@@ -2123,7 +2234,7 @@ function App() {
             <div>
               <b>{report.custom_equipment.display_name}</b>
               <p>{report.custom_equipment.truth_note}</p>
-              <p>Score from submitted media, skipped views, visible rust/wet/paint/tire signals, and missing identity/hour proof.</p>
+              <p>Score from submitted media, skipped views, and explicit evidence gates. No generic condition guesses.</p>
             </div>
           </div>
           <div className="deal-posture priority-action">
@@ -2148,6 +2259,16 @@ function App() {
                 <h3>{risk.label}</h3>
                 <p>{risk.verdict}</p>
                 <small>{risk.evidence}</small>
+              </article>
+            ))}
+          </div>
+          <div className="specific-finding-list" data-qa="specific-report-callouts">
+            <span>Exact report callouts</span>
+            {report.findings.slice(0, 6).map((finding) => (
+              <article className={finding.severity} key={`${finding.evidence}-${finding.category}`}>
+                <b>{reportFindingTitle(slots, finding)}</b>
+                <p>{finding.finding}</p>
+                <small>Evidence: {slotTitle(slots, finding.evidence)} · Action: {finding.nextStep}</small>
               </article>
             ))}
           </div>
@@ -2207,7 +2328,7 @@ function App() {
             </div>
           </details>
           <div className="hero-actions">
-            <button data-qa="pdf-report-button" onClick={generatePdfReport}>Generate PDF report</button>
+            <button data-qa="pdf-report-button" onClick={generatePdfReport}>Download PDF report / Score</button>
             <button className="ghost" onClick={exportReport}>Download JSON data</button>
           </div>
         </div>

@@ -523,12 +523,24 @@ h3 { margin:0 0 8px; }
 .buy-skip-calculator b { display:block; margin-top: 8px; color: var(--ink); }
 .score-explanation { display:flex; flex-wrap:wrap; align-items:center; gap: 8px; }
 .score-explanation b { border:1px solid rgba(255,255,255,.12); border-radius:999px; padding:8px 10px; color:#d7e4d1; background:rgba(255,255,255,.04); font-size:.82rem; }
-/* Hide demo/proof prose on the main website; source/verifier still keep it for judging artifacts. */
-.proof-strip, .sample-selector, .architecture-row, .report-intelligence-panel, .report-trust-loop, .judge-conversion-panel, .judge-proof-panel, .market-context-panel, .source-trail { display:none; }
-.detector-module-report, .specific-detector-stack, .zone-checklist { display:none; }
-.slot-step-list, .automated-step-list { display:none; }
+/* Streamlined FarmFax UX: Start Report -> Picture/video capture -> Download PDF / Score. */
+.proof-strip, .sample-selector, .architecture-row, .report-intelligence-panel, .report-trust-loop, .judge-conversion-panel, .judge-proof-panel, .market-context-panel, .source-trail, .judge-fast-path, #catalog { display:none; }
+.detector-module-report, .specific-detector-stack, .zone-checklist, .scan-cockpit, .vision-panel, .post-scan-decision, .equipment-toggle, .sample-video-button, .capture-order-panel, .session-form-grid, .session-summary { display:none; }
+.slot-step-list, .automated-step-list, .utility-hidden { display:none; }
 .hero-card { min-height: 360px; }
 .lede { max-width: 760px; }
+.analysis-layout { grid-template-columns:1fr; }
+.custom-session-panel { grid-template-columns:1fr; }
+.session-actions button { flex:1 1 220px; }
+.specific-finding-list { margin-top:12px; display:grid; gap:9px; border:1px solid rgba(110,247,194,.22); border-radius:18px; padding:14px; background:rgba(110,247,194,.045); }
+.specific-finding-list > span { color:var(--mint); font:1000 .68rem/1 ui-monospace, monospace; letter-spacing:.12em; text-transform:uppercase; }
+.specific-finding-list article { border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:11px; background:rgba(0,0,0,.22); }
+.specific-finding-list article.red { border-color:rgba(255,107,98,.42); }
+.specific-finding-list article.yellow { border-color:rgba(255,191,78,.38); }
+.specific-finding-list article.green { border-color:rgba(156,255,125,.30); }
+.specific-finding-list b { display:block; color:var(--green); }
+.specific-finding-list p { margin:7px 0; color:#d7e4d1; }
+.specific-finding-list small { color:var(--muted); line-height:1.35; }
 @media print {
   body.pdf-print-mode .app-shell > section:not(.pdf-report-shell),
   body.pdf-print-mode .topbar,
