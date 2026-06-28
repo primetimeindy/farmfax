@@ -137,6 +137,17 @@ type CaptureOrderStep = {
   video_steps: string[]
 }
 
+type FarmFaxAgentRun = {
+  agent_name: 'FarmFax Buyer Agent'
+  goal: string
+  status: 'collecting_evidence' | 'ready_to_report' | 'blocked'
+  observations: string[]
+  decisions: string[]
+  actions: string[]
+  next_action: string
+  stop_condition: string
+}
+
 type FarmFaxReport = {
   report_id: string
   schema_version: string
@@ -154,6 +165,7 @@ type FarmFaxReport = {
     truth_note: string
   }
   capture_order: CaptureOrderStep[]
+  agent_run: FarmFaxAgentRun
   media_driven_result: {
     headline: string
     basis: string[]
@@ -371,6 +383,12 @@ function buildPdfReportBlob(report: FarmFaxReport, slots: CaptureSlot[], dealPos
       const media = slot.mediaType === 'video' ? `video sampled (${slot.video?.frameCount ?? 0} frames)` : slot.image ? 'photo submitted' : slot.state === 'skipped' ? 'skipped' : 'not submitted'
       return `${slot.title}: ${media}; status ${slot.state}`
     }),
+    '',
+    'FarmFax Buyer Agent',
+    `Goal: ${report.agent_run.goal}`,
+    `Status: ${report.agent_run.status}`,
+    `Next action: ${report.agent_run.next_action}`,
+    ...report.agent_run.decisions.slice(0, 3).map((decision, index) => `Decision ${index + 1}: ${decision}`),
     '',
     'Specific report callouts',
     ...report.findings.slice(0, 8).flatMap((finding, index) => [
@@ -666,6 +684,48 @@ function buildRiskSummary(slots: CaptureSlot[], baseFindings: Finding[], analyze
     { id: 'hours', label: 'Hours check', score: hourScore, level: hourLevel, severity: riskSeverity(hourLevel), verdict: hourLevel === 'high' ? 'Hour evidence has serious gaps or missing proof.' : hourLevel === 'medium' ? 'Displayed hours should be checked against records and wear.' : 'Hour evidence appears usable, pending normal record review.', evidence: `${hourLabel} shown · service records not supplied`, buyerAction: 'Ask for service invoices, ECU/dealer diagnostics if available, and prior auction/dealer listings.', factors: hourFactors },
     { id: 'leverage', label: 'Offer leverage', score: leverageScore, level: leverageLevel, severity: riskSeverity(leverageLevel), verdict: leverageLevel === 'high' ? 'Strong reason to require repair proof or a contingency.' : leverageLevel === 'medium' ? 'Moderate leverage from visible issues and unanswered proof.' : 'Limited visible leverage; use report mainly for diligence.', evidence: `${redFindings.length} red · ${yellowFindings.length} yellow · ${missing.length} missing`, buyerAction: 'Use findings to request records, additional photos, inspection contingency, or seller concession — not as an appraisal.', factors: leverageFactors },
   ]
+}
+
+function buildFarmFaxAgentRun(
+  slots: CaptureSlot[],
+  findings: Finding[],
+  riskSummary: RiskCard[],
+  conditionScore: number,
+  dealPosture: string,
+  nextMoveCopy: string,
+  nextMissingStep?: CaptureOrderStep,
+): FarmFaxAgentRun {
+  const missing = slots.filter((slot) => slot.state === 'missing')
+  const skipped = slots.filter((slot) => slot.state === 'skipped')
+  const supplied = slots.filter((slot) => slot.state !== 'missing')
+  const criticalGap = [...missing, ...skipped].some((slot) => slot.id === 'serial' || slot.id === 'hours' || slot.id === 'engine')
+  const redCount = findings.filter((finding) => finding.severity === 'red').length
+  const yellowRiskCount = riskSummary.filter((risk) => risk.severity === 'yellow').length
+  const status: FarmFaxAgentRun['status'] = criticalGap ? 'blocked' : supplied.length >= 7 ? 'ready_to_report' : 'collecting_evidence'
+  const nextCapture = nextMissingStep ? `${nextMissingStep.title}: ${nextMissingStep.instruction}` : 'No required capture is missing; download PDF report / score.'
+
+  return {
+    agent_name: 'FarmFax Buyer Agent',
+    goal: 'Evaluate whether this machine is safe enough for a remote buyer to continue before deposit.',
+    status,
+    observations: [
+      `${supplied.length}/7 capture slots supplied; ${missing.length} missing; ${skipped.length} skipped.`,
+      `${redCount} red finding${redCount === 1 ? '' : 's'} and ${yellowRiskCount} yellow risk area${yellowRiskCount === 1 ? '' : 's'}.`,
+      `Current report score is ${conditionScore}/100.`,
+    ],
+    decisions: [
+      dealPosture,
+      nextMoveCopy,
+      criticalGap ? 'Hard gate active: identity, hours, or running/engine proof is missing before money should move.' : 'No hard identity/hour gate is active from the submitted media.',
+    ],
+    actions: [
+      nextCapture,
+      findings[0]?.nextStep ?? 'Ask seller for missing proof before relying on the score.',
+      'Generate a buyer-owned PDF report with the score, evidence ledger, seller questions, and limits.',
+    ],
+    next_action: criticalGap ? nextCapture : dealPosture,
+    stop_condition: 'Stop when the PDF has a score, exact evidence callouts, seller questions, and no unsupported certification claims.',
+  }
 }
 
 function rgbToHsv(r: number, g: number, b: number) {
@@ -1122,6 +1182,7 @@ function App() {
     if (conditionScore < 72 || riskSummary.some((risk) => risk.severity === 'red')) return { verdict: 'negotiate' as const, label: 'NEGOTIATE / INSPECT', reason: 'There is enough evidence to continue, but repair or proof gaps should lower price or require mechanic review.', max_deposit_action: 'Refundable deposit only after seller answers questions' }
     return { verdict: 'buy' as const, label: 'BUY CANDIDATE', reason: 'Core media is supplied and no red proof gate is active. Still verify paperwork and records.', max_deposit_action: 'Proceed only after paperwork match' }
   }, [conditionScore, missing, riskSummary, skipped])
+  const agentRun = useMemo(() => buildFarmFaxAgentRun(slots, findings, riskSummary, conditionScore, dealPosture, nextMoveCopy, nextMissingStep), [conditionScore, dealPosture, findings, nextMissingStep, nextMoveCopy, riskSummary, slots])
 
   const report: FarmFaxReport = useMemo(() => ({
     report_id: reportGenerated ? customSession.session_id : reportSeed.reportId,
@@ -1140,6 +1201,7 @@ function App() {
       truth_note: enteredEquipmentName ? 'Make/model was entered by the recorder and still needs serial/PIN and paperwork confirmation.' : 'No custom make/model entered; report shows scenario/catalog guess only.',
     },
     capture_order: captureOrder,
+    agent_run: agentRun,
     media_driven_result: mediaDrivenResult,
     equipment_type: reportSeed.equipmentType,
     serial_number: serialSlot?.state === 'missing' ? 'UNKNOWN' : 'MEDIA_SUPPLIED_NOT_OCR_VERIFIED',
@@ -1220,7 +1282,7 @@ function App() {
       status: item.status,
       proof: item.line,
     })),
-  }), [acceptedCount, analyzedSlots, beforeDepositChecklist, captureOrder, conditionScore, customSession, detectorModuleExports, detectorQuestions, enteredEquipmentName, findings, mechanicHandoffSummary, mediaDrivenResult, missing, moduleRiskSummary, photoSourceCount, buySkipCalculator, reportAdviceSummary, reportConfidence, scoringExplanation, reportDisplayName, reportGenerated, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, serialSlot?.state, hoursSlot?.state, slots, submittedIdentity, riskSummary, tractorMake, tractorModel, tractorNotes, videoSourceCount, skipped])
+  }), [acceptedCount, agentRun, analyzedSlots, beforeDepositChecklist, captureOrder, conditionScore, customSession, detectorModuleExports, detectorQuestions, enteredEquipmentName, findings, mechanicHandoffSummary, mediaDrivenResult, missing, moduleRiskSummary, photoSourceCount, buySkipCalculator, reportAdviceSummary, reportConfidence, scoringExplanation, reportDisplayName, reportGenerated, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, serialSlot?.state, hoursSlot?.state, slots, submittedIdentity, riskSummary, tractorMake, tractorModel, tractorNotes, videoSourceCount, skipped])
 
   const openRecordPreview = useMemo(() => ({
     schema: report.schema_version,
@@ -1231,6 +1293,7 @@ function App() {
     session: report.session,
     custom_equipment: report.custom_equipment,
     capture_order: report.capture_order,
+    agent_run: report.agent_run,
     report_generated: reportGenerated,
     media_driven_result: report.media_driven_result,
     input_sources: report.input_sources,
@@ -2236,6 +2299,17 @@ function App() {
               <p>{report.custom_equipment.truth_note}</p>
               <p>Score from submitted media, skipped views, and explicit evidence gates. No generic condition guesses.</p>
             </div>
+          </div>
+          <div className={`agent-run-panel ${report.agent_run.status}`} data-qa="farmfax-agent-run">
+            <span>FarmFax Buyer Agent</span>
+            <h3>{report.agent_run.status.replace(/_/g, ' ')}</h3>
+            <p>{report.agent_run.goal}</p>
+            <div className="agent-grid">
+              <article><b>Observes</b>{report.agent_run.observations.map((item) => <small key={item}>{item}</small>)}</article>
+              <article><b>Decides</b>{report.agent_run.decisions.map((item) => <small key={item}>{item}</small>)}</article>
+              <article><b>Acts</b>{report.agent_run.actions.map((item) => <small key={item}>{item}</small>)}</article>
+            </div>
+            <strong>Next agent action: {report.agent_run.next_action}</strong>
           </div>
           <div className="deal-posture priority-action">
             <span>recommended next step</span>

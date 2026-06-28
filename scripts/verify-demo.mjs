@@ -172,6 +172,10 @@ const requiredSourceLabels = [
   'Download PDF report / Score',
   'data-qa="specific-report-callouts"',
   'Exact report callouts',
+  'data-qa="farmfax-agent-run"',
+  'FarmFax Buyer Agent',
+  'agent_run',
+  'Next agent action',
 ]
 
 const rejectedSourceLabels = [
