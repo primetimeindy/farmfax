@@ -753,7 +753,11 @@ function App() {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recordedChunksRef = useRef<Blob[]>([])
   const cameraRequestRef = useRef(0)
+  const [guidedCaptureActive, setGuidedCaptureActive] = useState(false)
+  const [isRecordingVideo, setIsRecordingVideo] = useState(false)
   const uploadRequestRef = useRef<Record<SlotId, number>>({
     walkaround: 0,
     serial: 0,
@@ -1055,6 +1059,36 @@ function App() {
 
   const shareUrl = PUBLIC_DEMO_URL
 
+  function nextNeededSlot(currentSlots = slots) {
+    return currentSlots.find((slot) => slot.state === 'missing') ?? currentSlots.find((slot) => slot.state === 'review') ?? null
+  }
+
+  function startGuidedCameraCapture() {
+    setGuidedCaptureActive(true)
+    setReportGenerated(false)
+    const slot = nextNeededSlot()
+    if (slot) void openCamera(slot)
+    else {
+      setSessionStatus('all required slots have media — generate the scored report')
+      window.setTimeout(() => setSessionStatus(''), 2400)
+    }
+  }
+
+  function continueGuidedCapture(completedSlotId?: SlotId) {
+    if (!guidedCaptureActive) return
+    window.setTimeout(() => {
+      const remaining = slots.filter((slot) => slot.id !== completedSlotId)
+      const next = nextNeededSlot(remaining)
+      if (next) void openCamera(next)
+      else {
+        setGuidedCaptureActive(false)
+        setSessionStatus('capture sequence complete — generate scored report')
+        window.setTimeout(() => setSessionStatus(''), 2600)
+        document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }, 450)
+  }
+
   function nextUploadRequest(slotId: SlotId) {
     uploadRequestRef.current[slotId] += 1
     setMediaErrors((current) => ({ ...current, [slotId]: undefined }))
@@ -1072,6 +1106,7 @@ function App() {
     const analysis = await analyzeImageHeuristics(image)
     if (!isCurrentUpload(slotId, requestId)) return
     setScenarioState((current) => scenarioReducer(current, { type: 'set-slot-analysis', slotId, image, analysis, mediaType: 'image' }))
+    continueGuidedCapture(slotId)
   }
 
   async function saveSlotVideo(slotId: SlotId, file: File, requestId: number) {
@@ -1087,6 +1122,7 @@ function App() {
         mediaType: 'video',
         video,
       }))
+      continueGuidedCapture(slotId)
     } catch (error) {
       if (!isCurrentUpload(slotId, requestId)) return
       setMediaErrors((current) => ({
@@ -1173,6 +1209,10 @@ function App() {
 
   function stopCamera() {
     cameraRequestRef.current += 1
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop()
+    mediaRecorderRef.current = null
+    recordedChunksRef.current = []
+    setIsRecordingVideo(false)
     streamRef.current?.getTracks().forEach((track) => track.stop())
     streamRef.current = null
     if (videoRef.current) videoRef.current.srcObject = null
@@ -1228,6 +1268,40 @@ function App() {
     setCameraSlot(null)
     setCameraError('')
     setIsCameraStarting(false)
+  }
+
+  function startVideoRecording() {
+    if (!cameraSlot || !streamRef.current || isRecordingVideo) return
+    if (typeof MediaRecorder === 'undefined') {
+      setCameraError('Video recording is unavailable in this browser. Use Upload photo/video instead.')
+      return
+    }
+    recordedChunksRef.current = []
+    try {
+      const recorder = new MediaRecorder(streamRef.current, { mimeType: MediaRecorder.isTypeSupported('video/webm') ? 'video/webm' : undefined })
+      mediaRecorderRef.current = recorder
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) recordedChunksRef.current.push(event.data)
+      }
+      recorder.onstop = () => {
+        const blob = new Blob(recordedChunksRef.current, { type: recorder.mimeType || 'video/webm' })
+        recordedChunksRef.current = []
+        setIsRecordingVideo(false)
+        if (!cameraSlot || !blob.size) return
+        const requestId = nextUploadRequest(cameraSlot.id)
+        const file = new File([blob], `${cameraSlot.id}-farmfax-video.webm`, { type: blob.type || 'video/webm' })
+        void saveSlotVideo(cameraSlot.id, file, requestId)
+        closeCamera()
+      }
+      recorder.start()
+      setIsRecordingVideo(true)
+    } catch {
+      setCameraError('Could not start video recording. Use Upload photo/video instead.')
+    }
+  }
+
+  function stopVideoRecording() {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') mediaRecorderRef.current.stop()
   }
 
   function captureFrame() {
@@ -1461,6 +1535,7 @@ function App() {
         </div>
         <div className="session-actions">
           <button type="button" data-qa="start-new-report" onClick={startNewReportFlow}>Start new report</button>
+          <button type="button" data-qa="auto-camera-capture" onClick={startGuidedCameraCapture}>Auto camera capture</button>
           <button type="button" data-qa="save-custom-session" onClick={saveCustomSession}>Save progress</button>
           <button className="ghost" type="button" data-qa="load-custom-session" onClick={loadCustomSession}>Load saved session</button>
           <button className="ghost" type="button" data-qa="new-custom-session" onClick={newCustomSession}>Reset blank session</button>
@@ -1512,7 +1587,7 @@ function App() {
             <div>
               <span className="section-label">record in this order</span>
               <h3>Photo/video shot list for analysis</h3>
-              <p className="muted">Use this sequence while you are standing at the tractor. Each completed slot flows into the custom buyer report.</p>
+              <p className="muted">Use this sequence while you are standing at the tractor. Press Auto camera capture to load each needed photo/video slot, then FarmFax advances to the next missing view.</p>
             </div>
             <ol className="capture-order-list">
               {captureOrder.map((step) => (
@@ -1531,6 +1606,7 @@ function App() {
             </ol>
             <div className="submit-evidence-bar" data-qa="submit-evidence-generate">
               <b>{reportGenerated ? 'Report is generated' : 'When your photos/videos are submitted, generate the scored report.'}</b>
+              <button type="button" data-qa="auto-camera-capture-inline" onClick={startGuidedCameraCapture}>Auto-load camera for next needed shot</button>
               <button type="button" onClick={generateCustomReport}>Generate scored report from submitted media</button>
             </div>
           </div>
@@ -2122,6 +2198,7 @@ function App() {
           <div className="camera-modal">
             <div className="modal-topline"><span>Phone camera capture</span><button className="ghost" onClick={closeCamera}>close</button></div>
             <h2>{cameraSlot.title}</h2>
+            {guidedCaptureActive && <p className="guided-capture-status" data-qa="guided-camera-status">Auto guided capture is on — submit this slot and FarmFax will load the next needed camera view.</p>}
             <p>{cameraSlot.prompt}</p>
             <div className="camera-frame">
               <video ref={videoRef} playsInline muted autoPlay />
@@ -2142,7 +2219,12 @@ function App() {
             </div>
             <canvas ref={canvasRef} className="capture-canvas" aria-hidden="true" />
             <div className="camera-actions">
-              <button onClick={captureFrame} disabled={!!cameraError || isCameraStarting}>Capture evidence photo</button>
+              <button onClick={captureFrame} disabled={!!cameraError || isCameraStarting || isRecordingVideo}>Capture evidence photo</button>
+              {!isRecordingVideo ? (
+                <button className="ghost" type="button" data-qa="record-evidence-video" onClick={startVideoRecording} disabled={!!cameraError || isCameraStarting}>Record evidence video</button>
+              ) : (
+                <button type="button" data-qa="stop-evidence-video" onClick={stopVideoRecording}>Stop video + submit</button>
+              )}
               <label className="upload-button">
                 Upload photo/video
                 <input accept="image/*,video/*" capture="environment" type="file" onChange={(event) => {

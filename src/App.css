@@ -503,3 +503,4 @@ h3 { margin:0 0 8px; }
 .report-pending-card { margin:10px 0 14px; border:1px solid rgba(255,191,78,.24); border-radius:18px; padding:14px; background:rgba(255,191,78,.06); }
 .report-pending-card b { color:var(--amber); }
 @media (max-width: 860px) { .report-flow-panel ol { grid-template-columns:1fr; } .submit-evidence-bar { align-items:stretch; flex-direction:column; } }
+.guided-capture-status { border:1px solid rgba(156,255,125,.26); border-radius:12px; padding:9px 10px; color:var(--green); background:rgba(156,255,125,.07); font-weight:900; }

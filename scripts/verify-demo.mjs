@@ -139,6 +139,13 @@ const requiredSourceLabels = [
   'data-qa="submit-evidence-generate"',
   'data-qa="report-pending-state"',
   'Report not generated yet',
+  'data-qa="auto-camera-capture"',
+  'Auto camera capture',
+  'Auto-load camera for next needed shot',
+  'data-qa="guided-camera-status"',
+  'data-qa="record-evidence-video"',
+  'Record evidence video',
+  'Stop video + submit',
 ]
 
 const rejectedSourceLabels = [
