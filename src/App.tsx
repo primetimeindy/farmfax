@@ -967,12 +967,12 @@ function App() {
     { label: 'Send seller questions', status: detectorQuestions.length ? 'review' as const : 'done' as const, action: detectorQuestions.length ? 'Copy generated questions and require answers/photos before sending money.' : 'Use baseline seller questions before inspection.' },
   ], [detectorQuestions.length, missing, moduleRiskSummary])
   const conditionScore = useMemo(() => {
-    const missingPenalty = missing.length * 8
-    const reviewPenalty = reviewCount * 5
-    const findingPenalty = findings.reduce((sum, finding) => sum + (finding.severity === 'red' ? 16 : finding.severity === 'yellow' ? 8 : -2), 0)
-    const detectorPenalty = moduleRiskSummary.reduce((sum, module) => sum + (module.risk === 'red' ? 10 : module.risk === 'yellow' ? 5 : 0), 0)
-    const mediaBonus = Math.min(10, analyzedSlots.length * 2 + sampledFrameCount)
-    return Math.round(Math.max(0, Math.min(100, 82 - missingPenalty - reviewPenalty - findingPenalty - detectorPenalty + mediaBonus)))
+    const missingPenalty = missing.length * 3
+    const reviewPenalty = reviewCount * 4
+    const findingPenalty = findings.reduce((sum, finding) => sum + (finding.severity === 'red' ? 8 : finding.severity === 'yellow' ? 4 : -2), 0)
+    const detectorPenalty = moduleRiskSummary.reduce((sum, module) => sum + (module.risk === 'red' ? 8 : module.risk === 'yellow' ? 4 : 0), 0)
+    const mediaBonus = Math.min(12, analyzedSlots.length * 2 + sampledFrameCount)
+    return Math.round(Math.max(0, Math.min(100, 96 - missingPenalty - reviewPenalty - findingPenalty - detectorPenalty + mediaBonus)))
   }, [analyzedSlots.length, findings, missing.length, moduleRiskSummary, reviewCount, sampledFrameCount])
   const runningStatus: RunningStatus = slots.find((slot) => slot.id === 'engine')?.state === 'missing' ? 'not_shown' : 'unknown'
   const runningStatusSource = runningStatus === 'not_shown' ? 'engine/running proof missing' : 'engine bay media supplied; running not proven'
