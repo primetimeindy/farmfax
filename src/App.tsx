@@ -1117,7 +1117,7 @@ function App() {
   const [mediaErrors, setMediaErrors] = useState<Partial<Record<SlotId, string>>>({})
   const [jsonPreviewOpen, setJsonPreviewOpen] = useState(false)
   const [copyStatus, setCopyStatus] = useState('')
-  const [generatedPdf, setGeneratedPdf] = useState<{ url: string; filename: string; size: number; createdAt: string } | null>(null)
+  const [generatedPdf, setGeneratedPdf] = useState<{ blob: Blob; url: string; filename: string; size: number; createdAt: string } | null>(null)
 
   function clearGeneratedPdf() {
     setGeneratedPdf(null)
@@ -1588,25 +1588,50 @@ function App() {
   }
 
   function generatePdfReport() {
-    saveCustomSession()
-    setReportGenerated(true)
-    const blob = buildPdfReportBlob(report, slots, dealPosture, nextMoveCopy)
-    const url = URL.createObjectURL(blob)
-    const filename = reportFilename(report, 'pdf')
-    setGeneratedPdf({ url, filename, size: blob.size, createdAt: nowIso() })
+    try {
+      saveCustomSession()
+      setReportGenerated(true)
+      const blob = buildPdfReportBlob(report, slots, dealPosture, nextMoveCopy)
+      const url = URL.createObjectURL(blob)
+      const filename = reportFilename(report, 'pdf')
+      setGeneratedPdf({ blob, url, filename, size: blob.size, createdAt: nowIso() })
 
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    link.target = '_blank'
-    link.rel = 'noopener noreferrer'
-    link.style.display = 'none'
-    document.body.appendChild(link)
-    link.click()
-    window.setTimeout(() => link.remove(), 1200)
-    setSessionStatus('PDF ready. If your browser blocked the file, use the Download/Open PDF buttons below.')
-    window.setTimeout(() => setSessionStatus(''), 6000)
-    window.setTimeout(() => document.getElementById('pdf-download-fallback')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = filename
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
+      link.style.display = 'none'
+      document.body.appendChild(link)
+      link.click()
+      window.setTimeout(() => link.remove(), 1200)
+      setSessionStatus('PDF ready. If your browser blocked the file, use Share / Download / Open below.')
+      window.setTimeout(() => setSessionStatus(''), 6000)
+      window.setTimeout(() => document.getElementById('pdf-download-fallback')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown PDF error'
+      setSessionStatus(`PDF could not be generated: ${message}`)
+      window.setTimeout(() => setSessionStatus(''), 7000)
+    }
+  }
+
+  async function shareGeneratedPdf() {
+    if (!generatedPdf) return
+    try {
+      const file = new File([generatedPdf.blob], generatedPdf.filename, { type: 'application/pdf' })
+      if (navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'FarmFax PDF report', text: 'FarmFax buyer evidence report' })
+        setSessionStatus('PDF share sheet opened')
+        window.setTimeout(() => setSessionStatus(''), 3500)
+        return
+      }
+      setSessionStatus('Native file share is not available here. Use Download PDF file or Open PDF.')
+      window.setTimeout(() => setSessionStatus(''), 6000)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Share cancelled or blocked'
+      setSessionStatus(`PDF share did not complete: ${message}. Use Download PDF file or Open PDF.`)
+      window.setTimeout(() => setSessionStatus(''), 6000)
+    }
   }
 
   function updateSlotMedia(slotId: SlotId, event: ChangeEvent<HTMLInputElement>) {
@@ -2527,6 +2552,7 @@ function App() {
                 <b>PDF file ready</b>
                 <p>{generatedPdf.filename} · {Math.max(1, Math.round(generatedPdf.size / 1024))} KB · generated {new Date(generatedPdf.createdAt).toLocaleTimeString()}</p>
               </div>
+              <button type="button" onClick={() => void shareGeneratedPdf()} data-qa="share-pdf-file">Share PDF</button>
               <a href={generatedPdf.url} download={generatedPdf.filename} data-qa="persistent-pdf-download">Download PDF file</a>
               <a href={generatedPdf.url} target="_blank" rel="noopener noreferrer" data-qa="persistent-pdf-open">Open PDF</a>
             </div>

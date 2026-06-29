@@ -543,10 +543,10 @@ h3 { margin:0 0 8px; }
 .specific-finding-list p { margin:7px 0; color:#d7e4d1; }
 .specific-finding-list small { color:var(--muted); line-height:1.35; }
 .pdf-actions { align-items:center; }
-.pdf-download-fallback { margin-top:12px; display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:10px; align-items:center; border:1px solid rgba(156,255,125,.34); border-radius:18px; padding:12px; background:linear-gradient(145deg, rgba(156,255,125,.10), rgba(0,0,0,.18)); box-shadow:0 18px 50px rgba(0,0,0,.25); }
+.pdf-download-fallback { margin-top:12px; display:grid; grid-template-columns:minmax(0,1fr) auto auto auto; gap:10px; align-items:center; border:1px solid rgba(156,255,125,.34); border-radius:18px; padding:12px; background:linear-gradient(145deg, rgba(156,255,125,.10), rgba(0,0,0,.18)); box-shadow:0 18px 50px rgba(0,0,0,.25); }
 .pdf-download-fallback b { color:var(--green); }
 .pdf-download-fallback p { margin:4px 0 0; color:var(--muted); font-size:.85rem; }
-.pdf-download-fallback a { color:#06100c; background:linear-gradient(180deg,#dfffd4,#9cff7d); border:0; border-radius:999px; padding:12px 14px; font-weight:1000; text-decoration:none; white-space:nowrap; }
+.pdf-download-fallback a, .pdf-download-fallback button { color:#06100c; background:linear-gradient(180deg,#dfffd4,#9cff7d); border:0; border-radius:999px; padding:12px 14px; font-weight:1000; text-decoration:none; white-space:nowrap; margin:0; }
 .pdf-download-fallback a:last-child { color:var(--ink); background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.16); }
 .agent-run-panel { margin-top:12px; border:1px solid rgba(125,184,255,.26); border-radius:18px; padding:14px; background:linear-gradient(145deg, rgba(125,184,255,.09), rgba(0,0,0,.18)); }
 .agent-run-panel.blocked { border-color:rgba(255,107,98,.42); }
