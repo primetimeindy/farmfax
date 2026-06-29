@@ -370,63 +370,127 @@ function wrapPdfText(text: string, maxLength = 92) {
 }
 
 function buildPdfReportBlob(report: FarmFaxReport, slots: CaptureSlot[], dealPosture: string, nextMoveCopy: string) {
-  const lines = [
-    'FarmFax Equipment Report',
-    `Subject: ${report.custom_equipment.display_name}`,
-    `Score: ${report.condition_score}/100`,
-    `Decision: ${report.buy_or_skip_calculator.label}`,
-    `Recommended next step: ${dealPosture}`,
-    nextMoveCopy,
-    '',
-    'Evidence checked',
-    ...slots.map((slot) => {
-      const media = slot.mediaType === 'video' ? `video sampled (${slot.video?.frameCount ?? 0} frames)` : slot.image ? 'photo submitted' : slot.state === 'skipped' ? 'skipped' : 'not submitted'
-      return `${slot.title}: ${media}; status ${slot.state}`
-    }),
-    '',
-    'FarmFax Buyer Agent',
-    `Goal: ${report.agent_run.goal}`,
-    `Status: ${report.agent_run.status}`,
-    `Next action: ${report.agent_run.next_action}`,
-    ...report.agent_run.decisions.slice(0, 3).map((decision, index) => `Decision ${index + 1}: ${decision}`),
-    '',
-    'Specific report callouts',
-    ...report.findings.slice(0, 8).flatMap((finding, index) => [
-      `${index + 1}. ${reportFindingTitle(slots, finding)} - ${finding.severity.toUpperCase()} (${finding.confidence}%)`,
-      `What was seen: ${finding.finding}`,
-      `Where it came from: ${slotTitle(slots, finding.evidence)} capture slot`,
-      `Owner question/action: ${finding.nextStep}`,
-    ]),
-    '',
-    'Score math',
-    ...report.scoring_explanation,
-    '',
-    'Proof still needed',
-    report.missing_evidence.length ? report.missing_evidence.join(', ') : 'None in required set',
-    '',
-    'Seller questions',
-    ...report.buyer_questions.slice(0, 6).map((question, index) => `${index + 1}. ${question}`),
-    '',
-    'Limits: FarmFax reports visible submitted media and missing proof only. It is not a mechanic inspection, title search, lien check, appraisal, warranty, or guarantee.',
-  ]
-    .flatMap((line) => (line ? wrapPdfText(line) : ['']))
-    .slice(0, 58)
+  const pageStreams: string[] = []
+  let commands: string[] = []
+  let cursorY = 742
+  const pageWidth = 612
+  const marginX = 44
 
-  const commands = ['BT']
-  lines.forEach((line, index) => {
-    const y = 760 - index * 12
-    const size = index === 0 ? 18 : line.endsWith('checked') || line.endsWith('callouts') || line.endsWith('math') || line.endsWith('needed') || line.endsWith('questions') ? 12 : 9
-    commands.push(`/F1 ${size} Tf`)
-    commands.push(`1 0 0 1 54 ${y} Tm (${escapePdfText(line)}) Tj`)
+  const rgb = (r: number, g: number, b: number) => `${(r / 255).toFixed(3)} ${(g / 255).toFixed(3)} ${(b / 255).toFixed(3)}`
+  const setFill = (r: number, g: number, b: number) => commands.push(`${rgb(r, g, b)} rg`)
+  const setStroke = (r: number, g: number, b: number) => commands.push(`${rgb(r, g, b)} RG`)
+  const rect = (x: number, y: number, w: number, h: number, fill = true) => commands.push(`${x} ${y} ${w} ${h} re ${fill ? 'f' : 'S'}`)
+  const text = (value: string, x: number, y: number, size = 9, font: 'F1' | 'F2' = 'F1', color: [number, number, number] = [31, 41, 55]) => {
+    setFill(...color)
+    commands.push('BT')
+    commands.push(`/${font} ${size} Tf`)
+    commands.push(`1 0 0 1 ${x} ${y} Tm (${escapePdfText(value)}) Tj`)
+    commands.push('ET')
+  }
+  const sectionTitle = (title: string) => {
+    if (cursorY < 88) newPage(false)
+    setStroke(39, 174, 96)
+    commands.push(`${marginX} ${cursorY - 4} 524 0 l S`)
+    text(title.toUpperCase(), marginX, cursorY + 4, 10, 'F2', [22, 101, 52])
+    cursorY -= 22
+  }
+  const paragraph = (value: string, x = marginX, width = 84, size = 8.6, color: [number, number, number] = [55, 65, 81]) => {
+    for (const line of wrapPdfText(value, width)) {
+      if (cursorY < 54) newPage(false)
+      text(line, x, cursorY, size, 'F1', color)
+      cursorY -= size + 3.2
+    }
+  }
+  const bullet = (value: string, x = marginX, width = 82) => {
+    if (cursorY < 60) newPage(false)
+    setFill(39, 174, 96)
+    rect(x, cursorY + 2, 4, 4)
+    for (const [index, line] of wrapPdfText(value, width).entries()) {
+      text(line, x + 12, cursorY, 8.5, index === 0 ? 'F2' : 'F1', [31, 41, 55])
+      cursorY -= 11
+    }
+  }
+  const card = (title: string, body: string, x: number, y: number, w: number, h: number, accent: [number, number, number]) => {
+    setFill(248, 250, 252)
+    rect(x, y, w, h)
+    setStroke(...accent)
+    rect(x, y, w, h, false)
+    text(title, x + 12, y + h - 18, 9.5, 'F2', accent)
+    wrapPdfText(body, Math.max(34, Math.floor(w / 5.7))).slice(0, 4).forEach((line, index) => text(line, x + 12, y + h - 34 - index * 11, 8, 'F1', [55, 65, 81]))
+  }
+  const drawHeader = () => {
+    setFill(11, 20, 15)
+    rect(0, 700, pageWidth, 92)
+    setFill(39, 174, 96)
+    rect(0, 700, pageWidth, 7)
+    text('FARMFAX', marginX, 752, 25, 'F2', [234, 255, 240])
+    text('BUYER EVIDENCE REPORT', marginX, 735, 9, 'F2', [156, 255, 125])
+    text(report.session.session_id, marginX, 720, 7, 'F1', [188, 205, 197])
+    setFill(255, 255, 255)
+    rect(468, 718, 92, 48)
+    text(`${report.condition_score}`, 486, 735, 24, 'F2', [11, 20, 15])
+    text('/100 SCORE', 520, 737, 8, 'F2', [55, 65, 81])
+    text(report.buy_or_skip_calculator.label, 474, 724, 7.5, 'F2', [22, 101, 52])
+    cursorY = 676
+  }
+  function newPage(withHeader = true) {
+    pageStreams.push(commands.join('\n'))
+    commands = []
+    cursorY = 742
+    if (withHeader) drawHeader()
+  }
+
+  drawHeader()
+  text(report.custom_equipment.display_name, marginX, cursorY, 16, 'F2', [17, 24, 39])
+  cursorY -= 20
+  paragraph(`Recommended next step: ${dealPosture}. ${nextMoveCopy}`, marginX, 93, 9.2, [31, 41, 55])
+  cursorY -= 6
+  card('Agent status', report.agent_run.status.replace(/_/g, ' '), marginX, cursorY - 74, 160, 66, [37, 99, 235])
+  card('Next action', report.agent_run.next_action, 224, cursorY - 74, 160, 66, [39, 174, 96])
+  card('Deposit rule', report.buy_or_skip_calculator.max_deposit_action, 404, cursorY - 74, 164, 66, [217, 119, 6])
+  cursorY -= 92
+
+  sectionTitle('FarmFax Buyer Agent')
+  paragraph(report.agent_run.goal)
+  report.agent_run.decisions.slice(0, 3).forEach((decision) => bullet(decision))
+  cursorY -= 6
+
+  sectionTitle('Evidence checked')
+  slots.forEach((slot) => {
+    const media = slot.mediaType === 'video' ? `video sampled (${slot.video?.frameCount ?? 0} frames)` : slot.image ? 'photo submitted' : slot.state === 'skipped' ? 'skipped' : 'not submitted'
+    bullet(`${slot.title}: ${media}; status ${slot.state}`)
   })
-  commands.push('ET')
-  const stream = commands.join('\n')
+
+  sectionTitle('Exact report callouts')
+  report.findings.slice(0, 6).forEach((finding, index) => {
+    bullet(`${index + 1}. ${reportFindingTitle(slots, finding)} — ${finding.severity.toUpperCase()}: ${finding.finding} Action: ${finding.nextStep}`)
+  })
+
+  sectionTitle('Potential buyer follow-up questions')
+  report.buyer_questions.slice(0, 10).forEach((question, index) => bullet(`${index + 1}. ${question}`))
+
+  sectionTitle('Score math + limits')
+  report.scoring_explanation.forEach((item) => bullet(item))
+  paragraph(`Proof still needed: ${report.missing_evidence.length ? report.missing_evidence.join(', ') : 'None in required set'}`)
+  paragraph('Limits: FarmFax reports visible submitted media and missing proof only. It is not a mechanic inspection, title search, lien check, appraisal, warranty, or guarantee.')
+
+  pageStreams.push(commands.join('\n'))
+  const pageCount = pageStreams.length
+  const pageObjects = pageStreams.map((stream, index) => {
+    const pageObjectId = 3 + index * 2
+    const contentObjectId = pageObjectId + 1
+    return {
+      page: `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 ${3 + pageCount * 2} 0 R /F2 ${4 + pageCount * 2} 0 R >> >> /Contents ${contentObjectId} 0 R >>`,
+      content: `<< /Length ${new TextEncoder().encode(stream).length} >>\nstream\n${stream}\nendstream`,
+    }
+  })
+  const kids = pageObjects.map((_, index) => `${3 + index * 2} 0 R`).join(' ')
   const objects = [
     '<< /Type /Catalog /Pages 2 0 R >>',
-    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
-    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>',
+    `<< /Type /Pages /Kids [${kids}] /Count ${pageCount} >>`,
+    ...pageObjects.flatMap((item) => [item.page, item.content]),
     '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
-    `<< /Length ${new TextEncoder().encode(stream).length} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>',
   ]
   let pdf = '%PDF-1.4\n'
   const offsets = [0]
@@ -726,6 +790,27 @@ function buildFarmFaxAgentRun(
     next_action: criticalGap ? nextCapture : dealPosture,
     stop_condition: 'Stop when the PDF has a score, exact evidence callouts, seller questions, and no unsupported certification claims.',
   }
+}
+
+function buildFarmFaxBuyerQuestions(slots: CaptureSlot[], findings: Finding[], detectorQuestions: string[], buySkipCalculator: { max_deposit_action: string }, agentRun: FarmFaxAgentRun) {
+  const missing = slots.filter((slot) => slot.state === 'missing')
+  const skipped = slots.filter((slot) => slot.state === 'skipped')
+  const missingTitle = (slotId: SlotId) => [...missing, ...skipped].some((slot) => slot.id === slotId)
+  const questions = [
+    missingTitle('serial') ? 'Can you send a straight-on serial/PIN plate photo and paperwork showing the same number?' : 'Does the serial/PIN on the plate match the bill of sale, title/lien paperwork, dealer record, and service invoices?',
+    missingTitle('hours') ? 'Can you send an ignition-on dashboard/hour-meter photo before any deposit?' : 'Can you provide service records or dealer/ECU readout that reconcile with the displayed hour meter?',
+    missingTitle('engine') ? 'Can you send a cold-start/running video showing engine bay, exhaust, warning lights, and idle behavior?' : 'Was the engine cold before the running video, and were any warning lights, smoke, leaks, or starting issues present?',
+    missingTitle('hydraulics') ? 'Can you send close photos/video of lift cylinders, hoses, couplers, and the ground underneath after operating hydraulics?' : 'Do loader/3-point/PTO hydraulics hold under load, and are there any active seep points after operation?',
+    missingTitle('tires') ? 'Can you send low-angle tire/track photos showing tread/lugs, sidewalls, cracks, rims, and undercarriage edge?' : 'Are tires/tracks matched by age and size, and are there sidewall cracks, fluid-filled tires, rim damage, or uneven lug wear?',
+    missingTitle('paint') ? 'Can you send loader arms, hood panels, frame rails, welds, dents, repaint zones, and repair-area photos?' : 'Has the machine had repaint, collision repair, replacement panels, weld repair, or loader/frame work?',
+    'Are there liens, financed balances, salvage/theft history, or ownership gaps that would block transfer?',
+    'Can a buyer or mobile mechanic inspect it in person before non-refundable money changes hands?',
+    `Will the seller agree to this deposit rule: ${buySkipCalculator.max_deposit_action}?`,
+    `FarmFax agent next action says: ${agentRun.next_action}. Can the seller satisfy that before pickup or payment?`,
+    ...findings.slice(0, 4).map((finding) => finding.nextStep),
+    ...detectorQuestions,
+  ]
+  return Array.from(new Set(questions)).slice(0, 12)
 }
 
 function rgbToHsv(r: number, g: number, b: number) {
@@ -1183,6 +1268,7 @@ function App() {
     return { verdict: 'buy' as const, label: 'BUY CANDIDATE', reason: 'Core media is supplied and no red proof gate is active. Still verify paperwork and records.', max_deposit_action: 'Proceed only after paperwork match' }
   }, [conditionScore, missing, riskSummary, skipped])
   const agentRun = useMemo(() => buildFarmFaxAgentRun(slots, findings, riskSummary, conditionScore, dealPosture, nextMoveCopy, nextMissingStep), [conditionScore, dealPosture, findings, nextMissingStep, nextMoveCopy, riskSummary, slots])
+  const buyerFollowUpQuestions = useMemo(() => buildFarmFaxBuyerQuestions(slots, findings, detectorQuestions, buySkipCalculator, agentRun), [agentRun, buySkipCalculator, detectorQuestions, findings, slots])
 
   const report: FarmFaxReport = useMemo(() => ({
     report_id: reportGenerated ? customSession.session_id : reportSeed.reportId,
@@ -1271,7 +1357,7 @@ function App() {
     mechanic_handoff_summary: mechanicHandoffSummary,
     before_deposit_checklist: beforeDepositChecklist,
     risk_summary: riskSummary,
-    buyer_questions: [...findings.map((finding) => finding.nextStep), ...detectorQuestions].slice(0, 8),
+    buyer_questions: buyerFollowUpQuestions,
     missing_evidence: [...missing.map((slot) => slot.title), ...skipped.map((slot) => `${slot.title} (skipped)`)],
     open_record_commitment: 'Real report generated from submitted media and missing-proof checks; buyer owns the export.',
     integration_stack: architectureStack.map((item) => item.name),
@@ -1282,7 +1368,7 @@ function App() {
       status: item.status,
       proof: item.line,
     })),
-  }), [acceptedCount, agentRun, analyzedSlots, beforeDepositChecklist, captureOrder, conditionScore, customSession, detectorModuleExports, detectorQuestions, enteredEquipmentName, findings, mechanicHandoffSummary, mediaDrivenResult, missing, moduleRiskSummary, photoSourceCount, buySkipCalculator, reportAdviceSummary, reportConfidence, scoringExplanation, reportDisplayName, reportGenerated, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, serialSlot?.state, hoursSlot?.state, slots, submittedIdentity, riskSummary, tractorMake, tractorModel, tractorNotes, videoSourceCount, skipped])
+  }), [acceptedCount, agentRun, analyzedSlots, beforeDepositChecklist, buyerFollowUpQuestions, captureOrder, conditionScore, customSession, detectorModuleExports, detectorQuestions, enteredEquipmentName, findings, mechanicHandoffSummary, mediaDrivenResult, missing, moduleRiskSummary, photoSourceCount, buySkipCalculator, reportAdviceSummary, reportConfidence, scoringExplanation, reportDisplayName, reportGenerated, reportSeed, runningStatus, runningStatusSource, sampledFrameCount, scenarioState.selectedScenarioId, serialSlot?.state, hoursSlot?.state, slots, submittedIdentity, riskSummary, tractorMake, tractorModel, tractorNotes, videoSourceCount, skipped])
 
   const openRecordPreview = useMemo(() => ({
     schema: report.schema_version,
@@ -2363,9 +2449,9 @@ function App() {
               {report.missing_evidence.length > 0 && <span>{report.missing_evidence.length} view{report.missing_evidence.length === 1 ? '' : 's'} still needed</span>}
             </div>
           </div>
-          <div className="question-grid">
+          <div className="question-grid" data-qa="buyer-follow-up-questions">
             {report.buyer_questions.map((question) => (
-              <div key={question}><b>ask seller before deposit</b><p>{question}</p></div>
+              <div key={question}><b>potential buyer follow-up</b><p>{question}</p></div>
             ))}
           </div>
           <div className="data-disclosures">

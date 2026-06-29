@@ -176,6 +176,9 @@ const requiredSourceLabels = [
   'FarmFax Buyer Agent',
   'agent_run',
   'Next agent action',
+  'BUYER EVIDENCE REPORT',
+  'Potential buyer follow-up questions',
+  'data-qa="buyer-follow-up-questions"',
 ]
 
 const rejectedSourceLabels = [
