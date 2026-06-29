@@ -461,6 +461,16 @@ function buildPdfReportBlob(report: FarmFaxReport, slots: CaptureSlot[], dealPos
     bullet(`${slot.title}: ${media}; status ${slot.state}`)
   })
 
+  sectionTitle('Photo + video analysis')
+  if (report.visual_analysis.length) {
+    report.visual_analysis.slice(0, 8).forEach((item) => {
+      const source = item.source === 'video_frame' ? `video: ${item.frameCount ?? 0} sampled frames, worst frame ${item.worstFrameTime?.toFixed(1) ?? 'n/a'}s` : 'photo analysis'
+      bullet(`${slotTitle(slots, item.slot)} — ${source}. ${item.summary}. Confidence ${item.confidence}%.`)
+    })
+  } else {
+    paragraph('No submitted photo or video has been analyzed yet. Missing proof is treated as buyer risk instead of guessed condition.')
+  }
+
   sectionTitle('Exact report callouts')
   report.findings.slice(0, 6).forEach((finding, index) => {
     bullet(`${index + 1}. ${reportFindingTitle(slots, finding)} — ${finding.severity.toUpperCase()}: ${finding.finding} Action: ${finding.nextStep}`)
@@ -1107,6 +1117,11 @@ function App() {
   const [mediaErrors, setMediaErrors] = useState<Partial<Record<SlotId, string>>>({})
   const [jsonPreviewOpen, setJsonPreviewOpen] = useState(false)
   const [copyStatus, setCopyStatus] = useState('')
+  const [generatedPdf, setGeneratedPdf] = useState<{ url: string; filename: string; size: number; createdAt: string } | null>(null)
+
+  function clearGeneratedPdf() {
+    setGeneratedPdf(null)
+  }
 
   const acceptedCount = slots.filter((slot) => slot.state === 'accepted').length
   const reviewCount = slots.filter((slot) => slot.state === 'review').length
@@ -1490,6 +1505,7 @@ function App() {
   async function saveSlotImage(slotId: SlotId, image: string, requestId = nextUploadRequest(slotId)) {
     if (!isCurrentUpload(slotId, requestId)) return
     setReportGenerated(false)
+    clearGeneratedPdf()
     setScenarioState((current) => scenarioReducer(current, { type: 'replace-slot-image', slotId, image, mediaType: 'image' }))
     const analysis = await analyzeImageHeuristics(image)
     if (!isCurrentUpload(slotId, requestId)) return
@@ -1502,6 +1518,7 @@ function App() {
       const { poster, video } = await analyzeVideoFile(file)
       if (!isCurrentUpload(slotId, requestId)) return
       setReportGenerated(false)
+      clearGeneratedPdf()
       setScenarioState((current) => scenarioReducer(current, {
         type: 'replace-slot-image',
         slotId,
@@ -1563,6 +1580,7 @@ function App() {
   function skipSlot(slotId: SlotId) {
     stopCamera()
     setReportGenerated(false)
+    clearGeneratedPdf()
     setScenarioState((current) => scenarioReducer(current, { type: 'mark-slot-skipped', slotId }))
     setSessionStatus('slot skipped — PDF will list it as missing proof')
     window.setTimeout(() => setSessionStatus(''), 2200)
@@ -1574,15 +1592,21 @@ function App() {
     setReportGenerated(true)
     const blob = buildPdfReportBlob(report, slots, dealPosture, nextMoveCopy)
     const url = URL.createObjectURL(blob)
+    const filename = reportFilename(report, 'pdf')
+    setGeneratedPdf({ url, filename, size: blob.size, createdAt: nowIso() })
+
     const link = document.createElement('a')
     link.href = url
-    link.download = reportFilename(report, 'pdf')
+    link.download = filename
+    link.target = '_blank'
+    link.rel = 'noopener noreferrer'
+    link.style.display = 'none'
     document.body.appendChild(link)
     link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    setSessionStatus('PDF report downloaded')
-    window.setTimeout(() => setSessionStatus(''), 2400)
+    window.setTimeout(() => link.remove(), 1200)
+    setSessionStatus('PDF ready. If your browser blocked the file, use the Download/Open PDF buttons below.')
+    window.setTimeout(() => setSessionStatus(''), 6000)
+    window.setTimeout(() => document.getElementById('pdf-download-fallback')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
   }
 
   function updateSlotMedia(slotId: SlotId, event: ChangeEvent<HTMLInputElement>) {
@@ -1617,6 +1641,7 @@ function App() {
     setMediaErrors({})
     setIsSampleVideoLoading(false)
     setReportGenerated(false)
+    clearGeneratedPdf()
     setScenarioState(createScenarioState(scenarioId))
   }
 
@@ -1743,6 +1768,10 @@ function App() {
     }
   }, [])
 
+  useEffect(() => () => {
+    if (generatedPdf) URL.revokeObjectURL(generatedPdf.url)
+  }, [generatedPdf])
+
   function startNewReportFlow() {
     newCustomSession()
     window.setTimeout(() => document.getElementById('custom-session')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
@@ -1817,6 +1846,7 @@ function App() {
     setTractorModel('')
     setTractorNotes('')
     setReportGenerated(false)
+    clearGeneratedPdf()
     setGuidedCaptureActive(false)
     setScenarioState(createBlankRealReportState())
     setSessionStatus('new blank recording session ready')
@@ -2487,10 +2517,20 @@ function App() {
               )) : <p>No live slot image analyzed yet. Capture/upload a photo or short video to run the local check.</p>}
             </div>
           </details>
-          <div className="hero-actions">
+          <div className="hero-actions pdf-actions">
             <button data-qa="pdf-report-button" onClick={generatePdfReport}>Download PDF report / Score</button>
             <button className="ghost" onClick={exportReport}>Download JSON data</button>
           </div>
+          {generatedPdf && (
+            <div className="pdf-download-fallback" id="pdf-download-fallback" data-qa="pdf-download-fallback">
+              <div>
+                <b>PDF file ready</b>
+                <p>{generatedPdf.filename} · {Math.max(1, Math.round(generatedPdf.size / 1024))} KB · generated {new Date(generatedPdf.createdAt).toLocaleTimeString()}</p>
+              </div>
+              <a href={generatedPdf.url} download={generatedPdf.filename} data-qa="persistent-pdf-download">Download PDF file</a>
+              <a href={generatedPdf.url} target="_blank" rel="noopener noreferrer" data-qa="persistent-pdf-open">Open PDF</a>
+            </div>
+          )}
         </div>
 
         <aside className="panel commerce-panel">
