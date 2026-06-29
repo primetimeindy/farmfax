@@ -235,7 +235,7 @@ for (const snippet of ['rel="manifest"', 'apple-mobile-web-app-capable', 'apple-
 console.log('ok index.html includes iOS/PWA install metadata')
 
 const sw = await readFile(new URL('public/sw.js', root), 'utf8')
-for (const snippet of ['farmfax-phone-app-v3', 'install', 'activate', 'fetch', "request.mode === 'navigate'"]) {
+for (const snippet of ['farmfax-phone-app-v4', 'install', 'activate', 'fetch', "request.mode === 'navigate'"]) {
   if (!sw.includes(snippet)) throw new Error(`service worker missing ${snippet} handler`)
 }
 console.log('ok service worker has versioned network-first navigation caching')
