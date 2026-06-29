@@ -182,6 +182,10 @@ const requiredSourceLabels = [
   'Photo + video analysis',
   'data-qa="pdf-download-fallback"',
   'persistent-pdf-download',
+  'persistent-pdf-open',
+  "window.open(url, '_blank', 'noopener,noreferrer')",
+  'PDF opened in a new tab',
+  'blocked auto-open',
   'data-qa="share-pdf-file"',
 ]
 

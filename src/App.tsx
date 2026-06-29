@@ -1596,16 +1596,12 @@ function App() {
       const filename = reportFilename(report, 'pdf')
       setGeneratedPdf({ blob, url, filename, size: blob.size, createdAt: nowIso() })
 
-      const link = document.createElement('a')
-      link.href = url
-      link.download = filename
-      link.target = '_blank'
-      link.rel = 'noopener noreferrer'
-      link.style.display = 'none'
-      document.body.appendChild(link)
-      link.click()
-      window.setTimeout(() => link.remove(), 1200)
-      setSessionStatus('PDF ready. If your browser blocked the file, use Share / Download / Open below.')
+      const openedWindow = window.open(url, '_blank', 'noopener,noreferrer')
+      if (openedWindow) {
+        setSessionStatus('PDF opened in a new tab. Use Download PDF file below if you want to save a copy.')
+      } else {
+        setSessionStatus('PDF ready, but your browser blocked auto-open. Tap Open PDF below to read it.')
+      }
       window.setTimeout(() => setSessionStatus(''), 6000)
       window.setTimeout(() => document.getElementById('pdf-download-fallback')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
     } catch (error) {
