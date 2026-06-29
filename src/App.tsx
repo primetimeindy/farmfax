@@ -243,6 +243,7 @@ const assetUrl = (path: string) => `${import.meta.env.BASE_URL}${path.replace(/^
 const CUSTOM_SESSION_STORAGE_KEY = 'farmfax.custom.session.v1'
 const customSessionId = () => `farmfax-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.random().toString(36).slice(2, 7)}`
 const nowIso = () => new Date().toISOString()
+const pause = (ms: number) => new Promise((resolve) => window.setTimeout(resolve, ms))
 
 
 const catalogCandidates: CatalogCandidate[] = [
@@ -1117,6 +1118,7 @@ function App() {
   const [mediaErrors, setMediaErrors] = useState<Partial<Record<SlotId, string>>>({})
   const [jsonPreviewOpen, setJsonPreviewOpen] = useState(false)
   const [copyStatus, setCopyStatus] = useState('')
+  const [reportAnalysisStep, setReportAnalysisStep] = useState('')
   const [generatedPdf, setGeneratedPdf] = useState<{ blob: Blob; url: string; filename: string; size: number; createdAt: string } | null>(null)
 
   function clearGeneratedPdf() {
@@ -1153,6 +1155,15 @@ function App() {
   })), [slots])
   const photoSourceCount = analyzedSlots.filter((slot) => slot.mediaType !== 'video').length
   const sampledFrameCount = slots.reduce((sum, slot) => sum + (slot.video?.frameCount ?? 0), 0)
+  const detectorPassCount = analyzedSlots.length ? analyzedSlots.length * 5 : 5
+  const reportAnalysisSteps = useMemo(() => [
+    `Preparing ${acceptedCount + reviewCount + skipped.length || 7} capture slot${acceptedCount + reviewCount + skipped.length === 1 ? '' : 's'} for the buyer report`,
+    photoSourceCount ? `Analyzing ${photoSourceCount} submitted photo${photoSourceCount === 1 ? '' : 's'} for rust, wet areas, paint mismatch, and readability` : 'Checking missing photo proof gates instead of guessing from absent views',
+    videoSourceCount ? `Sampling ${sampledFrameCount} selected video frame${sampledFrameCount === 1 ? '' : 's'} from ${videoSourceCount} video${videoSourceCount === 1 ? '' : 's'}` : 'Checking whether any video evidence was supplied',
+    `Running ${detectorPassCount} detector module${detectorPassCount === 1 ? '' : 's'} and evidence-bound challenges`,
+    'Building buyer score, seller questions, and the PDF evidence packet',
+  ], [acceptedCount, detectorPassCount, photoSourceCount, reviewCount, sampledFrameCount, skipped.length, videoSourceCount])
+  const activeReportAnalysisIndex = reportAnalysisStep ? Math.max(0, reportAnalysisSteps.indexOf(reportAnalysisStep)) : -1
   const scanReadiness = Math.round(((acceptedCount + reviewCount * 0.55 + skipped.length * 0.2) / slots.length) * 100)
   const highestRiskFinding = findings.find((finding) => finding.severity === 'red') ?? findings.find((finding) => finding.severity === 'yellow') ?? findings[0]
   const scanMode = missing.length ? 'Evidence missing' : reviewCount ? 'Human review needed' : 'Ready for buyer report'
@@ -1587,9 +1598,17 @@ function App() {
     continueGuidedCapture(slotId)
   }
 
-  function generatePdfReport() {
+  async function generatePdfReport() {
+    if (reportAnalysisStep) return
     try {
+      clearGeneratedPdf()
+      setReportGenerated(false)
       saveCustomSession()
+      setSessionStatus('Analyzing photos and videos before building the PDF…')
+      for (const step of reportAnalysisSteps) {
+        setReportAnalysisStep(step)
+        await pause(320)
+      }
       setReportGenerated(true)
       const blob = buildPdfReportBlob(report, slots, dealPosture, nextMoveCopy)
       const url = URL.createObjectURL(blob)
@@ -1598,13 +1617,15 @@ function App() {
 
       const openedWindow = window.open(url, '_blank', 'noopener,noreferrer')
       if (openedWindow) {
-        setSessionStatus('PDF opened in a new tab. Use Download PDF file below if you want to save a copy.')
+        setSessionStatus('Analysis complete. PDF opened in a new tab. Use Download PDF file below if you want to save a copy.')
       } else {
-        setSessionStatus('PDF ready, but your browser blocked auto-open. Tap Open PDF below to read it.')
+        setSessionStatus('Analysis complete. PDF ready, but your browser blocked auto-open. Tap Open PDF below to read it.')
       }
+      setReportAnalysisStep('')
       window.setTimeout(() => setSessionStatus(''), 6000)
       window.setTimeout(() => document.getElementById('pdf-download-fallback')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 80)
     } catch (error) {
+      setReportAnalysisStep('')
       const message = error instanceof Error ? error.message : 'Unknown PDF error'
       setSessionStatus(`PDF could not be generated: ${message}`)
       window.setTimeout(() => setSessionStatus(''), 7000)
@@ -1908,6 +1929,25 @@ function App() {
         </nav>
       </header>
 
+      {reportAnalysisStep && (
+        <section className="report-analysis-overlay" data-qa="report-generation-analysis" aria-live="polite" aria-label="FarmFax report generation analysis">
+          <div className="report-analysis-card">
+            <span>Analyzing photos + videos</span>
+            <h2>Building buyer report…</h2>
+            <p>{reportAnalysisStep}</p>
+            <div className="report-analysis-meter" aria-hidden="true"><i style={{ width: `${((activeReportAnalysisIndex + 1) / reportAnalysisSteps.length) * 100}%` }} /></div>
+            <ol>
+              {reportAnalysisSteps.map((step, index) => (
+                <li key={step} className={index < activeReportAnalysisIndex ? 'done' : index === activeReportAnalysisIndex ? 'active' : ''}>
+                  <b>{index + 1}</b>
+                  <small>{step}</small>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+      )}
+
       <section className="hero-card farm-hero">
         <div className="hero-copy-block">
           <p className="eyebrow">Real equipment condition report</p>
@@ -1919,7 +1959,7 @@ function App() {
           <div className="hero-actions primary-actions">
             <button onClick={startNewReportFlow}>Start Report</button>
             <button className="ghost" onClick={() => document.getElementById('capture')?.scrollIntoView({ behavior: 'smooth' })}>Picture/video capture</button>
-            <button className="ghost" onClick={generatePdfReport}>Download PDF / Score</button>
+            <button className="ghost" onClick={() => void generatePdfReport()}>Download PDF / Score</button>
           </div>
           <div className="judge-fast-path" aria-label="judge demo controls">
             <span>Judges:</span>
@@ -2001,7 +2041,7 @@ function App() {
         <div className="session-actions">
           <button type="button" data-qa="start-new-report" onClick={startNewReportFlow}>Start Report</button>
           <button type="button" data-qa="auto-camera-capture" onClick={startGuidedCameraCapture}>Picture/video capture</button>
-          <button type="button" data-qa="generate-pdf-report" onClick={generatePdfReport}>Download PDF report / Score</button>
+          <button type="button" data-qa="generate-pdf-report" onClick={() => void generatePdfReport()}>Download PDF report / Score</button>
           <button className="utility-hidden" type="button" data-qa="load-custom-session" onClick={loadCustomSession}>Load saved session</button>
           <button className="utility-hidden" type="button" data-qa="generate-custom-report" onClick={generateCustomReport}>Generate scored report</button>
           {sessionStatus && <small>{sessionStatus}</small>}
@@ -2071,7 +2111,7 @@ function App() {
             <div className="submit-evidence-bar" data-qa="submit-evidence-generate">
               <b>{reportGenerated ? 'Report is generated' : 'When your photos/videos are submitted, download the scored PDF.'}</b>
               <button type="button" data-qa="auto-camera-capture-inline" onClick={startGuidedCameraCapture}>Auto-load camera for next needed shot</button>
-              <button type="button" data-qa="generate-pdf-report-inline" onClick={generatePdfReport}>Download PDF / Score</button>
+              <button type="button" data-qa="generate-pdf-report-inline" onClick={() => void generatePdfReport()}>Download PDF / Score</button>
             </div>
           </div>
           <div className="scan-cockpit" data-qa="scan-cockpit">
@@ -2308,7 +2348,7 @@ function App() {
           <div className="preview-questions">
             {sellerQuestionPreview.map((question) => <small key={question}>{question}</small>)}
           </div>
-          <button type="button" onClick={generatePdfReport}>Download PDF report / Score</button>
+          <button type="button" onClick={() => void generatePdfReport()}>Download PDF report / Score</button>
         </article>
       </section>
 
@@ -2539,7 +2579,7 @@ function App() {
             </div>
           </details>
           <div className="hero-actions pdf-actions">
-            <button data-qa="pdf-report-button" onClick={generatePdfReport}>Download PDF report / Score</button>
+            <button data-qa="pdf-report-button" onClick={() => void generatePdfReport()}>Download PDF report / Score</button>
             <button className="ghost" onClick={exportReport}>Download JSON data</button>
           </div>
           {generatedPdf && (

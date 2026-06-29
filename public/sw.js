@@ -1,4 +1,4 @@
-const CACHE_NAME = 'farmfax-phone-app-v6'
+const CACHE_NAME = 'farmfax-phone-app-v7'
 const APP_SHELL = ['./manifest.webmanifest', './farmfax-video-fixture.mp4', './farmfax-qr.svg']
 
 self.addEventListener('install', (event) => {
