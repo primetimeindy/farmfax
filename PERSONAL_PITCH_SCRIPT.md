@@ -80,7 +80,7 @@ Say:
 
 > In this hackathon prototype, the browser photo checks, real-photo overlays, video-frame sampling, scoring, JSON export, PDF print flow, QR share, and phone-installable app are live.
 
-> Hermes is the orchestration layer we would use in production: capture completeness, model routing, provenance, export, and payment handoff. Nemotron is the natural next step for deeper multimodal reasoning over photos, defect crops, OCR, and structured inspection notes. Stripe powers the hosted report business model — seller links, dealer branding, expert review, and subscriptions — without locking up the buyer’s core JSON/PDF report.
+> Hermes is the operations layer we would use in production: capture completeness, model routing, overclaim challenges, provenance, export, payment handoff, and follow-up tasks. NVIDIA NIM is the natural trust gate for photos, defect crops, OCR, missing proof, and structured inspection notes. Stripe powers the business rail — paid reports, verified listings, seller links, expert review, subscriptions, and inspector/agent payouts — without locking up the buyer’s core JSON/PDF report.
 
 ### 4:10 — Guardrails / close
 

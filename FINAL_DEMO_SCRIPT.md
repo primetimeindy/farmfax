@@ -90,7 +90,7 @@ Scroll to **Judge proof** and **For judges: demo trace**.
 
 Say:
 
-> “This is where we keep the sponsor story honest. The browser photo and video checks are working in the demo. Hermes orchestration and Nemotron reasoning are labeled as planned backend seams. Stripe is represented by a simulated hosted-report modal. The JSON says the same thing.”
+> “This is where we keep the sponsor story honest. The browser photo and video checks are working in the demo. Hermes orchestration and NVIDIA NIM vision are labeled as planned backend seams. Stripe is represented by a simulated hosted-report modal. The JSON says the same thing.”
 
 Point to:
 
@@ -124,13 +124,13 @@ Then show:
 
 Say:
 
-> “Stripe monetizes hosted report links, seller share pages, dealer branding, and expert review — but export remains available without paying. The business model is workflow, not data captivity.”
+> “Stripe monetizes the business workflow: paid reports, verified listings, hosted report links, expert review, and inspector or agent payouts — but export remains available without paying. The model is trust infrastructure, not data captivity.”
 
 ## 3:45 — Sponsor close
 
 Say:
 
-> “For Hermes, FarmFax is physical-world workflow orchestration: capture, evidence checks, reasoning, export, and commerce. For NVIDIA/Nemotron, it is a multimodal inspection workload. For Stripe, it is paid trust infrastructure for equipment commerce.”
+> “For Hermes and Nous, FarmFax is an agent-run operations loop: capture, evidence checks, overclaim challenges, report generation, payment handoff, and follow-up tasks. For NVIDIA NIM, it is a vision trust gate. For Stripe, it is paid trust infrastructure for equipment commerce.”
 
 ## Final line
 
@@ -148,7 +148,7 @@ Answer:
 
 Answer:
 
-> “The live prototype is a deployed React/Vite app. Capture slots, image/video upload, browser rust/wet/paint checks, selected video-frame sampling, overlays, report scoring, JSON export, print/PDF, QR/share, and the hosted-report modal are implemented. Hermes orchestration and Nemotron reasoning are planned backend seams. Stripe checkout is simulated.”
+> “The live prototype is a deployed React/Vite app. Capture slots, image/video upload, browser rust/wet/paint checks, selected video-frame sampling, overlays, report scoring, JSON export, print/PDF, QR/share, and the hosted-report modal are implemented. Hermes orchestration and NVIDIA NIM vision are planned backend seams. Stripe checkout is simulated.”
 
 ## If judges ask: “What prevents AI slop?”
 

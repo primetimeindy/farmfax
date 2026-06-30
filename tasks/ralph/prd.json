@@ -1,7 +1,7 @@
 {
   "project": "FarmFax",
   "branchName": "main",
-  "description": "Open-source AI-assisted condition report for used farm equipment with phone capture, serial/model cross-reference, NVIDIA/Hermes/Stripe positioning, and anti-vendor-lock portable records.",
+  "description": "Agent-run trust and payments workflow for used farm equipment with phone capture, serial/model cross-reference, NVIDIA NIM/Hermes/Stripe positioning, and anti-vendor-lock portable records.",
   "qualityChecks": [
     "npm run build",
     "browser smoke verification"
@@ -10,10 +10,10 @@
     {
       "id": "US-001",
       "title": "FarmFax strategic shell and sponsor positioning",
-      "description": "As a hackathon judge, I need to immediately understand FarmFax, why NVIDIA/Hermes/Stripe matter, and why this is not vendor-lock slop.",
+      "description": "As a hackathon judge, I need to immediately understand FarmFax, why NVIDIA NIM/Hermes/Stripe matter, and why this is not vendor-lock slop.",
       "acceptanceCriteria": [
         "Hero states AI pre-purchase inspection for farm equipment",
-        "NVIDIA/Nemotron, Hermes, and Stripe each have clear non-forced roles",
+        "NVIDIA NIM, Hermes, and Stripe each have clear non-forced roles",
         "Open-source anti-vendor-lock principle is visible above the fold or in primary flow"
       ],
       "priority": 1,

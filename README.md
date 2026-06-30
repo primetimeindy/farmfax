@@ -1,8 +1,8 @@
 # FarmFax
 
-**Open, evidence-backed condition reports for used farm equipment — built from phone photos and short videos.**
+**An agent-run trust and payments workflow for used farm equipment — built from phone photos and short videos.**
 
-FarmFax helps buyers slow down risky equipment deals before deposit. A buyer or seller captures the views a mechanic would ask for — walkaround, serial/PIN plate, hour meter, hydraulics, tires/tracks, paint/body/welds, and engine bay/cold start — then FarmFax turns that media into a portable buyer risk report with visible findings, confidence, missing proof, seller questions, and open JSON/PDF export.
+FarmFax helps buyers slow down risky equipment deals before deposit. A buyer or seller captures the views a mechanic would ask for — walkaround, serial/PIN plate, hour meter, hydraulics, tires/tracks, paint/body/welds, and engine bay/cold start — then FarmFax turns that media into a portable buyer risk report with visible findings, confidence, missing proof, seller questions, open JSON/PDF export, and paid report/verified-listing rails.
 
 > Carfax tells you what paperwork says happened. FarmFax shows what the machine is telling you right now: evidence, reasoning, missing proof, and buyer leverage.
 
@@ -34,7 +34,7 @@ FarmFax is built for the moment before money moves:
 5. **Buyer risk report** — summary cards cover identity/paperwork, costly repair/safety, proof supplied, hours plausibility, and offer leverage.
 6. **Evidence-linked reasoning** — findings point to a photo/video source, confidence, what it suggests, and what to verify next.
 7. **Open export** — buyer-owned JSON download and browser print/PDF remain available before any paid hosted link.
-8. **Truth-labeled demo seams** — `input_sources` and `demo_truth` separate implemented browser checks from planned Hermes/Nemotron orchestration and simulated Stripe hosting.
+8. **Truth-labeled demo seams** — `input_sources` and `demo_truth` separate implemented browser checks from planned Hermes/NVIDIA NIM orchestration and simulated Stripe hosting.
 
 ## Demo path for judges
 
@@ -69,15 +69,15 @@ https://primetimeindy.github.io/farmfax-demo/sample-report.html
 
 ### Nous Research / Hermes
 
-Hermes is the orchestration layer for the physical-world workflow: capture completeness, media routing, OCR/CV checks, reasoning, provenance, report generation, export, and payment handoff. The static demo labels this path honestly as a planned backend seam.
+Hermes is the agentic operations layer for the physical-world business workflow: capture completeness, media routing, overclaim challenges, OCR/CV checks, reasoning, provenance, report generation, export, payment handoff, and follow-up tasks. The static demo labels this path honestly as a planned backend seam.
 
-### NVIDIA / Nemotron
+### NVIDIA / NIM
 
-FarmFax is naturally multimodal: photos, selected video frames, defect crops, serial/hour OCR, segmentation overlays, and structured inspection reasoning. The hackathon demo uses lightweight browser heuristics; Nemotron/NVIDIA are the production path for stronger multimodal reasoning and accelerated inspection pipelines.
+FarmFax is naturally multimodal: photos, selected video frames, defect crops, serial/hour OCR, segmentation overlays, and structured inspection reasoning. The hackathon demo uses lightweight browser heuristics; NVIDIA NIM is the production trust gate for condition, completeness, visible damage, missing proof, and accelerated inspection pipelines.
 
 ### Stripe
 
-Stripe monetizes trust workflow without locking the record: hosted reports, seller share pages, dealer/shop branding, expert mechanic review, auction/dealer subscriptions, and paid verification. Core JSON/PDF export stays buyer-owned.
+Stripe monetizes trust workflow without locking the record: paid inspection reports, verified listings, hosted reports, seller share pages, dealer/shop branding, expert mechanic review, auction/dealer subscriptions, and Connect payouts for inspectors or agents. Core JSON/PDF export stays buyer-owned.
 
 ## Safety and trust guardrails
 

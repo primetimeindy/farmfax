@@ -75,7 +75,7 @@ const requiredSourceLabels = [
   'module_risk_summary',
   'browser_detector_modules: implemented',
   'trained_cv_models: planned',
-  'nemotron_reasoning_layer: planned',
+  'nvidia_nim_vision_gate: planned',
   'data-qa="report-trust-loop"',
   'Report trust loop',
   'Open JSON preview',

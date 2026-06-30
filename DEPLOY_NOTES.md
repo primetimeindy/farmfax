@@ -92,7 +92,7 @@ Any static host can serve `dist/`:
 
 ## Demo verification checklist after deploy
 
-1. Page title says `FarmFax — Open Equipment Condition Reports`.
+1. Page title says `FarmFax — Agent-Run Equipment Trust Workflow`.
 2. Hero shows FarmFax equipment-check copy.
 3. `Run judge demo` and `Load complete sample` buttons exist.
 4. `Try sample video` runs the bundled video fixture.
@@ -174,7 +174,7 @@ Future production backend work can add:
 
 - OCR for serial/PIN plate and hour meter.
 - NVIDIA-accelerated CV for rust, leaks, paint mismatch, wear, weld repairs, missing guards, and deformation.
-- Nemotron-style structured multi-image and selected-video-frame reasoning.
+- NIM-backed structured multi-image and selected-video-frame reasoning.
 - Hermes/OpenEye-style visual session tracking for pass/fail/uncertain checklist verification.
 - Durable cloud storage for hosted report links.
 - Seller response and mechanic/dealer review workflow.

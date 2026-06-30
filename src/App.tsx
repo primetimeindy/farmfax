@@ -210,8 +210,8 @@ type FarmFaxReport = {
     browser_detector_modules: 'implemented'
     trained_cv_models: 'planned'
     hermes_orchestration: 'planned'
-    nemotron_reasoning_layer: 'planned'
-    nemotron_reasoning: 'planned'
+    nvidia_nim_vision_gate: 'planned'
+    nvidia_nim_reasoning: 'planned'
     stripe_checkout: 'simulated'
     unsupported_claims: string[]
   }
@@ -223,7 +223,7 @@ type FarmFaxReport = {
   proof_intelligence: {
     'browser_detector_modules: implemented': boolean
     'trained_cv_models: planned': boolean
-    'nemotron_reasoning_layer: planned': boolean
+    'nvidia_nim_vision_gate: planned': boolean
     challenge: string
   }
   mechanic_handoff_summary: string[]
@@ -272,22 +272,22 @@ const catalogCandidates: CatalogCandidate[] = [
 
 const architectureStack = [
   {
-    name: 'Hermes workflow',
-    role: 'Physical-world workflow orchestration',
+    name: 'Hermes / Nous agent workflow',
+    role: 'Agent-run equipment diligence operations',
     status: 'planned backend seam' as const,
-    line: 'Routes capture → evidence check → overclaim challenge → buyer report → export / hosted handoff.',
+    line: 'Guides capture → evaluates evidence → challenges overclaims → generates the buyer report → routes export, payment, and handoff.',
   },
   {
-    name: 'Multimodal reasoning',
-    role: 'Photo, OCR-ready, and video-frame inspection path',
+    name: 'NVIDIA NIM vision gate',
+    role: 'Photo, OCR-ready, and video-frame trust inspection',
     status: 'planned backend seam' as const,
-    line: 'Upgrades browser heuristics into GPU-accelerated CV and structured reasoning over photos, serial plates, hour meters, and selected video frames.',
+    line: 'Upgrades browser heuristics into a NIM-backed inspection gate for condition, completeness, visible damage, serial/hour evidence, and missing proof.',
   },
   {
-    name: 'Hosted report commerce',
-    role: 'Paid trust infrastructure for equipment transactions',
+    name: 'Stripe business rail',
+    role: 'Checkout, PaymentIntents, Connect, and payouts',
     status: 'simulated commerce seam' as const,
-    line: 'Monetizes hosted report links, seller share pages, dealer branding, and expert review while keeping JSON/PDF export buyer-owned.',
+    line: 'Turns reports, verified listings, expert reviews, and inspector/agent work into paid workflows while keeping JSON/PDF export buyer-owned.',
   },
 ]
 
@@ -1348,8 +1348,8 @@ function App() {
       browser_detector_modules: 'implemented',
       trained_cv_models: 'planned',
       hermes_orchestration: 'planned',
-      nemotron_reasoning_layer: 'planned',
-      nemotron_reasoning: 'planned',
+      nvidia_nim_vision_gate: 'planned',
+      nvidia_nim_reasoning: 'planned',
       stripe_checkout: 'simulated',
       unsupported_claims: [
         'mechanical certification',
@@ -1377,7 +1377,7 @@ function App() {
     proof_intelligence: {
       'browser_detector_modules: implemented': true,
       'trained_cv_models: planned': true,
-      'nemotron_reasoning_layer: planned': true,
+      'nvidia_nim_vision_gate: planned': true,
       challenge: 'Detector module outputs are exported as buyer decision support, not as mechanical certification.',
     },
     mechanic_handoff_summary: mechanicHandoffSummary,
@@ -1957,7 +1957,7 @@ function App() {
           <div className="demo-badge">Real report mode · browser analysis · no backend required</div>
           <h1>Start. Capture. Download.</h1>
           <p className="lede">
-            FarmFax is now a three-step report flow: start a report, take tractor photos/video, download the PDF with score and exact evidence callouts.
+            FarmFax is an agent-operated trust and payments workflow: capture tractor evidence, challenge weak claims, generate a scored PDF, and hand off paid reports or verified listings.
           </p>
           <div className="hero-actions primary-actions">
             <button onClick={startNewReportFlow}>Start Report</button>
@@ -2008,7 +2008,7 @@ function App() {
         <article>
           <span>04</span>
           <b>Buyer-owned report</b>
-          <p>Export JSON/PDF before paying for optional hosted sharing. No data lock-in.</p>
+          <p>Export JSON/PDF before paying for hosted sharing, verified listings, expert review, or inspector/agent payouts.</p>
         </article>
       </section>
 
@@ -2362,7 +2362,7 @@ function App() {
         <div>
           <span className="section-label">Detector module intelligence in export</span>
           <h2>Proof export now carries the detector reasoning.</h2>
-          <p>The JSON report includes detector_modules, module_risk_summary, seller_questions_from_detectors, and proof_intelligence. Challenge: browser modules are implemented now; trained CV models and the Nemotron reasoning layer remain planned.</p>
+          <p>The JSON report includes detector_modules, module_risk_summary, seller_questions_from_detectors, and proof_intelligence. Challenge: browser modules are implemented now; trained CV models and the NVIDIA NIM vision gate remain planned.</p>
         </div>
         <div className="intel-grid">
           <article>
@@ -2378,7 +2378,7 @@ function App() {
           <article>
             <span>proof_intelligence</span>
             <b>browser_detector_modules: implemented</b>
-            <small>trained_cv_models: planned · nemotron_reasoning_layer: planned</small>
+            <small>trained_cv_models: planned · nvidia_nim_vision_gate: planned</small>
           </article>
         </div>
       </section>
@@ -2671,8 +2671,8 @@ function App() {
         <div className="judge-proof-grid">
           <article data-qa="judge-proof-item"><b>Browser evidence pass</b><p>Photo heuristics and selected video-frame sampling run in the demo.</p></article>
           <article data-qa="judge-proof-item"><b>Buyer-owned export</b><p>JSON and PDF remain available before any paid hosted link.</p></article>
-          <article data-qa="judge-proof-item"><b>Hermes orchestration seam</b><p>Capture → evidence check → report → export / hosted link is the planned route.</p></article>
-          <article data-qa="judge-proof-item"><b>Honest truth labels</b><p>Multimodal reasoning is planned, checkout is simulated, and unsupported claims are listed in JSON.</p></article>
+          <article data-qa="judge-proof-item"><b>Agent operations seam</b><p>Hermes routes capture → evidence check → overclaim challenge → report → payment handoff.</p></article>
+          <article data-qa="judge-proof-item"><b>Honest truth labels</b><p>NVIDIA NIM vision and Stripe checkout are marked as seams; unsupported claims are listed in JSON.</p></article>
         </div>
         <div className="defense-panel" data-qa="defense-panel">
           <article>
@@ -2798,7 +2798,7 @@ function App() {
             <div className="modal-topline"><span>Hosted report demo</span><button className="ghost" onClick={() => setStripeOpen(false)}>close</button></div>
             <div className="stripe-word">FarmFax</div>
             <h2>Save your FarmFax report</h2>
-            <p>Free export stays yours. The paid option creates a clean hosted link for seller follow-up, mechanic review, lender sharing, or partner approval. Checkout is simulated in this demo and does not certify the machine.</p>
+            <p>Free export stays yours. The paid option creates a clean hosted link for seller follow-up, mechanic review, verified-listing upgrades, inspector/agent payouts, lender sharing, or partner approval. Checkout is simulated in this demo and does not certify the machine.</p>
             <div className="receipt">
               <span>Report</span><b>{report.report_id}</b>
               <span>Price</span><b>$29.00</b>

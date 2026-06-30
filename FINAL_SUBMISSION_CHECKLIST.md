@@ -7,7 +7,7 @@
 - [x] React/Vite production build passes with `npm run build`.
 - [x] Demo verification passes with `npm run verify:demo`.
 - [x] GitHub Actions runs `npm run verify:demo` on push/PR.
-- [x] App title is FarmFax: `FarmFax — Open Equipment Condition Reports`.
+- [x] App title is FarmFax: `FarmFax — Agent-Run Equipment Trust Workflow`.
 - [x] Main UI is FarmFax, not old concepts.
 - [x] Old ParcelProof/Revenue Forge/land concept docs are quarantined under `archive/old-concepts/`.
 
@@ -62,25 +62,25 @@
 - Shows what is working now and what Hermes would orchestrate next.
 - Produces durable proof artifacts with explicit limits.
 
-### NVIDIA / Nemotron
+### NVIDIA / NIM
 
 - Multimodal inspection workload: photos, selected video frames, overlays, OCR-ready serial/hour evidence, checklist completeness, and structured reasoning.
-- Clear upgrade path from browser heuristics to GPU-accelerated CV and Nemotron-generated structured reports.
+- Clear upgrade path from browser heuristics to a NIM-backed vision trust gate and structured reports.
 - Physical economy use case with recurring inference demand.
 
 ### Stripe
 
-- Hosted report links, seller share pages, dealer/shop branding, expert review, and subscription workflow.
+- Paid reports, verified listings, hosted report links, seller share pages, dealer/shop branding, expert review, subscriptions, and inspector/agent payouts.
 - Paid workflow does not gate core JSON/PDF export.
 - Clean business model for trust infrastructure in equipment commerce.
 
 ## Submission one-liner
 
-FarmFax turns guided phone photos and short videos into an open, evidence-backed buyer risk report for used farm equipment — visible-condition scoring, identity/hour evidence, safety flags, missing proof, leverage questions, JSON/PDF export, and Stripe-hosted sharing without data lock-in.
+FarmFax turns used-equipment field evidence into an agent-run trust workflow — guided capture, vision-gated review, buyer risk report, owner questions, paid report delivery, verified listings, JSON/PDF export, and payout-ready inspection work.
 
 ## Winning narrative
 
-Used farm equipment is bought through trust gaps: listings are incomplete, inspections are inconsistent, records are fragmented, and a bad purchase can cost tens of thousands of dollars. FarmFax starts with the buyer’s phone and creates a portable evidence layer: what was captured, what visible defects were found, how confident the system is, what is missing, and what the buyer should ask next. It is not a fake certification; it is a practical, open, extensible inspection report that makes the market more trustworthy.
+Used farm equipment is bought through trust gaps: listings are incomplete, inspections are inconsistent, records are fragmented, and a bad purchase can cost tens of thousands of dollars. FarmFax starts with the buyer’s phone and creates an agent-operated trust layer: what was captured, what visible defects were found, how confident the system is, what is missing, what the buyer should ask next, and how paid follow-up work moves through Stripe.
 
 ## Safety copy
 
@@ -90,7 +90,7 @@ FarmFax is an AI-assisted screening aid, not a certified mechanic inspection, ti
 
 1. Add real OCR pipeline for serial/PIN plates, hour meters, model decals, and service documents.
 2. Add NVIDIA-accelerated defect detection for rust, leaks, weld repairs, tire/track wear, missing guards, and frame/bucket deformation.
-3. Add structured Nemotron report generation from multi-image/video-frame evidence.
+3. Add structured NIM-backed report generation from multi-image/video-frame evidence.
 4. Add Hermes/OpenEye-style visual session tracking for pass/fail/uncertain capture-step verification.
 5. Add open report schema package and self-hosted API.
 6. Add seller response workflow and mechanic/dealer review via Stripe Checkout.
