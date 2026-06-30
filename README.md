@@ -1,8 +1,8 @@
 # FarmFax
 
-**An agent-run trust and payments workflow for used farm equipment — built from phone photos and short videos.**
+**An evidence-backed trust workflow for used farm equipment — built from phone photos and short videos.**
 
-FarmFax helps buyers slow down risky equipment deals before deposit. A buyer or seller captures the views a mechanic would ask for — walkaround, serial/PIN plate, hour meter, hydraulics, tires/tracks, paint/body/welds, and engine bay/cold start — then FarmFax turns that media into a portable buyer risk report with visible findings, confidence, missing proof, seller questions, open JSON/PDF export, and paid report/verified-listing rails.
+FarmFax helps buyers slow down risky equipment deals before deposit. A buyer or seller captures the views a mechanic would ask for — walkaround, serial/PIN plate, hour meter, hydraulics, tires/tracks, paint/body/welds, and engine bay/cold start — then FarmFax turns that media into a portable buyer risk report with visible findings, confidence, missing proof, seller questions, open JSON/PDF export, and clearly labeled planned commerce rails.
 
 > Carfax tells you what paperwork says happened. FarmFax shows what the machine is telling you right now: evidence, reasoning, missing proof, and buyer leverage.
 
@@ -69,7 +69,7 @@ https://primetimeindy.github.io/farmfax-demo/sample-report.html
 
 ### Nous Research / Hermes
 
-Hermes is the agentic operations layer for the physical-world business workflow: capture completeness, media routing, overclaim challenges, OCR/CV checks, reasoning, provenance, report generation, export, payment handoff, and follow-up tasks. The static demo labels this path honestly as a planned backend seam.
+Hermes is the planned agentic operations layer for the physical-world business workflow: capture completeness, media routing, overclaim challenges, OCR/CV checks, reasoning, provenance, report generation, export, payment handoff, and follow-up tasks. The static demo labels this path honestly as a planned backend seam.
 
 ### NVIDIA / NIM
 
@@ -77,7 +77,7 @@ FarmFax is naturally multimodal: photos, selected video frames, defect crops, se
 
 ### Stripe
 
-Stripe monetizes trust workflow without locking the record: paid inspection reports, verified listings, hosted reports, seller share pages, dealer/shop branding, expert mechanic review, auction/dealer subscriptions, and Connect payouts for inspectors or agents. Core JSON/PDF export stays buyer-owned.
+Stripe is the planned commerce rail for monetizing trust workflow without locking the record: paid inspection reports, verified listings, hosted reports, seller share pages, dealer/shop branding, expert mechanic review, auction/dealer subscriptions, and Connect payouts for inspectors or agents. The current demo uses a simulated hosted-report modal; core JSON/PDF export stays buyer-owned.
 
 ## Safety and trust guardrails
 

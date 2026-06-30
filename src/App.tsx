@@ -287,7 +287,7 @@ const architectureStack = [
     name: 'Stripe business rail',
     role: 'Checkout, PaymentIntents, Connect, and payouts',
     status: 'simulated commerce seam' as const,
-    line: 'Turns reports, verified listings, expert reviews, and inspector/agent work into paid workflows while keeping JSON/PDF export buyer-owned.',
+    line: 'Planned commerce rail for reports, verified listings, expert reviews, and inspector/agent work while keeping JSON/PDF export buyer-owned.',
   },
 ]
 
@@ -1957,7 +1957,7 @@ function App() {
           <div className="demo-badge">Real report mode · browser analysis · no backend required</div>
           <h1>Start. Capture. Download.</h1>
           <p className="lede">
-            FarmFax is an agent-operated trust and payments workflow: capture tractor evidence, challenge weak claims, generate a scored PDF, and hand off paid reports or verified listings.
+            FarmFax turns tractor evidence into a buyer trust workflow: challenge weak claims, generate a scored PDF, and show planned commerce handoffs without pretending checkout is live.
           </p>
           <div className="hero-actions primary-actions">
             <button onClick={startNewReportFlow}>Start Report</button>
@@ -2008,7 +2008,7 @@ function App() {
         <article>
           <span>04</span>
           <b>Buyer-owned report</b>
-          <p>Export JSON/PDF before paying for hosted sharing, verified listings, expert review, or inspector/agent payouts.</p>
+          <p>Export JSON/PDF first. Hosted sharing, verified listings, expert review, and payouts are marked as planned commerce seams.</p>
         </article>
       </section>
 

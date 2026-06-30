@@ -18,7 +18,7 @@ https://github.com/primetimeindy/farmfax
 
 ## One-liner
 
-FarmFax turns used-equipment field evidence into an agent-run trust workflow: guided capture, vision-gated evidence review, buyer risk report, owner questions, paid report delivery, verified-listing upgrades, and payout-ready inspection work.
+FarmFax turns used-equipment field evidence into a buyer trust workflow: guided capture, vision-gated evidence review, buyer risk report, owner questions, and explicitly labeled planned commerce handoffs for paid reports, verified listings, and inspection work.
 
 ## Problem
 
@@ -36,7 +36,7 @@ Generic chatbots can summarize a listing. They do not run an inspection business
 
 ## Solution
 
-FarmFax makes the phone the inspection device, the report the proof artifact, and Stripe the commerce rail for monetizing trust.
+FarmFax makes the phone the inspection device, the report the proof artifact, and a simulated Stripe-style modal the honest commerce seam for monetizing trust.
 
 The live prototype guides a buyer or seller through the views a mechanic would ask for:
 
@@ -67,7 +67,7 @@ The report is intentionally more like a vehicle-history report than a chatbot an
 - JSON export containing `input_sources`, `demo_truth`, `unsupported_claims`, `visual_analysis`, `risk_summary`, and `buyer_questions`.
 - Print/PDF path.
 - QR/share block for phone viewing.
-- Stripe-style hosted report modal for paid reports, verified listings, and inspector/agent payouts.
+- Stripe-style hosted report modal showing planned paid reports, verified listings, and inspector/agent payouts.
 - CI verification through `npm run verify:demo`.
 
 ## Demo path
@@ -84,7 +84,7 @@ The report is intentionally more like a vehicle-history report than a chatbot an
 
 ## Why it matters for Nous Research / Hermes
 
-FarmFax demonstrates Hermes as an agentic operations layer for a real business workflow. In production, Hermes coordinates capture completeness, evidence routing, overclaim challenges, OCR/CV checks, provenance, report generation, export, payment handoff, and follow-up tasks for sellers, buyers, mechanics, or inspectors. The demo labels this honestly: browser checks are implemented; Hermes orchestration is a planned backend seam.
+FarmFax demonstrates Hermes as an agentic operations layer for a real business workflow. In production, Hermes would coordinate capture completeness, evidence routing, overclaim challenges, OCR/CV checks, provenance, report generation, export, payment handoff, and follow-up tasks for sellers, buyers, mechanics, or inspectors. The demo labels this honestly: browser checks are implemented; Hermes orchestration is a planned backend seam.
 
 ## Why it matters for NVIDIA / NIM
 
@@ -92,7 +92,7 @@ FarmFax is a multimodal inspection workload: photos, selected video frames, defe
 
 ## Why it matters for Stripe
 
-Stripe monetizes the trust workflow without creating a data prison. Paid products include inspection reports, verified listings, hosted report links, seller share pages, dealer/shop branding, expert mechanic review, auction/dealer subscriptions, and Connect payouts for inspectors or agents. The core JSON/PDF report remains buyer-owned before payment.
+Stripe is the planned commerce rail for monetizing the trust workflow without creating a data prison. The demo shows a simulated hosted-report checkout seam for future inspection reports, verified listings, hosted report links, seller share pages, dealer/shop branding, expert mechanic review, auction/dealer subscriptions, and Connect payouts for inspectors or agents. The core JSON/PDF report remains buyer-owned before payment.
 
 ## Open-source angle
 
@@ -121,7 +121,7 @@ The wedge starts with buyer trust before deposit. The expansion is dealer workfl
 
 ## Winning narrative
 
-Farm equipment commerce runs on trust gaps. Listings are messy, repairs are expensive, and records live in silos. FarmFax starts where the buyer already is — phone in hand, standing next to a machine or looking at a listing — and turns that moment into an agent-operated trust and payments workflow.
+Farm equipment commerce runs on trust gaps. Listings are messy, repairs are expensive, and records live in silos. FarmFax starts where the buyer already is — phone in hand, standing next to a machine or looking at a listing — and turns that moment into a trust workflow with explicitly labeled payment seams.
 
 ## Final closing line
 

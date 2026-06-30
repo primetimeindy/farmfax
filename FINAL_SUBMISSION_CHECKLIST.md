@@ -7,7 +7,7 @@
 - [x] React/Vite production build passes with `npm run build`.
 - [x] Demo verification passes with `npm run verify:demo`.
 - [x] GitHub Actions runs `npm run verify:demo` on push/PR.
-- [x] App title is FarmFax: `FarmFax — Agent-Run Equipment Trust Workflow`.
+- [x] App title is FarmFax: `FarmFax — Equipment Trust Workflow`.
 - [x] Main UI is FarmFax, not old concepts.
 - [x] Old ParcelProof/Revenue Forge/land concept docs are quarantined under `archive/old-concepts/`.
 
@@ -76,11 +76,11 @@
 
 ## Submission one-liner
 
-FarmFax turns used-equipment field evidence into an agent-run trust workflow — guided capture, vision-gated review, buyer risk report, owner questions, paid report delivery, verified listings, JSON/PDF export, and payout-ready inspection work.
+FarmFax turns used-equipment field evidence into a buyer trust workflow — guided capture, vision-gated review, buyer risk report, owner questions, JSON/PDF export, and clearly labeled planned commerce seams for paid reports, verified listings, and inspection work.
 
 ## Winning narrative
 
-Used farm equipment is bought through trust gaps: listings are incomplete, inspections are inconsistent, records are fragmented, and a bad purchase can cost tens of thousands of dollars. FarmFax starts with the buyer’s phone and creates an agent-operated trust layer: what was captured, what visible defects were found, how confident the system is, what is missing, what the buyer should ask next, and how paid follow-up work moves through Stripe.
+Used farm equipment is bought through trust gaps: listings are incomplete, inspections are inconsistent, records are fragmented, and a bad purchase can cost tens of thousands of dollars. FarmFax starts with the buyer’s phone and creates an evidence-backed trust layer: what was captured, what visible defects were found, how confident the system is, what is missing, what the buyer should ask next, and where planned paid follow-up work would move through Stripe.
 
 ## Safety copy
 

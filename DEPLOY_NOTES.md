@@ -92,7 +92,7 @@ Any static host can serve `dist/`:
 
 ## Demo verification checklist after deploy
 
-1. Page title says `FarmFax — Agent-Run Equipment Trust Workflow`.
+1. Page title says `FarmFax — Equipment Trust Workflow`.
 2. Hero shows FarmFax equipment-check copy.
 3. `Run judge demo` and `Load complete sample` buttons exist.
 4. `Try sample video` runs the bundled video fixture.

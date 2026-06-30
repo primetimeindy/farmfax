@@ -124,13 +124,13 @@ Then show:
 
 Say:
 
-> “Stripe monetizes the business workflow: paid reports, verified listings, hosted report links, expert review, and inspector or agent payouts — but export remains available without paying. The model is trust infrastructure, not data captivity.”
+> “The Stripe seam shows how this workflow can become paid trust infrastructure: reports, verified listings, hosted links, expert review, and inspector or agent payouts — while export remains available without paying. The demo marks checkout as simulated.”
 
 ## 3:45 — Sponsor close
 
 Say:
 
-> “For Hermes and Nous, FarmFax is an agent-run operations loop: capture, evidence checks, overclaim challenges, report generation, payment handoff, and follow-up tasks. For NVIDIA NIM, it is a vision trust gate. For Stripe, it is paid trust infrastructure for equipment commerce.”
+> “For Hermes and Nous, FarmFax is an operations loop: capture, evidence checks, overclaim challenges, report generation, payment handoff, and follow-up tasks. For NVIDIA NIM, it is the planned vision trust gate. For Stripe, it is the planned paid trust infrastructure for equipment commerce.”
 
 ## Final line
 

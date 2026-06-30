@@ -1,6 +1,6 @@
 # FarmFax llms.txt
 
-FarmFax is a Hermes-powered inspection agent for used farm equipment. It turns field evidence into buyer-ready reports with findings, risks, owner questions, and a buy/skip score.
+FarmFax is a Hermes-powered inspection workflow for used farm equipment. It turns field evidence into buyer-ready reports with findings, risks, owner questions, and a buy/skip score. Sponsor integrations that are not live in the browser demo are labeled as planned or simulated seams.
 
 Canonical site: https://primetimeindy.github.io/farmfax-demo/
 How it works: https://primetimeindy.github.io/farmfax-demo/how-it-works/
@@ -33,13 +33,13 @@ FarmFax produces:
 ## Sponsor rails
 
 Nous / Hermes / Agents:
-FarmFax uses Hermes Agent and Nous Research models to orchestrate the inspection workflow: guide capture, evaluate evidence, challenge overclaims, separate observed facts from assumptions, and generate the buyer report.
+FarmFax uses Hermes-style orchestration to structure the inspection workflow: guide capture, evaluate evidence, challenge overclaims, separate observed facts from assumptions, and generate the buyer report.
 
 NVIDIA:
-FarmFax uses the NVIDIA NIM vision rail as the inspection gate for photos and videos: condition review, completeness checks, visible damage review, serial/hour proof readiness, and missing-proof confidence.
+NVIDIA NIM is the planned production vision gate for photos and videos: condition review, completeness checks, visible damage review, serial/hour proof readiness, and missing-proof confidence.
 
 Stripe:
-FarmFax uses Stripe Checkout, PaymentIntents, and Connect as the payment rail for inspection reports, verified listings, expert review, and payout-ready inspection work by people or agents.
+Stripe Checkout, PaymentIntents, and Connect are planned commerce rails for inspection reports, verified listings, expert review, and payout-ready inspection work by people or agents. The browser demo uses a simulated hosted-report modal.
 
 ## Agent operating contract
 
