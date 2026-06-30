@@ -1,0 +1,164 @@
+# FarmFax llms.txt
+
+FarmFax is a Hermes-powered inspection agent for used farm equipment. It turns field evidence into buyer-ready reports with findings, risks, owner questions, and a buy/skip score.
+
+Canonical site: https://primetimeindy.github.io/farmfax-demo/
+How it works: https://primetimeindy.github.io/farmfax-demo/how-it-works/
+For agents: https://primetimeindy.github.io/farmfax-demo/for-agents/
+Machine-readable instructions: https://primetimeindy.github.io/farmfax-demo/llms.txt
+
+## What FarmFax does
+
+FarmFax helps buyers and sellers collect structured evidence for used equipment diligence:
+
+- walkaround media
+- engine bay and running-status proof
+- tires and tread evidence
+- hydraulics, hoses, cylinders, and leak signals
+- serial plate and hour meter proof
+- paint, body, weld, rust, and repair-history signals
+- explicit skipped or missing evidence
+
+FarmFax produces:
+
+- evidence-linked findings
+- buyer risk summary
+- owner follow-up questions
+- missing-proof list
+- before-deposit checklist
+- JSON export
+- PDF-style buyer report
+- buy/skip score
+
+## Sponsor rails
+
+Nous / Hermes / Agents:
+FarmFax uses Hermes Agent and Nous Research models to orchestrate the inspection workflow: guide capture, evaluate evidence, challenge overclaims, separate observed facts from assumptions, and generate the buyer report.
+
+NVIDIA:
+FarmFax uses the NVIDIA NIM vision rail as the inspection gate for photos and videos: condition review, completeness checks, visible damage review, serial/hour proof readiness, and missing-proof confidence.
+
+Stripe:
+FarmFax uses Stripe Checkout, PaymentIntents, and Connect as the payment rail for inspection reports, verified listings, expert review, and payout-ready inspection work by people or agents.
+
+## Agent operating contract
+
+Agents may:
+
+1. Read this file before interacting with FarmFax.
+2. Create a buyer capture session.
+3. Submit media metadata and detector outputs.
+4. Generate or persist report payloads.
+5. Create seller, mechanic, dealer, or buyer handoffs.
+6. Use missing evidence as an explicit owner question.
+7. Treat FarmFax as decision support only.
+
+Agents must not:
+
+- claim FarmFax certifies equipment
+- claim title status, lien status, theft status, warranty, appraisal, or safety certification
+- invent an hour meter reading, serial number, cold start, hydraulic test, or running proof
+- hide skipped or missing evidence
+- recommend a non-refundable deposit when critical proof is missing
+- imply hidden mechanical diagnosis from photos alone
+- submit copyrighted, unrelated, or misleading media as equipment evidence
+
+If evidence is missing, say it is missing. Convert it into a seller question.
+
+## API routes
+
+When the FarmFax backend is running, agents use these routes:
+
+GET /health
+Purpose: service status and version.
+
+GET /api/openapi.json
+Purpose: machine-readable API contract.
+
+POST /api/sessions
+Purpose: create a buyer capture session.
+Example body:
+{
+  "equipment_type": "tractor",
+  "buyer_id": "agent-or-human-id",
+  "source": "agent"
+}
+
+GET /api/sessions/{session_id}
+Purpose: fetch a capture session.
+
+POST /api/sessions/{session_id}/media
+Purpose: attach photo, video, or document metadata.
+Example body:
+{
+  "slot": "engine",
+  "media_type": "photo",
+  "filename": "engine-bay.jpg",
+  "sha256": "optional-file-hash",
+  "detector_outputs": [
+    { "name": "wet-mask segmentation module", "score": 0.72, "output": "possible wet/leak signal" }
+  ],
+  "notes": ["Engine bay visible. Cold start not supplied."]
+}
+
+POST /api/sessions/{session_id}/handoff
+Purpose: create seller, mechanic, dealer, or buyer handoff.
+Example body:
+{
+  "recipient_type": "mechanic",
+  "report_id": "farmfax-report-id",
+  "notes": ["Verify hydraulic function and confirm cold start."],
+  "checklist": ["serial plate", "hour meter", "cold start", "hydraulic test"]
+}
+
+POST /api/analyze
+Purpose: validate and summarize a FarmFax report payload.
+
+POST /api/reports
+Purpose: persist a FarmFax report payload.
+
+GET /api/reports/{report_id}
+Purpose: fetch a persisted report.
+
+POST /api/reports/{report_id}/share
+Purpose: create a share-link record.
+
+## Required report truth fields
+
+A valid report should include:
+
+- report_id
+- schema_version
+- generated_at
+- report_source
+- demo_mode
+- equipment_type
+- serial_number or unknown marker
+- hour_meter_status
+- running_status
+- input_sources
+- submitted_media
+- findings
+- risk_summary
+- buyer_questions
+- missing_evidence
+- before_deposit_checklist
+- proof_intelligence
+- demo_truth
+- system_integrations
+
+## Recommended agent response format
+
+When summarizing a FarmFax result, use:
+
+1. Verdict: buy, negotiate, or skip.
+2. Confidence: high, medium, or low.
+3. Top evidence supplied.
+4. Top missing proof.
+5. Buyer risks.
+6. Owner questions.
+7. Before-deposit action.
+
+## Truth statement
+
+FarmFax is evidence-bound decision support for used equipment buying. It is not a certified inspection, mechanic diagnosis, appraisal, warranty, title search, lien search, theft search, or safety certification.

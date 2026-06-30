@@ -19,6 +19,9 @@ const requiredFiles = [
   'public/sample-photos/engine-bay.jpg',
   'public/sample-photos/ATTRIBUTION.md',
   'public/sample-report.html',
+  'public/how-it-works/index.html',
+  'public/for-agents/index.html',
+  'public/llms.txt',
   'src/App.tsx',
 ]
 const requiredSourceLabels = [
@@ -193,6 +196,12 @@ const requiredSourceLabels = [
   'Analyzing photos and videos before building the PDF',
   'Sampling ${sampledFrameCount} selected video frame',
   'Building buyer score, seller questions, and the PDF evidence packet',
+  'data-qa="how-it-works-link"',
+  'data-qa="for-agents-link"',
+  'data-qa="llms-link"',
+  'How it works',
+  'For agents',
+  'llms.txt',
 ]
 
 const rejectedSourceLabels = [
@@ -263,5 +272,23 @@ for (const snippet of ['FarmFax Sample Report', 'Evidence-linked findings', 'Hyd
   if (!sampleReport.includes(snippet)) throw new Error(`sample report missing ${snippet}`)
 }
 console.log('ok standalone sample report has evidence-linked photo/video reasoning')
+
+const howItWorks = await readFile(new URL('public/how-it-works/index.html', root), 'utf8')
+for (const snippet of ['Anyone records. FarmFax inspects. Buyers get proof.', 'Nous / Hermes / Agents', 'NVIDIA', 'Stripe', 'Evidence support, not mechanical certification']) {
+  if (!howItWorks.includes(snippet)) throw new Error(`how-it-works page missing ${snippet}`)
+}
+console.log('ok how-it-works page explains sponsor rails and truth layer')
+
+const forAgents = await readFile(new URL('public/for-agents/index.html', root), 'utf8')
+for (const snippet of ['For autonomous inspection agents', 'GET /api/openapi.json', 'POST /api/sessions', 'Do not fake certainty']) {
+  if (!forAgents.includes(snippet)) throw new Error(`for-agents page missing ${snippet}`)
+}
+console.log('ok for-agents page documents agent workflow and API surface')
+
+const llms = await readFile(new URL('public/llms.txt', root), 'utf8')
+for (const snippet of ['FarmFax llms.txt', 'Agent operating contract', 'GET /api/openapi.json', 'Truth statement', 'must not']) {
+  if (!llms.includes(snippet)) throw new Error(`llms.txt missing ${snippet}`)
+}
+console.log('ok llms.txt exposes machine-readable agent contract')
 
 console.log('FarmFax demo verification passed')

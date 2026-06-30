@@ -1926,6 +1926,9 @@ function App() {
           <a href="#custom-session">Start Report</a>
           <a href="#capture">Capture</a>
           <a href="#report">PDF / Score</a>
+          <a href={assetUrl('/how-it-works/')}>How it works</a>
+          <a href={assetUrl('/for-agents/')}>For agents</a>
+          <a href={assetUrl('/llms.txt')}>llms.txt</a>
         </nav>
       </header>
 
@@ -1969,6 +1972,9 @@ function App() {
             <button className="ghost" data-qa="sample-inspection-button" onClick={() => void runCompleteSampleInspection()} disabled={isSampleVideoLoading}>
               Load complete sample
             </button>
+            <a className="ghost judge-resource-link" data-qa="how-it-works-link" href={assetUrl('/how-it-works/')}>How it works</a>
+            <a className="ghost judge-resource-link" data-qa="for-agents-link" href={assetUrl('/for-agents/')}>For agents</a>
+            <a className="ghost judge-resource-link" data-qa="llms-link" href={assetUrl('/llms.txt')}>llms.txt</a>
           </div>
         </div>
         <aside className="summary-card machine-card">
