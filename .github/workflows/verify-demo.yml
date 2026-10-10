@@ -25,3 +25,6 @@ jobs:
 
       - name: Verify demo
         run: npm run verify:demo
+
+      - name: Service worker regression tests (offline)
+        run: node --test scripts/service-worker.test.mjs
